@@ -5,9 +5,9 @@
 #   --crop : evaluate with robot-bbox crop (use a crop-trained detector+head). Optional.
 # Env: pins GPU2 by default (override CUDA_VISIBLE_DEVICES before calling).
 set -u
-cd /data/public/NAS/DINObotPose3/Eval
-export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-GPU-05f84104-40d4-c675-91bf-5427bc0fd5e9}
-export HF_HOME=/data/public/97_cache
+cd "$(dirname "$(readlink -f "$0")")"
+export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-1}
+[ -d /data/public/97_cache ] && export HF_HOME=/data/public/97_cache
 
 HEAD="$1"; LABEL="$2"; CROP=""; MAXF=300
 shift 2
