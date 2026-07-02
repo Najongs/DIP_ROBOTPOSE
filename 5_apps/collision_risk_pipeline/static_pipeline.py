@@ -186,7 +186,7 @@ def main() -> None:
     parser.add_argument("--image", required=True, help="Input image path")
     parser.add_argument(
         "--robot-checkpoint",
-        default="/home/najo/NAS/DIP/Fr5_robot_SegFormer/best_segformer_robot_arm.pth",
+        default="/home/najo/NAS/DIP/4_perception/Fr5_robot_SegFormer/best_segformer_robot_arm.pth",
         help="SegFormer robot checkpoint path",
     )
     parser.add_argument("--human-model", default="yolov8n-seg.pt", help="Ultralytics person segmentation model")

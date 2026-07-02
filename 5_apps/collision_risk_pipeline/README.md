@@ -20,11 +20,11 @@ The current default is intentionally 2D and fast. Depth is kept optional because
 From `/home/najo/NAS/DIP`:
 
 ```bash
-python collision_risk_pipeline/static_pipeline.py \
-  --image /home/najo/NAS/DIP/Fr5_robot_SegFormer/fr5_2.jpeg \
-  --robot-checkpoint /home/najo/NAS/DIP/Fr5_robot_SegFormer/best_segformer_robot_arm.pth \
+python 5_apps/collision_risk_pipeline/static_pipeline.py \
+  --image /home/najo/NAS/DIP/4_perception/Fr5_robot_SegFormer/fr5_2.jpeg \
+  --robot-checkpoint /home/najo/NAS/DIP/4_perception/Fr5_robot_SegFormer/best_segformer_robot_arm.pth \
   --human-model yolov8n-seg.pt \
-  --out-dir collision_risk_pipeline/outputs
+  --out-dir 5_apps/collision_risk_pipeline/outputs
 ```
 
 Outputs:
