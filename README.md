@@ -1,9 +1,11 @@
 # DIP — Robot Pose Estimation Workspace (Monorepo)
 
 로봇 포즈 추정 연구 모노레포. 기능 흐름(데이터 수집 → 데이터셋 → 로봇/카메라 유틸 → 모델 학습 → 인식 → 응용)에 따라 카테고리로 구성.
-**원격 없음** — 이 repo는 로컬 단일 저장소. 과거 프로젝트별 이력은 GitHub 개별 repo(`Najongs/<이름>`)에 아카이브로 보존됨.
+원격: **https://github.com/Najongs/DIP_ROBOTPOSE** (이 모노레포의 유일한 push 대상). 과거 프로젝트별 이력은 GitHub 개별 repo(`Najongs/<이름>`)에 아카이브로 보존됨.
 
 > 2026-07-03 재편: 중첩 개별 git 제거 후 모노레포 통합, 카테고리 폴더 그룹핑, ICRA dataset(36G) datasets/로 통합, Meca500 중복 zip 제거(~1.2G).
+
+**문서**: 카테고리별 실험 진행 방법은 [docs/](docs/README.md), 작업 규칙은 [CLAUDE.md](CLAUDE.md).
 
 ## 구조
 
@@ -42,6 +44,7 @@ DIP/
 ## git 관리
 
 - 이 repo가 유일한 git. 코드·문서·설정만 추적 (미디어/데이터/가중치/학습 산출물은 .gitignore).
+- 원격은 `origin = Najongs/DIP_ROBOTPOSE` 하나뿐 — 여기로만 push.
 - 과거 이력: GitHub `Najongs/<프로젝트>` 개별 repo에 보존 (읽기 전용 아카이브로 취급, push 금지).
   - `DINObotPose`, `DINObotPose2`: 원격에만 존재 (로컬 삭제됨)
   - `ZED_Cap_make_dataset`의 미완성 ArUco WIP는 원격 `stash-backup-wip-aruco` 브랜치에 백업
