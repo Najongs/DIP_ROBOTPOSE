@@ -9,8 +9,8 @@ import torch
 from torch.utils.data import Dataset
 
 # Dataset Root
-DATASET_ROOT = "/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset"
-DREAM_DATASET_PATH = "/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/Converted_dataset/DREAM_to_DREAM"
+DATASET_ROOT = "/home/najo/NAS/DIP/datasets/ICRA_multiview"
+DREAM_DATASET_PATH = "/home/najo/NAS/DIP/datasets/ICRA_multiview/Converted_dataset/DREAM_to_DREAM"
 # Use (H, W) ordering for torchvision.Resize; keep landscape (width>height)
 IMAGE_RESOLUTION = (512, 512)
 HEATMAP_SIZE = (512, 512)

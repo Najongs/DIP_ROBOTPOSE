@@ -15,8 +15,8 @@ MODEL_NAME="facebook/dinov3-vitb16-pretrain-lvd1689m"
 DEPTH_SIZE=280,504  # Height,Width from training
 
 # Dataset paths
-DEPTH_ROOT="/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/depth_dataset"
-SOURCE_ROOT="/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset"
+DEPTH_ROOT="/home/najo/NAS/DIP/3_pose_models/2025_ICRA_Multi_View_Robot_Pose_Estimation/depth_dataset"
+SOURCE_ROOT="/home/najo/NAS/DIP/datasets/ICRA_multiview"
 
 # Inference settings
 NUM_SAMPLES=20

@@ -2,8 +2,8 @@
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MODEL_PATH="/home/najo/NAS/DIP/DINObotPose3/TRAIN/outputs_3d_v4/train_3d_v4_20260310_174640/best_joint_angle.pth"
-DATASET_DIR="/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/Converted_dataset/DREAM_to_DREAM/panda-3cam_azure"
+MODEL_PATH="/home/najo/NAS/DIP/3_pose_models/DINObotPose3/TRAIN/outputs_3d_v4/train_3d_v4_20260310_174640/best_joint_angle.pth"
+DATASET_DIR="/home/najo/NAS/DIP/datasets/ICRA_multiview/Converted_dataset/DREAM_to_DREAM/panda-3cam_azure"
 OUTPUT_DIR="${SCRIPT_DIR}/eval_v4_dataset_results"
 
 # Inference parameters

@@ -5,7 +5,7 @@
 # Configuration
 ROBOT_CHECKPOINT="checkpoints_simple_dino_only_100e/latest_checkpoint.pth"
 ROBOT_CLASS="FR5"
-IMAGE_PATH="${1:-/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/Fr5/Fr5_4th_250526/right/zed_34850673_right_1748249125.900.jpg}"
+IMAGE_PATH="${1:-/home/najo/NAS/DIP/datasets/ICRA_multiview/Fr5/Fr5_4th_250526/right/zed_34850673_right_1748249125.900.jpg}"
 OUTPUT_PATH="${2:-single_image_result.png}"
 
 # GPU settings

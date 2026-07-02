@@ -4,8 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Model and dataset
-MODEL_PATH="/home/najo/NAS/DIP/DINObotPose3/TRAIN/outputs_heatmap/*finetune_no_fda_with_occ_beta0.001_occ0.35_20260305_134104/best_heatmap.pth"
-DATASET_DIR="/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/Converted_dataset/DREAM_to_DREAM/panda-3cam_azure"
+MODEL_PATH="/home/najo/NAS/DIP/3_pose_models/DINObotPose3/TRAIN/outputs_heatmap/*finetune_no_fda_with_occ_beta0.001_occ0.35_20260305_134104/best_heatmap.pth"
+DATASET_DIR="/home/najo/NAS/DIP/datasets/ICRA_multiview/Converted_dataset/DREAM_to_DREAM/panda-3cam_azure"
 # DATASET_DIR="/data/public/NAS/DINObotPose2/Dataset/Converted_dataset/DREAM_to_DREAM/panda-3cam_kinect360"
 # DATASET_DIR="/data/public/NAS/DINObotPose2/Dataset/Converted_dataset/DREAM_to_DREAM/panda-3cam_realsense"
 # DATASET_DIR="/data/public/NAS/DINObotPose2/Dataset/Converted_dataset/DREAM_to_DREAM/panda-orb"

@@ -263,7 +263,7 @@ def main():
     print(f"🎮 GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'N/A'}")
 
     # Load test images
-    dataset_root = "/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset"
+    dataset_root = "/home/najo/NAS/DIP/datasets/ICRA_multiview"
     image_paths = load_test_images(dataset_root, num_images=100)
 
     # Benchmark Depth Anything 3 (with batch inference like dataset generation)

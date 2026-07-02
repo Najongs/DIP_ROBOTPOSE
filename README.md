@@ -30,16 +30,14 @@ DIP/
 │   ├── FR5_robot/  meca500/  meca_insertion/  intertek_image/ ...
 ├── notebooks/        공용 노트북 (All_pipeline, Robot_pose_pipeline, Vit_embedding, depth_image_MiDas, yolo_v8)
 ├── assets/           참조 없는 이미지 모음
-├── yolov8n-seg.pt  yolo_train_robot_box.yaml   # 코드가 루트 기준 참조 → 루트 유지
-└── <호환 심볼릭링크 11개>                        # 아래 참고
+└── yolov8n-seg.pt  yolo_train_robot_box.yaml   # 코드가 루트 기준 참조 → 루트 유지
 ```
 
-## 호환 심볼릭링크 (구 절대경로 안전망)
+## 경로 규칙
 
-구버전 코드(특히 DINOv3_fine_tunning, DINObotPose3)가 `/home/najo/NAS/DIP/<프로젝트>/...` 절대경로를 하드코딩하고 있어,
-루트에 구 이름 → 새 위치 심볼릭링크를 유지함 (예: `DINObotPose3 → 3_pose_models/DINObotPose3`).
-`2025_ICRA_.../dataset`도 `datasets/ICRA_multiview`로의 링크.
-**해당 코드의 경로를 새 구조로 고치면 링크는 제거해도 됨.**
+- 2026-07-03에 전체 코드의 구 절대경로(`/home/najo/NAS/DIP/<프로젝트>/...`)를 새 구조로 일괄 치환 완료 (73파일). 루트 호환 심볼릭링크는 제거됨.
+- 예외 하나: `3_pose_models/2025_ICRA_.../dataset → ../../datasets/ICRA_multiview` 심볼릭링크는 **유지** — ICRA 학습 코드가 `__file__` 기준으로 `<프로젝트>/dataset`을 계산하기 때문 (예: `Train/FR5/fr5_main.py`의 `DATASET_ROOT`).
+- 이미 깨져 있던 참조(삭제된 학습 산출물 .pth, 존재한 적 없는 `coco_dataset/`, `3d-robot-pose-estimation/` 등)는 그대로 둠 — 재학습/재준비 시 새 경로에 생성하면 됨.
 
 ## git 관리
 
@@ -53,7 +51,7 @@ DIP/
 ## 의존 관계
 
 - `5_apps/collision_risk_pipeline` → `4_perception/Fr5_robot_SegFormer/best_segformer_robot_arm.pth`, 루트 `yolov8n-seg.pt`
-- DINOv3_fine_tunning(71곳)·DINObotPose3(16곳) → `datasets/ICRA_multiview` (구 경로 링크로 동작)
+- DINOv3_fine_tunning(71곳)·DINObotPose3(16곳) → `datasets/ICRA_multiview` (직접 참조)
 - `notebooks/Robot_pose_pipeline.ipynb` → 루트 `yolo_train_robot_box.yaml`
 - 노트북들 → `datasets/` 절대경로. `yolo_v8.ipynb` 일부는 다른 NAS 폴더(`RobotHuman_Co-work`) 참조
 

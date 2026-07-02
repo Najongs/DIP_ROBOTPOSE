@@ -113,8 +113,8 @@ def main(args):
     DEPTH_SIZE = tuple(map(int, args.depth_size.split(',')))  # e.g., "280,504"
 
     # Paths
-    RGB_ROOT = "/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset"
-    DEPTH_ROOT = "/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/depth_dataset"
+    RGB_ROOT = "/home/najo/NAS/DIP/datasets/ICRA_multiview"
+    DEPTH_ROOT = "/home/najo/NAS/DIP/3_pose_models/2025_ICRA_Multi_View_Robot_Pose_Estimation/depth_dataset"
 
     WANDB_PROJECT = "DINOv3_Depth_Estimation"
     CHECKPOINT_DIR = f"checkpoints_depth_{args.run_name}"

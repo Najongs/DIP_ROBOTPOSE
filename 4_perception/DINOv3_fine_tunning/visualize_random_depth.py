@@ -147,9 +147,9 @@ def visualize_depth_samples(depth_files, depth_root, source_root, output_dir, nu
 
 def main():
     # Configuration
-    depth_root = "/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/depth_dataset"
-    source_root = "/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset"
-    output_dir = "/home/najo/NAS/DIP/DINOv3_fine_tunning/random_depth_visualization"
+    depth_root = "/home/najo/NAS/DIP/3_pose_models/2025_ICRA_Multi_View_Robot_Pose_Estimation/depth_dataset"
+    source_root = "/home/najo/NAS/DIP/datasets/ICRA_multiview"
+    output_dir = "/home/najo/NAS/DIP/4_perception/DINOv3_fine_tunning/random_depth_visualization"
     num_samples = 5
 
     print("=" * 80)

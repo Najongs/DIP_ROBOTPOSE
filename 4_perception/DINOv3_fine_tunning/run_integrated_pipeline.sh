@@ -26,7 +26,7 @@ DEPTH_GPU=1
 HUMAN_GPU=2
 
 # Input/Output
-IMAGE_PATH="/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/franka_research3/franka_research3_pose1/Panda_dataset_1th/view1/zed_41182735_left_1756275914.348.jpg"
+IMAGE_PATH="/home/najo/NAS/DIP/datasets/ICRA_multiview/franka_research3/franka_research3_pose1/Panda_dataset_1th/view1/zed_41182735_left_1756275914.348.jpg"
 OUTPUT_PATH="integrated_result.png"
 
 # =========================

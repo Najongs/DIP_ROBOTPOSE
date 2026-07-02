@@ -13,12 +13,12 @@ NUM_GPUS=5
 export CUDA_VISIBLE_DEVICES=${GPU_IDS}
 
 # Data paths
-TRAIN_DIR="/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/Converted_dataset/DREAM_to_DREAM_syn/panda_synth_train_dr"
-VAL_DIR="/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/Converted_dataset/DREAM_to_DREAM/panda-3cam_azure"
+TRAIN_DIR="/home/najo/NAS/DIP/datasets/ICRA_multiview/Converted_dataset/DREAM_to_DREAM_syn/panda_synth_train_dr"
+VAL_DIR="/home/najo/NAS/DIP/datasets/ICRA_multiview/Converted_dataset/DREAM_to_DREAM/panda-3cam_azure"
 
 # 1st Stage Checkpoint (필수)
 # 1단계에서 3D Head가 안정화된 'best_3d_pose.pth' 경로를 입력하세요.
-CHECKPOINT="/home/najo/NAS/DIP/DINObotPose3/TRAIN/outputs_3d/train_3d_XXXXXXXX_XXXXXX/best_3d_pose.pth"
+CHECKPOINT="/home/najo/NAS/DIP/3_pose_models/DINObotPose3/TRAIN/outputs_3d/train_3d_XXXXXXXX_XXXXXX/best_3d_pose.pth"
 
 # Model configuration
 MODEL_NAME='facebook/dinov3-vitb16-pretrain-lvd1689m'

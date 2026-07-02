@@ -3,7 +3,7 @@
 ## 빠른 시작
 
 ```bash
-cd /home/najo/NAS/DIP/DINOv3_fine_tunning/visualization
+cd /home/najo/NAS/DIP/4_perception/DINOv3_fine_tunning/visualization
 ./Visualization.sh
 ```
 

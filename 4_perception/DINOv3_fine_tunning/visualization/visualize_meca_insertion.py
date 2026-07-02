@@ -25,10 +25,10 @@ from confidence_utils import (
 )
 
 # Configuration
-SYNC_CSV_PATH = "/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/Meca_insertion/Meca_insertion_matched_joint_angle.csv"
-ARUCO_JSON_PATH = "/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/Meca_insertion/Meca_insertion_aruco_pose_summary.json"
-CALIB_DIR = "/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/Meca_insertion/Meca_calib_cam_from_conf"
-CHECKPOINT_PATH = "/home/najo/NAS/DIP/DINOv3_fine_tunning/checkpoints_total_dino_conv_only/best_model.pth"
+SYNC_CSV_PATH = "/home/najo/NAS/DIP/datasets/ICRA_multiview/Meca_insertion/Meca_insertion_matched_joint_angle.csv"
+ARUCO_JSON_PATH = "/home/najo/NAS/DIP/datasets/ICRA_multiview/Meca_insertion/Meca_insertion_aruco_pose_summary.json"
+CALIB_DIR = "/home/najo/NAS/DIP/datasets/ICRA_multiview/Meca_insertion/Meca_calib_cam_from_conf"
+CHECKPOINT_PATH = "/home/najo/NAS/DIP/4_perception/DINOv3_fine_tunning/checkpoints_total_dino_conv_only/best_model.pth"
 
 CAMERA_SERIALS = {
     "right": '49429257',
@@ -39,11 +39,11 @@ CAMERA_SERIALS = {
 def convert_to_absolute_path(relative_path):
     """Convert relative path from CSV to absolute path."""
     if relative_path.startswith('../dataset/'):
-        return relative_path.replace('../dataset/', '/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/')
+        return relative_path.replace('../dataset/', '/home/najo/NAS/DIP/datasets/ICRA_multiview/')
     elif os.path.isabs(relative_path):
         return relative_path
     else:
-        return os.path.join('/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/', relative_path)
+        return os.path.join('/home/najo/NAS/DIP/datasets/ICRA_multiview/', relative_path)
 
 def load_model(checkpoint_path, model_type, device='cuda'):
     """Load the trained model from checkpoint."""

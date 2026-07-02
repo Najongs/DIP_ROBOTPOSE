@@ -27,12 +27,12 @@ from confidence_utils import (
 )
 
 # Configuration
-SYNC_CSV_PATH = "/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/franka_research3/fr3_matched_joint_angle.csv"
-POSE1_ARUCO_JSON_PATH = "/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/franka_research3/pose1_aruco_pose_summary.json"
-POSE2_ARUCO_JSON_PATH = "/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/franka_research3/pose2_aruco_pose_summary.json"
-CALIB_DIR = "/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/franka_research3/franka_research3_calib_cam_from_conf"
-CHECKPOINT_PATH = "/home/najo/NAS/DIP/DINOv3_fine_tunning/checkpoints_total_dino_conv_only/best_model.pth"
-JSON_DIR = "/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/Converted_dataset/franka_research3_to_DREAM"
+SYNC_CSV_PATH = "/home/najo/NAS/DIP/datasets/ICRA_multiview/franka_research3/fr3_matched_joint_angle.csv"
+POSE1_ARUCO_JSON_PATH = "/home/najo/NAS/DIP/datasets/ICRA_multiview/franka_research3/pose1_aruco_pose_summary.json"
+POSE2_ARUCO_JSON_PATH = "/home/najo/NAS/DIP/datasets/ICRA_multiview/franka_research3/pose2_aruco_pose_summary.json"
+CALIB_DIR = "/home/najo/NAS/DIP/datasets/ICRA_multiview/franka_research3/franka_research3_calib_cam_from_conf"
+CHECKPOINT_PATH = "/home/najo/NAS/DIP/4_perception/DINOv3_fine_tunning/checkpoints_total_dino_conv_only/best_model.pth"
+JSON_DIR = "/home/najo/NAS/DIP/datasets/ICRA_multiview/Converted_dataset/franka_research3_to_DREAM"
 
 SERIAL_TO_VIEW = {
     '41182735': "view1",
@@ -44,11 +44,11 @@ SERIAL_TO_VIEW = {
 def convert_to_absolute_path(relative_path):
     """Convert relative path from CSV to absolute path."""
     if relative_path.startswith('../dataset/'):
-        return relative_path.replace('../dataset/', '/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/')
+        return relative_path.replace('../dataset/', '/home/najo/NAS/DIP/datasets/ICRA_multiview/')
     elif os.path.isabs(relative_path):
         return relative_path
     else:
-        return os.path.join('/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/', relative_path)
+        return os.path.join('/home/najo/NAS/DIP/datasets/ICRA_multiview/', relative_path)
 
 def load_model(checkpoint_path, model_type, device='cuda'):
     """Load the trained model from checkpoint."""

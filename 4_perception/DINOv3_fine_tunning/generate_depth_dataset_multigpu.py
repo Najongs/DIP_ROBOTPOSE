@@ -172,8 +172,8 @@ def worker_process(gpu_id, image_subset, source_root, target_root, target_size, 
 
 def main():
     # Configuration
-    source_root = "/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset"
-    target_root = "/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/depth_dataset"
+    source_root = "/home/najo/NAS/DIP/datasets/ICRA_multiview"
+    target_root = "/home/najo/NAS/DIP/3_pose_models/2025_ICRA_Multi_View_Robot_Pose_Estimation/depth_dataset"
     target_size = (640, 360)  # (width, height)
     batch_size = 16  # Process 16 images at a time per GPU
     num_gpus = torch.cuda.device_count()

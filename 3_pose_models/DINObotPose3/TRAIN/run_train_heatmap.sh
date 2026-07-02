@@ -86,12 +86,12 @@ run_finetune() {
 # run_finetune "" "0.0" "no_fda"
 
 # 2. FDA BETA 0.01 모델 추가 학습
-# run_finetune "/home/najo/NAS/DIP/DINObotPose3/TRAIN/outputs_heatmap/finetune_beta_0.01_beta0.01_20260304_025505/best_heatmap.pth" "0.01" "beta_0.01"
+# run_finetune "/home/najo/NAS/DIP/3_pose_models/DINObotPose3/TRAIN/outputs_heatmap/finetune_beta_0.01_beta0.01_20260304_025505/best_heatmap.pth" "0.01" "beta_0.01"
 
 # 3. FDA BETA 0.001 모델 추가 학습
 run_finetune "/data/public/NAS/DINObotPose3/TRAIN/outputs_heatmap/finetune_beta_0.001_beta0.001_20260304_163045/best_heatmap.pth" "0.001" "beta_0.001"
 
 # 4. FDA BETA 0.05 모델 추가 학습
-# run_finetune "/home/najo/NAS/DIP/DINObotPose3/TRAIN/outputs_heatmap/finetune_beta_0.05_beta0.05_20260304_052019/best_heatmap.pth" "0.05" "beta_0.05"
+# run_finetune "/home/najo/NAS/DIP/3_pose_models/DINObotPose3/TRAIN/outputs_heatmap/finetune_beta_0.05_beta0.05_20260304_052019/best_heatmap.pth" "0.05" "beta_0.05"
 
 echo "All scheduled training sessions have finished!"

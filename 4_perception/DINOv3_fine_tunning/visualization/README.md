@@ -84,7 +84,7 @@ python visualize_meca500.py --num_samples 9
 
 ## 체크포인트 경로
 
-기본 체크포인트 경로: `/home/najo/NAS/DIP/DINOv3_fine_tunning/checkpoints_total_dino_conv_only/best_model.pth`
+기본 체크포인트 경로: `/home/najo/NAS/DIP/4_perception/DINOv3_fine_tunning/checkpoints_total_dino_conv_only/best_model.pth`
 
 다른 체크포인트를 사용하려면 `--checkpoint` 옵션을 사용하세요.
 

@@ -17,8 +17,8 @@ HEATMAP_SIZE=512,512  # Height,Width from training
 
 # Dataset paths (COCO format)
 # Update these to your actual COCO dataset paths
-IMAGE_DIR="/home/najo/NAS/DIP/DINOv3_fine_tunning/coco_dataset/val2017"
-ANNOTATION_FILE="/home/najo/NAS/DIP/DINOv3_fine_tunning/coco_dataset/annotations/person_keypoints_val2017.json"
+IMAGE_DIR="/home/najo/NAS/DIP/4_perception/DINOv3_fine_tunning/coco_dataset/val2017"
+ANNOTATION_FILE="/home/najo/NAS/DIP/4_perception/DINOv3_fine_tunning/coco_dataset/annotations/person_keypoints_val2017.json"
 
 # Inference settings
 NUM_SAMPLES=20

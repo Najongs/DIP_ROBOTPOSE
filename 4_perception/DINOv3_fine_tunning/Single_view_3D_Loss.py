@@ -135,7 +135,7 @@ def main(args):
 
     if rank == 0:
         print("Loading dataset files...")
-    json_files = glob.glob("/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/Converted_dataset/**/*.json", recursive=True)
+    json_files = glob.glob("/home/najo/NAS/DIP/datasets/ICRA_multiview/Converted_dataset/**/*.json", recursive=True)
     if rank == 0:
         print(f"Found {len(json_files)} files.")
 

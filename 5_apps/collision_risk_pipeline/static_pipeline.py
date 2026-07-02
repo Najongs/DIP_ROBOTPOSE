@@ -190,7 +190,7 @@ def main() -> None:
         help="SegFormer robot checkpoint path",
     )
     parser.add_argument("--human-model", default="yolov8n-seg.pt", help="Ultralytics person segmentation model")
-    parser.add_argument("--out-dir", default="collision_risk_pipeline/outputs", help="Output directory")
+    parser.add_argument("--out-dir", default="5_apps/collision_risk_pipeline/outputs", help="Output directory")
     parser.add_argument("--danger-px", type=float, default=20.0)
     parser.add_argument("--caution-px", type=float, default=80.0)
     parser.add_argument("--device", default=None)

@@ -31,7 +31,7 @@ pip install depth-anything-v2
 ### 방법 2: 수동 다운로드
 
 ```bash
-cd /home/najo/NAS/DIP/DINOv3_fine_tunning
+cd /home/najo/NAS/DIP/4_perception/DINOv3_fine_tunning
 
 # Config 디렉토리 생성
 mkdir -p configs
@@ -187,7 +187,7 @@ Config 파일들이 절대 경로로 설정되어 있는지 확인:
 
 ```bash
 # 절대 경로 사용
-RTM_DET_CONFIG="/home/najo/NAS/DIP/DINOv3_fine_tunning/configs/rtmdet_m_640-8xb32_coco-person.py"
+RTM_DET_CONFIG="/home/najo/NAS/DIP/4_perception/DINOv3_fine_tunning/configs/rtmdet_m_640-8xb32_coco-person.py"
 ```
 
 ## 9. RTMPose 모델 선택 가이드

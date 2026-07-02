@@ -316,7 +316,7 @@ def verify_forward_kinematics(gt_angles, gt_3d_points, robot_class):
 
 def main():
     # Configuration
-    output_dir = "/home/najo/NAS/DIP/DINOv3_fine_tunning/gt_visualization_results"
+    output_dir = "/home/najo/NAS/DIP/4_perception/DINOv3_fine_tunning/gt_visualization_results"
     num_samples = 5
     test_with_occlusion = True
 
@@ -337,7 +337,7 @@ def main():
 
     print("\nLoading dataset files...")
     json_files = glob.glob(
-        "/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/Converted_dataset/**/*.json",
+        "/home/najo/NAS/DIP/datasets/ICRA_multiview/Converted_dataset/**/*.json",
         recursive=True
     )
     print(f"✓ Found {len(json_files)} JSON files")

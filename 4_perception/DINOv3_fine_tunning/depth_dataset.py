@@ -123,8 +123,8 @@ if __name__ == "__main__":
 
     print("Testing DepthDataset...")
 
-    rgb_root = "/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset"
-    depth_root = "/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/depth_dataset"
+    rgb_root = "/home/najo/NAS/DIP/datasets/ICRA_multiview"
+    depth_root = "/home/najo/NAS/DIP/3_pose_models/2025_ICRA_Multi_View_Robot_Pose_Estimation/depth_dataset"
 
     transform = transforms.Compose([
         transforms.Resize((640, 360)),

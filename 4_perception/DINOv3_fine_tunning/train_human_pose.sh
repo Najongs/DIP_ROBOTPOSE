@@ -8,10 +8,10 @@
 # =========================
 
 # Dataset paths
-TRAIN_IMAGE_DIR="/home/najo/NAS/DIP/DINOv3_fine_tunning/coco_dataset/train2017"
-TRAIN_ANNOTATION="/home/najo/NAS/DIP/DINOv3_fine_tunning/coco_dataset/annotations/person_keypoints_train2017.json"
-VAL_IMAGE_DIR="/home/najo/NAS/DIP/DINOv3_fine_tunning/coco_dataset/val2017"
-VAL_ANNOTATION="/home/najo/NAS/DIP/DINOv3_fine_tunning/coco_dataset/annotations/person_keypoints_val2017.json"
+TRAIN_IMAGE_DIR="/home/najo/NAS/DIP/4_perception/DINOv3_fine_tunning/coco_dataset/train2017"
+TRAIN_ANNOTATION="/home/najo/NAS/DIP/4_perception/DINOv3_fine_tunning/coco_dataset/annotations/person_keypoints_train2017.json"
+VAL_IMAGE_DIR="/home/najo/NAS/DIP/4_perception/DINOv3_fine_tunning/coco_dataset/val2017"
+VAL_ANNOTATION="/home/najo/NAS/DIP/4_perception/DINOv3_fine_tunning/coco_dataset/annotations/person_keypoints_val2017.json"
 
 # Model configuration
 MODEL_NAME="facebook/dinov3-vitb16-pretrain-lvd1689m"

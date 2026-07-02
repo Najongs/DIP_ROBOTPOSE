@@ -8,7 +8,7 @@ import mediapipe as mp
 from pathlib import Path
 
 # Test image
-test_image = "/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/Fr5/Fr5_7th_250526/left/zed_38007749_left_1748249364.809.jpg"
+test_image = "/home/najo/NAS/DIP/datasets/ICRA_multiview/Fr5/Fr5_7th_250526/left/zed_38007749_left_1748249364.809.jpg"
 
 # Initialize MediaPipe Hands
 mp_hands = mp.solutions.hands

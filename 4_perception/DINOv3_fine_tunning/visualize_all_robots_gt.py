@@ -278,8 +278,8 @@ def process_robot_dataset(robot_path, robot_name, output_dir, num_samples=3):
 
 def main():
     # Configuration
-    base_dataset_path = "/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/Converted_dataset"
-    output_base_dir = "/home/najo/NAS/DIP/DINOv3_fine_tunning/gt_visualization_all_robots"
+    base_dataset_path = "/home/najo/NAS/DIP/datasets/ICRA_multiview/Converted_dataset"
+    output_base_dir = "/home/najo/NAS/DIP/4_perception/DINOv3_fine_tunning/gt_visualization_all_robots"
     num_samples_per_robot = 3
 
     # Robot datasets to process

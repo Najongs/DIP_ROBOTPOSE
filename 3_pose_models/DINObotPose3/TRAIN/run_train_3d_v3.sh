@@ -12,11 +12,11 @@ NUM_GPUS=5
 export CUDA_VISIBLE_DEVICES=${GPU_IDS}
 
 # Data paths
-TRAIN_DIR="/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/Converted_dataset/DREAM_to_DREAM_syn/panda_synth_train_dr"
-VAL_DIR="/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/Converted_dataset/DREAM_to_DREAM_syn/panda_synth_test_dr"
+TRAIN_DIR="/home/najo/NAS/DIP/datasets/ICRA_multiview/Converted_dataset/DREAM_to_DREAM_syn/panda_synth_train_dr"
+VAL_DIR="/home/najo/NAS/DIP/datasets/ICRA_multiview/Converted_dataset/DREAM_to_DREAM_syn/panda_synth_test_dr"
 
 # 2D Pretrained Checkpoint (required for fresh start)
-CHECKPOINT="/home/najo/NAS/DIP/DINObotPose3/TRAIN/outputs_heatmap/*finetune_no_fda_with_occ_beta0.001_occ0.35_20260305_134104/best_heatmap.pth"
+CHECKPOINT="/home/najo/NAS/DIP/3_pose_models/DINObotPose3/TRAIN/outputs_heatmap/*finetune_no_fda_with_occ_beta0.001_occ0.35_20260305_134104/best_heatmap.pth"
 
 # 3D Checkpoint
 CHECKPOINT_3D=""

@@ -26,9 +26,9 @@ from confidence_utils import (
 )
 
 # Configuration
-DREAM_JSON_BASE = "/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/Converted_dataset/DREAM_to_DREAM"
-DREAM_IMAGE_BASE = "/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/DREAM_real"
-CHECKPOINT_PATH = "/home/najo/NAS/DIP/DINOv3_fine_tunning/checkpoints_total_dino_conv_only/best_model.pth"
+DREAM_JSON_BASE = "/home/najo/NAS/DIP/datasets/ICRA_multiview/Converted_dataset/DREAM_to_DREAM"
+DREAM_IMAGE_BASE = "/home/najo/NAS/DIP/datasets/ICRA_multiview/DREAM_real"
+CHECKPOINT_PATH = "/home/najo/NAS/DIP/4_perception/DINOv3_fine_tunning/checkpoints_total_dino_conv_only/best_model.pth"
 
 DREAM_DATASETS = [
     "panda-3cam_azure",

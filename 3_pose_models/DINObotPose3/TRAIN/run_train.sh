@@ -11,8 +11,8 @@
 DATA_DIRS=("/data/public/NAS/DINObotPose2/Dataset/Converted_dataset/DREAM_to_DREAM_syn/panda_synth_train_dr")
 VAL_DIR="/data/public/NAS/DINObotPose2/Dataset/Converted_dataset/DREAM_to_DREAM/panda-3cam_azure"  
 
-# DATA_DIR="/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/Converted_dataset/DREAM_to_DREAM_syn/panda_synth_train_dr"  # Training data directory
-# VAL_DIR="/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/Converted_dataset/DREAM_to_DREAM/panda-3cam_azure"  # Validation data directory (separate from training)
+# DATA_DIR="/home/najo/NAS/DIP/datasets/ICRA_multiview/Converted_dataset/DREAM_to_DREAM_syn/panda_synth_train_dr"  # Training data directory
+# VAL_DIR="/home/najo/NAS/DIP/datasets/ICRA_multiview/Converted_dataset/DREAM_to_DREAM/panda-3cam_azure"  # Validation data directory (separate from training)
 
 TRAIN_SPLIT=1.0  # Train split ratio (1.0 = use all training data when VAL_DIR is specified)
 VAL_SPLIT=0.5  # Validation data usage ratio (0.1 = use 10% of validation data)

@@ -5,7 +5,7 @@ from tqdm import tqdm
 import math
 
 def check_z_depths():
-    val_dir = "/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/Converted_dataset/DREAM_to_DREAM_syn/panda_synth_test_dr"
+    val_dir = "/home/najo/NAS/DIP/datasets/ICRA_multiview/Converted_dataset/DREAM_to_DREAM_syn/panda_synth_test_dr"
     keypoint_names = ['link0', 'link2', 'link3', 'link4', 'link6', 'link7', 'hand']
     
     val_dataset = PoseEstimationDataset(

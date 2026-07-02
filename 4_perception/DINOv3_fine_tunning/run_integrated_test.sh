@@ -5,7 +5,7 @@
 # Configuration
 ROBOT_CHECKPOINT="checkpoints_simple_dino_only_300e/latest_checkpoint.pth"
 ROBOT_CLASS="research3"
-IMAGE_DIR="/home/najo/NAS/DIP/2025_ICRA_Multi_View_Robot_Pose_Estimation/dataset/franka_research3/franka_research3_pose2/Panda_dataset_22th_block/view3"
+IMAGE_DIR="/home/najo/NAS/DIP/datasets/ICRA_multiview/franka_research3/franka_research3_pose2/Panda_dataset_22th_block/view3"
 OUTPUT_DIR="integrated_test_results"
 NUM_IMAGES=5  # Number of random images to test
 
