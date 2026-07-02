@@ -1,0 +1,6 @@
+# data.yaml
+train: /home/najo/NAS/DIP/datasets/FR5_model/YOLO_Train/images/train
+val: /home/najo/NAS/DIP/datasets/FR5_model/YOLO_Train/images/val
+
+nc: 1
+names: ['object']
