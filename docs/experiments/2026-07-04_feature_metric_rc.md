@@ -20,3 +20,6 @@
 
 ## 결과
 (구현·평가 후 기입)
+
+## ⚠️ 중간 교훈 (edge-NCC를 목적함수로): 판별력 ≠ 최적화가능성
+edge-NCC struct-RC를 azure 최적화 목적으로 쓰니 −0.10(w=0.1)~−0.18(w=0.5), nan mean(발산). 프로브에서 GT를 이겼지만(판별) gradient 최적화는 실패 — image gradient는 고주파라 landscape가 노이지, 국소최적. **이게 문헌이 특징 공간을 쓰는 이유**(semantic·저주파·넓은 basin). 특징 항은 재투영 앵커 강하게 유지하며 검증 중.

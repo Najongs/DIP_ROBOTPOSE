@@ -41,7 +41,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--dump', required=True, help='npz from selfbbox_eval --dump-npz (deployed poses)')
     ap.add_argument('--val-dir', required=True)
-    ap.add_argument('--sam-checkpoint', required=True)
+    ap.add_argument('--sam-checkpoint', default=None)
     ap.add_argument('--image-size', type=int, default=512)
     ap.add_argument('--batch-size', type=int, default=8)
     ap.add_argument('--render-h', type=int, default=224)
@@ -55,6 +55,14 @@ def main():
     ap.add_argument('--max-frames', type=int, default=0, help='0 = all dumped frames')
     ap.add_argument('--occlude-ratio', type=float, default=0.0,
                     help='paint the SAME deterministic occluders as selfbbox_eval --occlude-ratio (seeded per frame+ratio) so SAM sees the occluded image the pose stage saw')
+    ap.add_argument('--struct-w', type=float, default=0.0,
+                    help='weight of the internal-STRUCTURE term: edge-NCC between rendered-depth gradients and image gradients (lighting/albedo-free; probe-validated GT-discriminative even on azure where the silhouette term hurts)')
+    ap.add_argument('--feat-w', type=float, default=0.0,
+                    help='weight of the DINO FEATURE-METRIC term: (1 - masked patch-cosine) between the Lambertian-shaded render and the real crop in frozen-DINOv3 feature space (absorbs albedo/lighting gap; probe-validated to beat edge-NCC on azure). Backprops through DINOv3 forward.')
+    ap.add_argument('--model-name', default='facebook/dinov3-vitb16-pretrain-lvd1689m')
+    ap.add_argument('--feat-size', type=int, default=384, help='DINOv3 input resolution for the feature term (smaller = faster inner loop)')
+    ap.add_argument('--no-sil', action='store_true',
+                    help='drop the SAM/silhouette IoU term entirely (pure model-based refinement: structure + reproj anchor; no mask needed)')
     ap.add_argument('--multi-start', action='store_true',
                     help='multi-start RC over base-Z rotation perturbations of the init pose; final hypothesis chosen by SAM-IoU (external-evidence basin selection)')
     ap.add_argument('--ms-deltas', default='30,60', help='perturbation magnitudes in degrees (each used as +/-)')
@@ -79,10 +87,19 @@ def main():
     order = [by_fid[f] for f in fids if f in by_fid]
     assert len(order) == len(fids), f"dump/frames mismatch: {len(order)} vs {len(fids)}"
 
-    from segment_anything import sam_model_registry, SamPredictor
-    sam = sam_model_registry['vit_b'](checkpoint=args.sam_checkpoint).to(device); sam.eval()
-    sam_pred = SamPredictor(sam)
+    sam_pred = None
+    if not args.no_sil:
+        from segment_anything import sam_model_registry, SamPredictor
+        sam = sam_model_registry['vit_b'](checkpoint=args.sam_checkpoint).to(device); sam.eval()
+        sam_pred = SamPredictor(sam)
     rdr = NVDRSilhouette(device, kind=args.kind)
+    if args.struct_w > 0:
+        from rgb_rc_probe import edge_score
+    backbone = None
+    if args.feat_w > 0:
+        from model_v4 import DINOv3Backbone
+        from feat_rc_probe import dino_feats, feat_score
+        backbone = DINOv3Backbone(args.model_name, unfreeze_blocks=0).to(device).eval()
     MEAN = torch.tensor(IMAGENET_MEAN, device=device).view(3, 1, 1)
     STD = torch.tensor(IMAGENET_STD, device=device).view(3, 1, 1)
 
@@ -112,8 +129,11 @@ def main():
         with torch.no_grad():
             init_mask = (rdr(rdr.robot_verts(th0, all_link_transforms), R0, t0, K, H, S) > 0.5).float()
         u8 = ((img * STD + MEAN).clamp(0, 1) * 255).byte().permute(0, 2, 3, 1).cpu().numpy()
+        gray = ((img * STD + MEAN).clamp(0, 1)).mean(1, keepdim=True) if args.struct_w > 0 else None
         tgt = torch.zeros_like(init_mask); use = torch.zeros(len(idxs), device=device)
-        for b in range(len(idxs)):
+        if sam_pred is None:
+            use += 1.0                                     # struct/anchor-only: refine every frame
+        for b in range(len(idxs) if sam_pred is not None else 0):
             sam_pred.set_image(u8[b])
             p = uv_anchor[b][found[b] > 0].detach().cpu().numpy()
             if len(p) < 2:
@@ -148,6 +168,8 @@ def main():
             union = (pix_w * (a + b - a * b)).sum((-1, -2))
             return inter / (union + 1e-6)
 
+        f_real = dino_feats(backbone, (img * STD + MEAN).clamp(0, 1), args.feat_size) if backbone is not None else None
+
         def refine_from(R_init):
             """One conservative RC refine from a given camera-rotation init. Returns per-frame
             (kp_rc, uv_rc, final hard IoU vs tgt)."""
@@ -159,13 +181,30 @@ def main():
             for _ in range(args.rc_iters):
                 opt.zero_grad()
                 th = torch.cat([pth, zc], 1); R = rot6d_to_matrix(d6)
-                mask = rdr(rdr.robot_verts(th, all_link_transforms), R, tt, K, H, S)
-                l_iou = (use * (1 - w_soft_iou(mask, tgt))).sum() / use.sum().clamp(min=1)
+                verts = rdr.robot_verts(th, all_link_transforms)
+                if sam_pred is not None:
+                    mask = rdr(verts, R, tt, K, H, S)
+                    l_iou = (use * (1 - w_soft_iou(mask, tgt))).sum() / use.sum().clamp(min=1)
+                else:
+                    l_iou = torch.zeros((), device=device)
+                if args.struct_w > 0:
+                    dmap = rdr.render_depth(verts, R, tt, K, H, S)
+                    l_struct = (1 - edge_score(dmap, gray, H)).mean()
+                else:
+                    l_struct = torch.zeros((), device=device)
+                if backbone is not None:
+                    sh = rdr.render_shaded(verts, R, tt, K, H, S)
+                    fr = dino_feats(backbone, sh.unsqueeze(1).repeat(1, 3, 1, 1), args.feat_size)
+                    gmask = (F.interpolate(sh.unsqueeze(1), size=fr.shape[-2:], mode='bilinear',
+                                           align_corners=False).squeeze(1) > 0.05).float()
+                    l_feat = (1 - feat_score(fr, f_real, gmask)).mean()
+                else:
+                    l_feat = torch.zeros((), device=device)
                 fk = panda_forward_kinematics(th)
                 cam = torch.einsum('bij,bpj->bpi', R, fk) + tt.unsqueeze(1)
                 uv = project(cam, K)
                 l_uv = (((uv - uv_anchor) / S) * wconf.unsqueeze(-1)).pow(2).mean()
-                (l_iou + args.repro_w * l_uv).backward()
+                (l_iou + args.struct_w * l_struct + args.feat_w * l_feat + args.repro_w * l_uv).backward()
                 opt.step()
             with torch.no_grad():
                 th = torch.cat([pth, zc], 1); R = rot6d_to_matrix(d6)
@@ -209,9 +248,12 @@ def main():
             else:
                 adds_rc.append(base); skipped += 1
 
-    si = np.array(sam_ious)
     print(f"\n=== DEPLOYABLE NVDR+SAM RENDER-COMPARE  {os.path.basename(args.val_dir)}  (n={len(adds_base)}, skipped {skipped}) ===")
-    print(f"  SAM-vs-init-render IoU: mean {si.mean():.3f}  median {np.median(si):.3f}  frac>=0.5: {(si>=0.5).mean():.2f}")
+    if sam_ious:
+        si = np.array(sam_ious)
+        print(f"  SAM-vs-init-render IoU: mean {si.mean():.3f}  median {np.median(si):.3f}  frac>=0.5: {(si>=0.5).mean():.2f}")
+    else:
+        print(f"  [no-sil] pure model-based refinement (struct_w={args.struct_w})")
     print(f"  baseline (deployed dump) ADD-AUC@100mm {add_auc(adds_base):.4f}  mean {1000*np.mean(adds_base):.1f}mm")
     print(f"  + nvdr/SAM render-compare ADD-AUC@100mm {add_auc(adds_rc):.4f}  mean {1000*np.mean(adds_rc):.1f}mm")
     print(f"  Δ: {add_auc(adds_rc)-add_auc(adds_base):+.4f}")
