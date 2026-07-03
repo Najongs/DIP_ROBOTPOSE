@@ -23,3 +23,6 @@
 
 ## ⚠️ 중간 교훈 (edge-NCC를 목적함수로): 판별력 ≠ 최적화가능성
 edge-NCC struct-RC를 azure 최적화 목적으로 쓰니 −0.10(w=0.1)~−0.18(w=0.5), nan mean(발산). 프로브에서 GT를 이겼지만(판별) gradient 최적화는 실패 — image gradient는 고주파라 landscape가 노이지, 국소최적. **이게 문헌이 특징 공간을 쓰는 이유**(semantic·저주파·넓은 basin). 특징 항은 재투영 앵커 강하게 유지하며 검증 중.
+
+## 결과 1 — azure 순수 feature-RC (--no-sil): 여지 없음
+feat_w 스윕: 1.0→−0.043, 0.3→−0.020, 0.1→−0.004 (단조 수렴, 발산 없음). edge-NCC(발산)와 달리 **잘 조건화됨**(저가중 do-no-harm). 그러나 azure는 순손실 — **재해석: azure는 test-time refinement 여지가 없는 카메라**(이미 0.783=RoboPEPP+0.035, 남은 오차는 상류 2D). 배포는 이미 azure RC OFF이라 회귀 아님. → 특징 항의 시험대를 여지 있는 곳(realsense 스택, 40% 가림)으로 이동.
