@@ -92,6 +92,26 @@ class NVDRSilhouette:
     def robot_verts(self, theta, all_link_transforms_fn):
         return transform_robot_verts(theta, self.mesh, all_link_transforms_fn)
 
+    def render_depth(self, pts_robot, R, t, K, H, img_size):
+        """Camera-space depth map (B,H,H); 0 outside the robot. Depth DISCONTINUITIES encode
+        link boundaries + self-occlusion contours — the internal structure the silhouette
+        throws away (probe signal for photometric/feature render-and-compare)."""
+        dr = self.dr
+        B = pts_robot.shape[0]
+        cam = torch.einsum('bij,bpj->bpi', R, pts_robot) + t.unsqueeze(1)
+        x, y, z = cam[..., 0], cam[..., 1], cam[..., 2]
+        W = float(img_size)
+        fx, fy = K[:, 0, 0:1], K[:, 1, 1:2]
+        cx, cy = K[:, 0, 2:3], K[:, 1, 2:3]
+        n, f = self.near, self.far
+        xc = x * (2.0 * fx / W) + z * (2.0 * cx / W - 1.0)
+        yc = y * (2.0 * fy / W) + z * (2.0 * cy / W - 1.0)
+        zc = z * (f + n) / (f - n) - (2.0 * f * n) / (f - n)
+        pos = torch.stack([xc, yc, zc, z], dim=-1).contiguous()
+        rast, _ = dr.rasterize(self.ctx, pos, self.mesh['faces'], resolution=[H, H])
+        depth, _ = dr.interpolate(z.unsqueeze(-1).contiguous(), rast, self.mesh['faces'])
+        return (depth.squeeze(-1) * (rast[..., 3] > 0).float())          # (B,H,H)
+
     def __call__(self, pts_robot, R, t, K, H, img_size):
         """pts_robot: (B,V,3) FK-posed verts (from .robot_verts). Returns soft mask (B,H,H)."""
         dr = self.dr
