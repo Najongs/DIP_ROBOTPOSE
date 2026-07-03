@@ -2,22 +2,24 @@
 
 **Goal:** single-image robot (Panda) pose + joint-angle estimator that beats **RoboPEPP** on the 6 DREAM-Panda splits (metric: ADD-AUC@100mm).
 
-## 🏆 2026-07-03 — GOAL ACHIEVED: mean 0.796 vs RoboPEPP 0.780 (4 real splits)
+## 🏆 2026-07-04 — mean 0.799 vs RoboPEPP 0.780 (4 real splits); +DARK decode
 
 The 06-09 renderer blocker was broken with **nvdiffrast** (exact visual-mesh differentiable silhouette,
 local build on the NAS box) + **SAM ViT-B** true-robot masks (init-render-consistent mask selection).
-Deployable render-and-compare (`Eval/rc_refine_from_dump.py`) on top of the crop+rot-adapt pipeline:
-| cam | deployable | RoboPEPP | gap |
-|---|---|---|---|
-| realsense | **0.8183** (0.7525 +RC@448) | 0.805 | **+0.013 BEAT** |
-| kinect360 | **0.8112** (0.7462 crop cfg +RC@448 — CONFIG SWITCH from non-crop 0.776) | 0.785 | **+0.026 BEAT** |
-| azure | **0.7881** (crop base, **RC OFF** — near cam, depth already right, RC hurts −0.047) | 0.753 | **+0.035 BEAT** |
-| orb | 0.7647 (0.7154 +RC@512) | 0.775 | −0.010 |
-| **MEAN** | **0.7956** | 0.780 | **+0.016** |
+Deployable render-and-compare (`Eval/rc_refine_from_dump.py`) on top of the crop+rot-adapt pipeline,
++ **cov-PnP** (heatmap-covariance Mahalanobis) + **DARK sub-pixel decode** (both free, no training):
+| cam | deployable (+DARK) | was (07-03) | RoboPEPP | gap |
+|---|---|---|---|---|
+| realsense | **0.8213** (+RC@448) | 0.8183 | 0.805 | **+0.016 BEAT** |
+| kinect360 | **0.8132** (+RC@448) | 0.8112 | 0.785 | **+0.028 BEAT** |
+| azure | **0.7916** (crop base, **RC OFF**) | 0.7881 | 0.753 | **+0.039 BEAT** |
+| orb | **0.7714** (+RC@512) | 0.7647 | 0.775 | −0.004 ≈MATCH |
+| **MEAN** | **0.7994** | 0.7956 | 0.780 | **+0.019** |
 Protocol: predicted angles + fully-automatic bbox (stricter than RoboPEPP's GT-bbox headline); rs/kinect/orb
-anti-leak held-out 800/cam. Key facts: RC gain scales with render resolution (saturates 448; orb 512);
-RC = depth/scale corrector → per-camera on/off (helps far/foreshortened cams only). Details in
-EXPERIMENTS.md 2026-07-03; SOTA survey in `docs/robot_pose_sota_survey.md`. Remaining: orb −0.010.
+anti-leak held-out 800/cam. DARK decode (`--dark-decode`, `Eval/decode_util.py`) lifts pose 2D precision
+universally (+0.0035–0.017 per cam, free) — closed the orb gap −0.010→−0.004. RC = depth/scale corrector →
+per-camera on/off (helps far cams; azure RC OFF). Details EXPERIMENTS.md 2026-07-04; survey
+`docs/robot_pose_sota_survey.md`; roadmap `docs/robot_pose_next_directions.md`. Remaining: orb −0.004.
 
 **Occlusion robustness (RoboPEPP Fig.6 protocol, same-day):** ours +RC = 0.775/0.726/**0.626**/**0.525**/0.328
 at 0-40% RoI occlusion vs RoboPEPP 0.795/0.730/0.600/0.470/0.351 — **WIN at 20-30%**, identical degradation

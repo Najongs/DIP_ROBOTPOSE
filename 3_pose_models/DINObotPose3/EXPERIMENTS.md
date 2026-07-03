@@ -923,3 +923,25 @@ selfbbox orb held-out @200 with --image-size 768 on the FROZEN 512-trained stack
 detector conf calibration / kp-feature sampling / heads are 512-distribution-specialized. Higher-res
 crops require a RETRAIN CASCADE (crop detector @768 → angle/rot heads @768) — deferred; queue only if
 T1/T2 (occlusion-aug heads) leave orb as the binding gap. Roadmap ④ updated.
+
+## 2026-07-04 — DARK decode ADOPTED → mean 0.796→0.799, orb gap −0.010→−0.004
+Survey round-2 (docs/robot_pose_sota_survey.md §6) ranked DINO feature-metric RC #1, but it proved
+REDUNDANT with our silhouette RC (azure no headroom; realsense +0.002, silhouette already saturates
+the depth signal; 40%-occl +0.005 tail-only) — well-conditioned `--feat-w` kept but not deployed.
+edge-NCC-as-loss also refuted (discriminates GT in the probe but diverges as an objective, −0.10/−0.18).
+
+The WIN was Idea 3 — **DARK sub-pixel heatmap decode** (`Eval/decode_util.py`, `--dark-decode`):
+Gaussian-modulate + Taylor-refine the argmax from log-heatmap 1st/2nd derivatives (1px clamp). Free,
+no training. Pose-stage matched A/B (300f): orb +0.0074, azure +0.0045, realsense +0.0050 — universal
+do-no-harm gain (mean ADD drops = far/small-frame tail fixed, DARK's low-res strength). Stacked with RC:
+| cam | deployed was | +DARK | RoboPEPP | gap |
+|---|---|---|---|---|
+| realsense | 0.8183 | 0.8213 | 0.805 | +0.016 |
+| kinect360 | 0.8112 | 0.8132 | 0.785 | +0.028 |
+| azure(RC off) | 0.7881 | 0.7916 | 0.753 | +0.039 |
+| orb | 0.7647 | 0.7714 | 0.775 | −0.004 |
+| MEAN | 0.7956 | 0.7994 | 0.780 | +0.019 |
+orb −0.010→−0.004 (near-MATCH). ADOPT --dark-decode + --cov-pnp in the deployed config. Multi-start RC,
+768-crop, feature-metric RC, edge-NCC, occl-robust silhouette, population prior all refuted this session.
+Occlusion-aug heads (T1/T2) still training — robustness/accuracy tradeoff (+0.014/0.018 occluded, −0.009
+clean @Ep1), positioned as a separate robustness config. Docs: docs/experiments/*.

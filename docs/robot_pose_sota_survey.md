@@ -25,9 +25,9 @@
 | **RoboPEPP** | CVPR'25 | masking-pretrain+PnP | **75.3** | **78.5** | **80.5** | **77.5** | **77.9** | predicted | **GT-bbox 헤드라인** (auto orb≈34); 가림 최강(40% 가림 AUC 35.1) |
 | RoboTAG | '25-11 | — | 83.1 | 75.7 | 78.3 | 58.8 | ~74 | predicted | auto-bbox; Table 1 직접 확인 권장(arXiv:2511.07717) |
 | ~~PoseDiff~~ | '25-09 | diffusion E2E | ~~96.4~~ | ~~94.8~~ | ~~96.6~~ | ~~96.5~~ | ~~96.1~~ | — | 🔴 **2025-10-30 저자 철회** — 철회 사유 원문: "The experimental setup and metrics lacks rigor, affecting the fairness of the comparisons". real 80/20 in-domain 학습이었음. **수치 전면 무시** |
-| **Ours** | '26-07-03 | kp+solver+**RC(nvdr+SAM)** | **78.8** | **81.1** | **81.8** | 76.5 | **79.6** | predicted | **완전 자동 bbox** (RoboPEPP GT-bbox보다 엄격); rs/kinect/orb는 anti-leak held-out |
+| **Ours** | '26-07-04 | kp+solver+RC+**DARK** | **79.2** | **81.3** | **82.1** | **77.1** | **79.9** | predicted | **완전 자동 bbox**; +DARK decode+cov-PnP(무료); rs/kinect/orb anti-leak held-out |
 
-**결론 (2026-07-03 갱신): 동일 프로토콜에서 우리가 mean 0.796으로 RoboPEPP 0.780을 넘음** (azure/kinect/realsense 3승, orb −0.010). PoseDiff는 **저자가 직접 철회**(2025-10-30, "실험 설정·지표의 엄밀성 부족으로 비교 공정성 훼손" — arXiv:2509.24591 v2 확인) — 수치 무효. CtRNet 계열 0.86은 known-angle+real self-train. RoboTAG만 주시.
+**결론 (2026-07-04 갱신): mean 0.799로 RoboPEPP 0.780 초월** (azure/kinect/realsense 3승, orb −0.004 근접). DARK decode(무료)가 orb 격차 −0.010→−0.004. PoseDiff는 **저자가 직접 철회**(2025-10-30, "실험 설정·지표의 엄밀성 부족으로 비교 공정성 훼손" — arXiv:2509.24591 v2 확인) — 수치 무효. CtRNet 계열 0.86은 known-angle+real self-train. RoboTAG만 주시.
 
 ### 가림 대응 메커니즘 비교 (핵심만)
 - **RoboPEPP**: 관절 영역 마스킹 + embedding-predictive 사전학습 + conf 필터 PnP → 40% 가림 AUC 35.1 (RoboPose 14.5). 단 **from-scratch co-train 인코더** 전제 — frozen-DINOv3 이식은 우리 반증과 동일 계열이라 금지.
