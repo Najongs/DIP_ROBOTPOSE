@@ -55,6 +55,10 @@ def main():
     ap.add_argument('--max-frames', type=int, default=0, help='0 = all dumped frames')
     ap.add_argument('--occlude-ratio', type=float, default=0.0,
                     help='paint the SAME deterministic occluders as selfbbox_eval --occlude-ratio (seeded per frame+ratio) so SAM sees the occluded image the pose stage saw')
+    ap.add_argument('--multi-start', action='store_true',
+                    help='multi-start RC over base-Z rotation perturbations of the init pose; final hypothesis chosen by SAM-IoU (external-evidence basin selection)')
+    ap.add_argument('--ms-deltas', default='30,60', help='perturbation magnitudes in degrees (each used as +/-)')
+    ap.add_argument('--ms-margin', type=float, default=0.01, help='challenger must beat hypothesis-0 IoU by this margin')
     ap.add_argument('--occl-robust-w', type=float, default=-1.0,
                     help='if >=0: occlusion-robust pixel-weighted IoU — downweight to this value the pixels where the INIT render says robot but SAM says background (candidate external occluder covering the robot), so the occluded part is inferred from FK + the visible remainder instead of being penalized. -1 = off (plain soft-IoU).')
     ap.add_argument('--viz', default=None)
@@ -83,6 +87,7 @@ def main():
     STD = torch.tensor(IMAGENET_STD, device=device).view(3, 1, 1)
 
     adds_base, adds_rc, skipped, sam_ious = [], [], 0, []
+    ms_switched = 0
     B = args.batch_size
     for lo in tqdm(range(0, len(fids), B), desc='rc-refine'):
         idxs = list(range(lo, min(lo + B, len(fids))))
@@ -143,28 +148,54 @@ def main():
             union = (pix_w * (a + b - a * b)).sum((-1, -2))
             return inter / (union + 1e-6)
 
-        d6 = matrix_to_rot6d(R0).clone().detach().requires_grad_(True)
-        tt = t0.clone().detach().requires_grad_(True)
-        pth = th0[:, :6].clone().detach().requires_grad_(True)
-        opt = torch.optim.Adam([d6, tt, pth], lr=args.rc_lr)
-        zc = torch.zeros(pth.shape[0], 1, device=device)
-        for _ in range(args.rc_iters):
-            opt.zero_grad()
-            th = torch.cat([pth, zc], 1); R = rot6d_to_matrix(d6)
-            mask = rdr(rdr.robot_verts(th, all_link_transforms), R, tt, K, H, S)
-            l_iou = (use * (1 - w_soft_iou(mask, tgt))).sum() / use.sum().clamp(min=1)
-            fk = panda_forward_kinematics(th)
-            cam = torch.einsum('bij,bpj->bpi', R, fk) + tt.unsqueeze(1)
-            uv = project(cam, K)
-            l_uv = (((uv - uv_anchor) / S) * wconf.unsqueeze(-1)).pow(2).mean()
-            (l_iou + args.repro_w * l_uv).backward()
-            opt.step()
+        def refine_from(R_init):
+            """One conservative RC refine from a given camera-rotation init. Returns per-frame
+            (kp_rc, uv_rc, final hard IoU vs tgt)."""
+            d6 = matrix_to_rot6d(R_init).clone().detach().requires_grad_(True)
+            tt = t0.clone().detach().requires_grad_(True)
+            pth = th0[:, :6].clone().detach().requires_grad_(True)
+            opt = torch.optim.Adam([d6, tt, pth], lr=args.rc_lr)
+            zc = torch.zeros(pth.shape[0], 1, device=device)
+            for _ in range(args.rc_iters):
+                opt.zero_grad()
+                th = torch.cat([pth, zc], 1); R = rot6d_to_matrix(d6)
+                mask = rdr(rdr.robot_verts(th, all_link_transforms), R, tt, K, H, S)
+                l_iou = (use * (1 - w_soft_iou(mask, tgt))).sum() / use.sum().clamp(min=1)
+                fk = panda_forward_kinematics(th)
+                cam = torch.einsum('bij,bpj->bpi', R, fk) + tt.unsqueeze(1)
+                uv = project(cam, K)
+                l_uv = (((uv - uv_anchor) / S) * wconf.unsqueeze(-1)).pow(2).mean()
+                (l_iou + args.repro_w * l_uv).backward()
+                opt.step()
+            with torch.no_grad():
+                th = torch.cat([pth, zc], 1); R = rot6d_to_matrix(d6)
+                fk = panda_forward_kinematics(th)
+                kp = torch.einsum('bij,bpj->bpi', R, fk) + tt.unsqueeze(1)
+                uv = project(kp, K)
+                m = (rdr(rdr.robot_verts(th, all_link_transforms), R, tt, K, H, S) > 0.5).float()
+                inter = (m * tgt).sum((-1, -2)); union = ((m + tgt) > 0).float().sum((-1, -2)).clamp(min=1)
+            return kp, uv, inter / union
 
-        with torch.no_grad():
-            th = torch.cat([pth, zc], 1); R = rot6d_to_matrix(d6)
-            fk = panda_forward_kinematics(th)
-            kp_rc = torch.einsum('bij,bpj->bpi', R, fk) + tt.unsqueeze(1)
-            uv_rc = project(kp_rc, K)
+        # multi-start over the base-Z gauge circle: 2D keypoints CANNOT tell these hypotheses
+        # apart (that IS the foreshortening/base-yaw ambiguity), but the exact-mesh silhouette
+        # can — selection by SAM-IoU is an EXTERNAL-evidence selector (unlike the refuted
+        # learned-selector MCL). Hypothesis 0 = original init; challengers must beat it by a
+        # margin (do-no-harm).
+        deltas = [0.0]
+        if args.multi_start:
+            for dgn in [float(x) for x in args.ms_deltas.split(',') if x.strip()]:
+                deltas += [np.deg2rad(dgn), -np.deg2rad(dgn)]
+        kp_rc, uv_rc, best_iou = refine_from(R0)
+        for dlt in deltas[1:]:
+            c, s = float(np.cos(dlt)), float(np.sin(dlt))
+            Rz = torch.tensor([[c, -s, 0.], [s, c, 0.], [0., 0., 1.]], device=device)
+            kp_k, uv_k, iou_k = refine_from(R0 @ Rz)
+            better = (iou_k > best_iou + args.ms_margin) & (use > 0)
+            if better.any():
+                kp_rc = torch.where(better.view(-1, 1, 1), kp_k, kp_rc)
+                uv_rc = torch.where(better.view(-1, 1, 1), uv_k, uv_rc)
+                best_iou = torch.where(better, iou_k, best_iou)
+                ms_switched += int(better.sum())
         for b in range(len(idxs)):
             fb = found[b].bool()
             if fb.sum() < 5:
@@ -184,6 +215,8 @@ def main():
     print(f"  baseline (deployed dump) ADD-AUC@100mm {add_auc(adds_base):.4f}  mean {1000*np.mean(adds_base):.1f}mm")
     print(f"  + nvdr/SAM render-compare ADD-AUC@100mm {add_auc(adds_rc):.4f}  mean {1000*np.mean(adds_rc):.1f}mm")
     print(f"  Δ: {add_auc(adds_rc)-add_auc(adds_base):+.4f}")
+    if args.multi_start:
+        print(f"  [multi-start] deltas ±{args.ms_deltas}°, switched hypothesis on {ms_switched} frames")
 
 
 if __name__ == '__main__':
