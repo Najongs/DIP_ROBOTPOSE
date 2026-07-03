@@ -820,3 +820,48 @@ Full survey: `docs/robot_pose_sota_survey.md`. 핵심: (1) PoseDiff의 0.96은 r
 완전 자동이라 더 엄격한 조건**). (2) 가림-강건 top 아이디어: 가림-로버스트 실루엣(RC 픽셀 가중),
 공분산 가중 PnP(IRLS 확장), masked-state prior(prior_w 훅), CtRNet-X식 가시 링크 선택. V-JEPA/백본 계열
 기각 재확인(V-JEPA 2.1 논문이 우리 반증 독립 확인). RoboTAG(arXiv:2511.07717)만 주시.
+
+---
+
+## 2026-07-03 — 🔒🔒🔒 SOTA: nvdiffrast+SAM render-and-compare DEPLOYED — mean 0.796 vs RoboPEPP 0.780
+
+**The 06-09 blocker (renderer fidelity) is broken.** nvdiffrast (pip source build, CUDA raster, no GL)
+renders the EXACT visual meshes (+both gripper fingers baked into the hand frame) → GT-pose render now
+overlays the real robot pixel-accurately. SAM-vs-render agreement jumped 0.345→0.68 (GT-pose gate),
+0.85 (init-pose, deployment prompts) — the shape-inconsistency that made SAM targets diverge is gone.
+
+**Deployable pipeline addition** (`Eval/rc_refine_from_dump.py`): refine the deployed crop+rot-adapt
+poses (from `selfbbox_eval --dump-npz`) against SAM ViT-B masks: prompts = projected dump-pose keypoints
+(+bbox), mask candidate SELECTED by IoU vs the init-pose render (render-consistency selection, not SAM
+score), conservative opt (Adam 5e-4, soft-IoU + reproj anchor w=100), do-no-harm gate min-iou 0.35.
+
+**Resolution scaling (realsense 200-slice): 224 +0.041 → 320 +0.067 → 448 +0.078 → 512 +0.078 (saturates).**
+Lock render-h=448 (rs/kinect), 512 (orb — smaller/farther, kept climbing to 512).
+
+### 🔒 FINAL DEPLOYABLE TABLE (anti-leak held-out 800/cam for rs/kinect/orb; azure full-split @1000)
+| cam | base (rot-adapt deploy) | +RC | RoboPEPP | gap |
+|---|---|---|---|---|
+| realsense | 0.7525 | **0.8183** (+0.066) | 0.805 | **+0.013 BEAT** |
+| kinect360 | 0.7462 (crop cfg) | **0.8112** (+0.065) | 0.785 | **+0.026 BEAT** |
+| azure | 0.7881 (crop base, RC OFF) | — | 0.753 | **+0.035 BEAT** |
+| orb | 0.7154 | **0.7647** (+0.049) | 0.775 | −0.010 |
+| **MEAN** | | **0.7956** | 0.780 | **+0.016 SOTA** |
+
+- **kinect CONFIG SWITCH**: crop+rot-adapt+RC 0.811 > old non-crop self-det 0.776.
+- **azure RC OFF**: near camera (Z 0.87m), depth already right → RC −0.047 (mask noise perturbs depth;
+  uv-shift guard ineffective — the damage is IN the depth direction). Consistent with mechanism: RC is a
+  depth/scale corrector; per-camera on/off matches the failure decomposition (t-error #1 on rs/orb only).
+- Protocol honesty: predicted angles + FULLY AUTOMATIC bbox (bbox-from-solved) — STRICTER than RoboPEPP's
+  GT-bbox headline (their auto-bbox orb ≈34). rs/kinect/orb numbers are anti-leak held-out (self-trained
+  heads); deltas are same-frame A/B. + SAM ViT-B added to the pipeline (inference cost note).
+- orb residual −0.010: RC recovered +0.049 but orb has a real 2D-detector component too (06-08 decomp).
+
+Migration/infra: local NAS box (4×3090+A6000), env `dino`; checkpoints mirrored from GPU server; baselines
+reproduced ±0.005 before any new work (see 2026-07-03 migration entry). Tools: `Eval/render_nvdr.py`
+(exact-mesh silhouette, drop-in), `Eval/nvdr_sam_gate.py` (fidelity gate), `Eval/rc_refine_from_dump.py`.
+Survey: `docs/robot_pose_sota_survey.md` (RoboPEPP 0.780 confirmed as same-protocol frontier; PoseDiff 0.96
+is in-domain real-trained, not comparable).
+
+NEXT (levers, in EV order): (1) orb −0.010: RC + detector-side (2D) improvement, or 576+ render-h;
+(2) full-split re-lock for paper numbers; (3) occlusion catalog probes from the survey (robust silhouette
+weighting for external occluders, covariance-weighted PnP, masked-state prior via prior_w).

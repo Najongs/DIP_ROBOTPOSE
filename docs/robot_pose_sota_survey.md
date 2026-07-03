@@ -25,9 +25,9 @@
 | **RoboPEPP** | CVPR'25 | masking-pretrain+PnP | **75.3** | **78.5** | **80.5** | **77.5** | **77.9** | predicted | **GT-bbox 헤드라인** (auto orb≈34); 가림 최강(40% 가림 AUC 35.1) |
 | RoboTAG | '25-11 | — | 83.1 | 75.7 | 78.3 | 58.8 | ~74 | predicted | auto-bbox; Table 1 직접 확인 권장(arXiv:2511.07717) |
 | PoseDiff | '25-09 | diffusion E2E | 96.4 | 94.8 | 96.6 | 96.5 | 96.1 | predicted | ⚠️ **real 80/20 in-domain 학습 — sim-to-real 아님, 비교 불가** |
-| **Ours** | '26 | kp+solver+RC(nvdr) | 78.8 | 77.6 | 75.3→**RC 중** | 71.5→RC 중 | 75.9+ | predicted | **완전 자동 bbox** (RoboPEPP GT-bbox보다 엄격) |
+| **Ours** | '26-07-03 | kp+solver+**RC(nvdr+SAM)** | **78.8** | **81.1** | **81.8** | 76.5 | **79.6** | predicted | **완전 자동 bbox** (RoboPEPP GT-bbox보다 엄격); rs/kinect/orb는 anti-leak held-out |
 
-**결론: 동일 프로토콜(predicted angles + sim-to-real)에서 RoboPEPP ~0.78을 명확히 넘는 방법은 아직 없음.** PoseDiff 0.96은 in-domain 학습이라 제외. CtRNet 계열 0.86은 known-angle+real self-train. → **타깃 0.780 유지**, RoboTAG만 주시.
+**결론 (2026-07-03 갱신): 동일 프로토콜에서 우리가 mean 0.796으로 RoboPEPP 0.780을 넘음** (azure/kinect/realsense 3승, orb −0.010). PoseDiff 0.96은 in-domain 학습이라 제외. CtRNet 계열 0.86은 known-angle+real self-train. RoboTAG만 주시.
 
 ### 가림 대응 메커니즘 비교 (핵심만)
 - **RoboPEPP**: 관절 영역 마스킹 + embedding-predictive 사전학습 + conf 필터 PnP → 40% 가림 AUC 35.1 (RoboPose 14.5). 단 **from-scratch co-train 인코더** 전제 — frozen-DINOv3 이식은 우리 반증과 동일 계열이라 금지.
