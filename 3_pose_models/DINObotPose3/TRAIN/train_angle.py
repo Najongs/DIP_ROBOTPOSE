@@ -73,6 +73,9 @@ def main(args):
     n_det = sum(1 for k in loaded if k.startswith('backbone.') or k.startswith('keypoint_head.'))
     print(f"==> Loaded {len(loaded)} tensors from detector ({n_det} into backbone+keypoint_head)")
     model.freeze_detector()
+    if args.init_head:
+        model.angle_head.load_state_dict(torch.load(args.init_head, map_location=device))
+        print(f'[warm-start] angle_head <- {args.init_head}')
 
     opt = optim.AdamW(model.angle_head.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     sched = optim.lr_scheduler.CosineAnnealingLR(opt, T_max=args.epochs, eta_min=args.min_lr)
@@ -93,7 +96,12 @@ def main(args):
             has = batch['has_angles'].to(device).bool() if 'has_angles' in batch else torch.ones(len(imgs), dtype=torch.bool, device=device)
             K = scale_K(batch['camera_K'], batch['original_size'], args.image_size).to(device)
 
-            out_d = model(imgs, K, kp_jitter=args.kp_jitter)
+            if args.occlude_aug > 0:
+                import sys as _s, os as _o
+                _s.path.append(_o.path.join(_o.path.dirname(_o.path.abspath(__file__)), '../Eval'))
+                from occl_util import paste_random_occluders_
+                paste_random_occluders_(imgs, batch['keypoints'].numpy(), batch['valid_mask'].numpy(), args.occlude_aug)
+            out_d = model(imgs, K, kp_jitter=args.kp_jitter, kp_drop=args.kp_drop)
             sc = out_d['sin_cos']                       # (B,6,2)
             gt6 = gt[:, :6]
             gt_sc = torch.stack([torch.sin(gt6), torch.cos(gt6)], dim=-1)
@@ -161,6 +169,11 @@ if __name__ == '__main__':
     p.add_argument('--crop-to-robot', action='store_true',
                    help='crop image to robot bbox (train+test), RoboPEPP-style; must match detector ckpt')
     p.add_argument('--crop-margin', type=float, default=1.5)
+    p.add_argument('--occlude-aug', type=float, default=0.0,
+                   help='train-time occlusion augmentation: with prob 0.5 paste black occluders covering U(0.05,THIS) of the robot RoI (frozen detector -> head learns to handle degraded conf/keypoints)')
+    p.add_argument('--kp-drop', type=float, default=0.0,
+                   help='keypoint-level occlusion aug: randomly displace+deconfidence keypoints (model_angle.forward kp_drop)')
+    p.add_argument('--init-head', default=None, help='warm-start angle_head from this state dict')
     p.add_argument('--kp-jitter', type=float, default=0.0,
                    help='train-time Gaussian px noise on detected 2D before geo/sampling (J0 noise-robustness)')
     p.add_argument('--num-workers', type=int, default=8)

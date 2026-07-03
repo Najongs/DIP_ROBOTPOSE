@@ -68,3 +68,16 @@ def paste_occluders_batch_(imgs, kps_xy, valids, ratio, fids):
         return
     for b in range(imgs.shape[0]):
         paste_occluders_(imgs[b], kps_xy[b], valids[b], ratio, str(fids[b]))
+
+
+def paste_random_occluders_(imgs, kps_xy, valids, max_ratio, prob=0.5, rng=None):
+    """TRAIN-time augmentation: with probability `prob` per sample, occlude a Uniform(0.05,
+    max_ratio) fraction of the RoI (non-deterministic). Teaches heads to handle the degraded
+    heatmap/conf/keypoint inputs an occluded robot produces (backbone/detector stay frozen)."""
+    if max_ratio <= 0:
+        return
+    rng = rng or np.random
+    for b in range(imgs.shape[0]):
+        if rng.rand() < prob:
+            r = float(rng.uniform(0.05, max_ratio))
+            paste_occluders_(imgs[b], kps_xy[b], valids[b], r, f"aug{rng.randint(1 << 30)}")

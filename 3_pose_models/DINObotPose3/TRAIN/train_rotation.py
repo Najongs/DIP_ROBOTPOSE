@@ -70,6 +70,9 @@ def main(args):
     msd = model.state_dict()
     model.load_state_dict({k: v for k, v in ckpt.items() if k in msd and v.shape == msd[k].shape}, strict=False)
     model.freeze_detector()
+    if args.init_head:
+        model.rot_head.load_state_dict(torch.load(args.init_head, map_location=device))
+        print(f'[warm-start] rot_head <- {args.init_head}')
     print("==> training rotation head only")
 
     opt = optim.AdamW(model.rot_head.parameters(), lr=args.lr, weight_decay=args.weight_decay)
@@ -92,6 +95,11 @@ def main(args):
             if keep.sum() == 0:
                 continue
             Rg, tg = gt_pose(gt_ang, kp3d, valid)
+            if args.occlude_aug > 0:
+                import sys as _s, os as _o
+                _s.path.append(_o.path.join(_o.path.dirname(_o.path.abspath(__file__)), '../Eval'))
+                from occl_util import paste_random_occluders_
+                paste_random_occluders_(imgs, batch['keypoints'].numpy(), batch['valid_mask'].numpy(), args.occlude_aug)
             o = model(imgs, K)
             r_loss = ((o['rot_matrix'][keep] - Rg[keep]) ** 2).sum(dim=(1, 2)).mean()  # Frobenius^2
             t_loss = F.smooth_l1_loss(o['trans'][keep], tg[keep])                       # meters
@@ -144,6 +152,9 @@ if __name__ == '__main__':
     p.add_argument('--min-lr', type=float, default=1e-6); p.add_argument('--weight-decay', type=float, default=1e-4)
     p.add_argument('--t-weight', type=float, default=1.0, help='weight on the translation SmoothL1 loss')
     p.add_argument('--crop-to-robot', action='store_true', help='robot-bbox crop (match a crop-trained detector)')
+    p.add_argument('--occlude-aug', type=float, default=0.0,
+                   help='train-time occlusion augmentation (see train_angle.py --occlude-aug)')
+    p.add_argument('--init-head', default=None, help='warm-start rot_head from this state dict')
     p.add_argument('--crop-margin', type=float, default=1.5)
     p.add_argument('--num-workers', type=int, default=8)
     p.add_argument('--use-wandb', action='store_true')
