@@ -50,7 +50,13 @@ def main():
     ap.add_argument('--rc-lr', type=float, default=5e-4)
     ap.add_argument('--repro-w', type=float, default=100.0)
     ap.add_argument('--min-iou', type=float, default=0.35, help='skip refine when SAM-vs-init-render IoU below this (do-no-harm)')
+    ap.add_argument('--max-uv-shift', type=float, default=0.0,
+                    help='if >0: REVERT frames whose refined pose moved the 2D reprojection more than this many px from the dump anchor. The intended depth correction is 2D-invariant (monocular ambiguity direction); a large 2D shift means the mask dragged the pose sideways.')
     ap.add_argument('--max-frames', type=int, default=0, help='0 = all dumped frames')
+    ap.add_argument('--occlude-ratio', type=float, default=0.0,
+                    help='paint the SAME deterministic occluders as selfbbox_eval --occlude-ratio (seeded per frame+ratio) so SAM sees the occluded image the pose stage saw')
+    ap.add_argument('--occl-robust-w', type=float, default=-1.0,
+                    help='if >=0: occlusion-robust pixel-weighted IoU — downweight to this value the pixels where the INIT render says robot but SAM says background (candidate external occluder covering the robot), so the occluded part is inferred from FK + the visible remainder instead of being penalized. -1 = off (plain soft-IoU).')
     ap.add_argument('--viz', default=None)
     args = ap.parse_args()
     device = torch.device('cuda'); S = args.image_size; H = args.render_h
@@ -81,9 +87,15 @@ def main():
     for lo in tqdm(range(0, len(fids), B), desc='rc-refine'):
         idxs = list(range(lo, min(lo + B, len(fids))))
         items = [ds[order[i]] for i in idxs]
-        img = torch.stack([it['image'] for it in items]).to(device)
-        K = scale_K(torch.stack([it['camera_K'] for it in items]),
-                    torch.stack([it['original_size'] for it in items]), S).to(device)
+        img = torch.stack([torch.as_tensor(it['image']) for it in items]).to(device)
+        if args.occlude_ratio > 0:
+            from occl_util import paste_occluders_
+            for b, it in enumerate(items):
+                sc = S / np.asarray(it['original_size'], dtype=np.float32)      # (2,) w,h scale
+                paste_occluders_(img[b], np.asarray(it['gt_2d']) * sc[None, :],
+                                 np.asarray(it['found']), args.occlude_ratio, fids[idxs[b]])
+        K = scale_K(torch.stack([torch.as_tensor(it['camera_K']).float() for it in items]),
+                    torch.stack([torch.as_tensor(it['original_size']) for it in items]), S).to(device)
         th0 = theta_d[idxs].to(device); kpc0 = kpcam_d[idxs].to(device)
         gt3d = gt3d_d[idxs].to(device); found = found_d[idxs].to(device)
 
@@ -115,6 +127,22 @@ def main():
             if iou3[j] >= args.min_iou:                                        # do-no-harm gate
                 tgt[b] = cands[j]; use[b] = 1.0
 
+        # occlusion-robust pixel weights: "init-render robot BUT SAM background" = candidate
+        # external occluder ON the robot -> don't penalize the render there; the hidden part is
+        # then constrained by FK + the visible remainder ("infer roughly through the occluder").
+        pix_w = None
+        if args.occl_robust_w >= 0:
+            occluder_cand = (init_mask > 0.5) & (tgt < 0.5)               # (B,H,H)
+            pix_w = torch.where(occluder_cand, torch.full_like(init_mask, args.occl_robust_w),
+                                torch.ones_like(init_mask))
+
+        def w_soft_iou(a, b):
+            if pix_w is None:
+                return soft_iou(a, b)
+            inter = (pix_w * a * b).sum((-1, -2))
+            union = (pix_w * (a + b - a * b)).sum((-1, -2))
+            return inter / (union + 1e-6)
+
         d6 = matrix_to_rot6d(R0).clone().detach().requires_grad_(True)
         tt = t0.clone().detach().requires_grad_(True)
         pth = th0[:, :6].clone().detach().requires_grad_(True)
@@ -124,7 +152,7 @@ def main():
             opt.zero_grad()
             th = torch.cat([pth, zc], 1); R = rot6d_to_matrix(d6)
             mask = rdr(rdr.robot_verts(th, all_link_transforms), R, tt, K, H, S)
-            l_iou = (use * (1 - soft_iou(mask, tgt))).sum() / use.sum().clamp(min=1)
+            l_iou = (use * (1 - w_soft_iou(mask, tgt))).sum() / use.sum().clamp(min=1)
             fk = panda_forward_kinematics(th)
             cam = torch.einsum('bij,bpj->bpi', R, fk) + tt.unsqueeze(1)
             uv = project(cam, K)
@@ -136,13 +164,16 @@ def main():
             th = torch.cat([pth, zc], 1); R = rot6d_to_matrix(d6)
             fk = panda_forward_kinematics(th)
             kp_rc = torch.einsum('bij,bpj->bpi', R, fk) + tt.unsqueeze(1)
+            uv_rc = project(kp_rc, K)
         for b in range(len(idxs)):
             fb = found[b].bool()
             if fb.sum() < 5:
                 continue
             base = float((kpc0[b][fb] - gt3d[b][fb]).norm(dim=-1).mean())
             adds_base.append(base)
-            if use[b] > 0:
+            shift = float((uv_rc[b][fb] - uv_anchor[b][fb]).norm(dim=-1).mean())
+            reverted = args.max_uv_shift > 0 and shift > args.max_uv_shift
+            if use[b] > 0 and not reverted:
                 adds_rc.append(float((kp_rc[b][fb] - gt3d[b][fb]).norm(dim=-1).mean()))
             else:
                 adds_rc.append(base); skipped += 1

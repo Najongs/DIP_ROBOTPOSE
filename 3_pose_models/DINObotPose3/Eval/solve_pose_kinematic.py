@@ -183,10 +183,43 @@ def pnp_init(kp_2d, kp_3d_robot, K, conf=None, conf_gate=0.0, min_kp=6, pnp_rel=
 # ---------------------------------------------------------------------------
 # Core optimizer (batched, all frames independent)
 # ---------------------------------------------------------------------------
+def heatmap_cov_inv(heatmaps, kp2d, win=15, sigma_min=1.0, sigma_max=64.0):
+    """Per-keypoint ANISOTROPIC 2x2 inverse covariance from the heatmap's local second moments
+    around the soft-argmax peak. Occluded/ambiguous keypoints produce diffuse or multimodal
+    heatmaps -> large covariance -> smoothly down-weighted (Mahalanobis) instead of hard-gated.
+    heatmaps: (B,N,H,W) (heatmap res == image res in this repo), kp2d: (B,N,2) px. Returns (B,N,2,2)."""
+    B, N, H, W = heatmaps.shape
+    dev = heatmaps.device
+    r = win // 2
+    cx = kp2d[..., 0].round().long().clamp(r, W - 1 - r)          # (B,N)
+    cy = kp2d[..., 1].round().long().clamp(r, H - 1 - r)
+    off = torch.arange(-r, r + 1, device=dev)
+    gy = (cy.unsqueeze(-1) + off).unsqueeze(-1)                    # (B,N,win,1)
+    gx = (cx.unsqueeze(-1) + off).unsqueeze(-2)                    # (B,N,1,win)
+    patch = heatmaps.clamp(min=0.0)[
+        torch.arange(B, device=dev)[:, None, None, None],
+        torch.arange(N, device=dev)[None, :, None, None],
+        gy.expand(B, N, win, win), gx.expand(B, N, win, win)]      # (B,N,win,win)
+    p = patch / patch.sum(dim=(-1, -2), keepdim=True).clamp(min=1e-8)
+    xs = off.view(1, 1, 1, win).expand(B, N, win, win).float()     # local coords about the peak
+    ys = off.view(1, 1, win, 1).expand(B, N, win, win).float()
+    mx = (p * xs).sum(dim=(-1, -2)); my = (p * ys).sum(dim=(-1, -2))
+    vxx = (p * (xs - mx[..., None, None]) ** 2).sum(dim=(-1, -2))
+    vyy = (p * (ys - my[..., None, None]) ** 2).sum(dim=(-1, -2))
+    vxy = (p * (xs - mx[..., None, None]) * (ys - my[..., None, None])).sum(dim=(-1, -2))
+    lo, hi = sigma_min ** 2, sigma_max ** 2
+    vxx = vxx.clamp(lo, hi); vyy = vyy.clamp(lo, hi); vxy = vxy.clamp(-hi, hi)
+    det = (vxx * vyy - vxy ** 2).clamp(min=lo * lo * 0.25)
+    inv = torch.stack([torch.stack([vyy / det, -vxy / det], -1),
+                       torch.stack([-vxy / det, vxx / det], -1)], -2)  # (B,N,2,2)
+    return inv
+
+
 def solve_batch(kp_2d, conf, K, fix_joint7=True, iters=250, lr=5e-2,
                 img_size=512, device='cuda', prior_w=2e-3, theta_init=None,
                 conf_gate=0.0, anchor_init_w=0.0, min_kp=6, pnp_rel=0.0, pnp_drop=3,
-                R_init=None, t_init=None, gt_tz=None, depth_w=0.0, return_pose=False):
+                R_init=None, t_init=None, gt_tz=None, depth_w=0.0, return_pose=False,
+                cov_inv=None, prior_adaptive=0.0):
     """
     kp_2d: (B,N,2) tensor, conf: (B,N) tensor, K: (B,3,3) tensor.
     theta_init: optional (B,7) tensor — learned-prediction init (refinement mode).
@@ -199,6 +232,10 @@ def solve_batch(kp_2d, conf, K, fix_joint7=True, iters=250, lr=5e-2,
                         mean. Joints whose keypoints are gated out keep no data constraint, so
                         this prior makes them fall back to the learned estimate instead of
                         drifting -> "when occluded, predict from the kinematic/learned prior".
+      cov_inv (B,N,2,2): OPTIONAL anisotropic inverse covariance (from heatmap_cov_inv) —
+                        the reprojection residual becomes a Mahalanobis (whitened) distance, so
+                        diffuse/ambiguous heatmaps are down-weighted CONTINUOUSLY per-direction
+                        (upgrade of the scalar-conf weighting; conf_gate still composes).
     Returns theta (B,7), kp_cam (B,N,3), reproj_px (B,).
     """
     B, N = kp_2d.shape[:2]
@@ -265,18 +302,42 @@ def solve_batch(kp_2d, conf, K, fix_joint7=True, iters=250, lr=5e-2,
         fk = panda_forward_kinematics(theta)            # (B,N,3)
         R = rot6d_to_matrix(d6)
         uv, _ = project_points(fk, R, t, K)             # (B,N,2)
-        resid_px = (uv - kp_2d).norm(dim=-1)            # (B,N) pixels
+        err = uv - kp_2d                                 # (B,N,2)
+        if cov_inv is not None:
+            # Mahalanobis/whitened residual: sharp peaks count at full strength, diffuse
+            # (occluded) peaks are attenuated per-direction. Scale by a nominal sigma so the
+            # whitened magnitude stays in "pixels" for the shared Huber/IRLS thresholds.
+            quad = torch.einsum('bni,bnij,bnj->bn', err, cov_inv, err).clamp(min=0)
+            resid_px = quad.sqrt() * 2.0                 # nominal sigma 2px -> whitened px
+        else:
+            resid_px = err.norm(dim=-1)                  # (B,N) pixels
         # IRLS robust reweighting (Geman-McClure-ish): outliers get down-weighted.
         if it > 30:
             robust = (huber_px ** 2) / (huber_px ** 2 + resid_px.detach() ** 2)
             w = base_w * robust
             w = w / w.sum(dim=1, keepdim=True).clamp(min=1e-6)
-        # Huber on normalized pixel residual for stable LR
-        res = (uv - kp_2d) / img_size
-        loss_per = F.huber_loss(res, torch.zeros_like(res), delta=0.01, reduction='none').sum(-1)
+        if cov_inv is not None:
+            # Huber on the whitened distance (already combines both axes)
+            res_n = resid_px / img_size
+            loss_per = F.huber_loss(res_n, torch.zeros_like(res_n), delta=0.01, reduction='none')
+        else:
+            # LEGACY path preserved bit-exact: per-component Huber on normalized residual
+            res = err / img_size
+            loss_per = F.huber_loss(res, torch.zeros_like(res), delta=0.01, reduction='none').sum(-1)
         loss = (w * loss_per).sum(dim=1).mean()
         # Light prior on theta to resolve depth-ambiguous null-space directions.
         loss = loss + prior_w * ((theta[:, :6] - theta_mean[:6]) ** 2).mean()
+        if prior_adaptive > 0.0:
+            # Occlusion-adaptive configuration prior ("masked-state prior", analytic form):
+            # DREAM synth joints are INDEPENDENT (max |corr| 0.06) but NOT uniform, so the full
+            # information content of a learned state prior reduces to per-joint Gaussians.
+            # Weight grows as keypoint evidence disappears -> "the less we see, the more we lean
+            # on the plausible-configuration prior" (per-frame, differentiable).
+            sigma = torch.tensor([1.02, 0.65, 0.50, 0.50, 0.75, 0.50], device=device)  # synth stds
+            vis_frac = (conf > max(conf_gate, 0.05)).float().mean(dim=1)               # (B,)
+            occ_w = prior_adaptive * (1.0 - vis_frac).clamp(min=0.0)                   # (B,)
+            maha = (((theta[:, :6] - theta_mean[:6]) / sigma) ** 2).mean(dim=1)        # (B,)
+            loss = loss + (occ_w * maha).mean()
         # GT-depth ceiling probe: anchor solved root depth t_z to GT base depth, re-solve R,theta
         # consistently around it (gauge-safe oracle test of "would correct depth fix the pose?").
         if depth_w > 0.0 and gt_tz is not None:
