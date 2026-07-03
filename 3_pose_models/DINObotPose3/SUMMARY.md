@@ -19,6 +19,12 @@ anti-leak held-out 800/cam. Key facts: RC gain scales with render resolution (sa
 RC = depth/scale corrector → per-camera on/off (helps far/foreshortened cams only). Details in
 EXPERIMENTS.md 2026-07-03; SOTA survey in `docs/robot_pose_sota_survey.md`. Remaining: orb −0.010.
 
+**Occlusion robustness (RoboPEPP Fig.6 protocol, same-day):** ours +RC = 0.775/0.726/**0.626**/**0.525**/0.328
+at 0-40% RoI occlusion vs RoboPEPP 0.795/0.730/0.600/0.470/0.351 — **WIN at 20-30%**, identical degradation
+slope. cov-PnP (heatmap-covariance Mahalanobis, `--cov-pnp`) ADOPTED (do-no-harm, +0.011@20%). REFUTED:
+occl-robust silhouette downweighting (depth bias) and population-mean adaptive prior (fights the true
+config; learned state prior skipped — synth joints independent). Bench: `Eval/occlusion_bench.sh`.
+
 ## Pipeline (deployable, oracle-free)
 ```
 image → [self-bbox: full-frame DINOv3 detector + kinematic solve → project FK 7 kp → crop bbox]
