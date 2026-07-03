@@ -812,3 +812,11 @@ batched clip-space projection from K, dr.antialias edge gradients), drop-in for 
 `render_mesh`, with a smoke test (IoU vs splat + real-image overlays). Blocked on `pip install
 nvdiffrast` (GitHub source; awaiting user-run install). Pose dumps for cross-checking saved to
 `Eval/rc_dumps/{realsense,azure,orb}_*.npz`.
+
+## 2026-07-03 — 문헌 서베이: 타깃 0.780 유지 확정 + 가림 아이디어 랭킹
+Full survey: `docs/robot_pose_sota_survey.md`. 핵심: (1) PoseDiff의 0.96은 real-학습 in-domain — 비교 무효,
+**동일 프로토콜(predicted angles + sim-to-real)에서 RoboPEPP 0.780이 여전히 프론티어** (RoboPEPP 수치
+75.3/78.5/80.5/77.5 원문 검증, 단 GT-bbox 헤드라인이며 auto-bbox면 orb ~34 — **우리 bbox-from-solved는
+완전 자동이라 더 엄격한 조건**). (2) 가림-강건 top 아이디어: 가림-로버스트 실루엣(RC 픽셀 가중),
+공분산 가중 PnP(IRLS 확장), masked-state prior(prior_w 훅), CtRNet-X식 가시 링크 선택. V-JEPA/백본 계열
+기각 재확인(V-JEPA 2.1 논문이 우리 반증 독립 확인). RoboTAG(arXiv:2511.07717)만 주시.

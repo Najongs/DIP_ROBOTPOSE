@@ -15,4 +15,5 @@
 
 - 워크스페이스 전체 구조·규칙: 루트 [README.md](../README.md), [CLAUDE.md](../CLAUDE.md)
 - DINObotPose3 실험 상세 기록: [`3_pose_models/DINObotPose3/EXPERIMENTS.md`](../3_pose_models/DINObotPose3/EXPERIMENTS.md) (실험 일지), [`SUMMARY.md`](../3_pose_models/DINObotPose3/SUMMARY.md) (확정 결론·재개 방법)
+- DREAM SOTA 문헌 서베이 + 가림-강건 아이디어: [robot_pose_sota_survey.md](robot_pose_sota_survey.md) (2026-07-03, 프로토콜 3축 주의사항 포함)
 - 통합 파이프라인 설치: [`4_perception/DINOv3_fine_tunning/PIPELINE_SETUP.md`](../4_perception/DINOv3_fine_tunning/PIPELINE_SETUP.md)
