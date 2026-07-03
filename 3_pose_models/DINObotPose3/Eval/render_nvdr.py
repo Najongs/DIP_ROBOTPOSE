@@ -30,20 +30,34 @@ def _mesh_path(kind, name):
     return sub if os.path.exists(sub) else os.path.join(MESH_ROOT, kind, name + '.obj')
 
 
-def load_link_meshes(device, kind=_MESH_KIND_DEFAULT):
+def load_link_meshes(device, kind=_MESH_KIND_DEFAULT, finger_open=0.02):
     """Load every link mesh with FACES (trimesh handles multi-object OBJ), concatenated into one
     buffer with per-link vertex slices so the whole robot rasterizes in a single call.
+    Both gripper fingers are baked into the HAND frame at a fixed half-opening `finger_open`
+    (URDF: finger joints prismatic ±y at xyz 0,0,0.0584; right finger mesh z-rotated pi) —
+    SAM masks include the fingers, so the render must too or IoU pays a systematic tax.
     Returns dict(verts=(V,3) float32 tensor, faces=(F,3) int32 tensor, slices=[(fidx, lo, hi)])."""
     import trimesh
     verts, faces, slices = [], [], []
     off = 0
-    for name, fidx in LINK_MESH:
-        m = trimesh.load(_mesh_path(kind, name), force='mesh', process=False)
-        v = np.asarray(m.vertices, dtype=np.float32)
-        f = np.asarray(m.faces, dtype=np.int64)
-        verts.append(v); faces.append(f + off)
+
+    def _add(v, f, fidx):
+        nonlocal off
+        verts.append(v.astype(np.float32)); faces.append(f + off)
         slices.append((fidx, off, off + len(v)))
         off += len(v)
+
+    for name, fidx in LINK_MESH:
+        m = trimesh.load(_mesh_path(kind, name), force='mesh', process=False)
+        _add(np.asarray(m.vertices), np.asarray(m.faces, dtype=np.int64), fidx)
+
+    fm = trimesh.load(_mesh_path(kind, 'finger'), force='mesh', process=False)
+    fv = np.asarray(fm.vertices, dtype=np.float32); ff = np.asarray(fm.faces, dtype=np.int64)
+    HAND_FIDX = 9
+    _add(fv + np.array([0.0, finger_open, 0.0584], dtype=np.float32), ff, HAND_FIDX)          # left
+    rz = np.array([[-1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, 1.0]], dtype=np.float32)   # Rz(pi)
+    _add(fv @ rz.T + np.array([0.0, -finger_open, 0.0584], dtype=np.float32), ff, HAND_FIDX)  # right
+
     return {
         'verts': torch.from_numpy(np.concatenate(verts)).to(device),
         'faces': torch.from_numpy(np.concatenate(faces).astype(np.int32)).to(device),

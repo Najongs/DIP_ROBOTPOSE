@@ -168,6 +168,8 @@ def main():
     ap.add_argument('--mask-head', default=None, help='trained DINOv3 mask head: PREDICT the target mask from the REAL image (deployable, non-oracle) instead of rendering the GT pose')
     ap.add_argument('--mask-res', type=int, default=256, help='out_res the mask head was trained at')
     ap.add_argument('--sam-checkpoint', default=None, help='SAM ViT-B checkpoint: prompt with detected keypoints to segment the REAL robot mask (correctly-placed) as the render-compare target')
+    ap.add_argument('--renderer', default='splat', choices=['splat', 'nvdr'],
+                    help='nvdr = exact-mesh nvdiffrast rasterization (shape-consistent with a TRUE segmenter mask); splat = legacy bilinear point splat')
     args = ap.parse_args()
     torch.manual_seed(0)
 
@@ -175,6 +177,18 @@ def main():
     mesh_verts = [((nm, fi), torch.from_numpy(load_obj_verts(mesh_path(nm))).to(device))
                   for nm, fi in LINK_MESH]
     print('mesh pts total:', sum(v.shape[0] for _, v in mesh_verts), flush=True)
+
+    nvdr = None
+    if args.renderer == 'nvdr':
+        from render_nvdr import NVDRSilhouette
+        nvdr = NVDRSilhouette(device, kind=_MESH_KIND if _MESH_KIND != 'collision' else 'visual')
+        print(f'[nvdr] exact-mesh renderer, kind={nvdr.kind}', flush=True)
+
+    def render_pose(th, R, t, K):
+        """Silhouette at pose — renderer-agnostic."""
+        if nvdr is not None:
+            return nvdr(nvdr.robot_verts(th, all_link_transforms), R, t, K, H, S)
+        return render_mesh(robot_pointcloud(th, mesh_verts), R, t, K, H, S)
 
     m = AnglePredictor(args.model_name, S, head_type='mlp').to(device).eval()
     sd = torch.load(args.detector, map_location=device); sd = {k.replace('module.', ''): v for k, v in sd.items()}
@@ -240,7 +254,7 @@ def main():
         with torch.no_grad():
             if sam_pred is not None:
                 tgt = sam_masks(img, kp2d, conf, H)
-                orc = (render_mesh(robot_pointcloud(ga, mesh_verts), Rg, tg, K, H, S) > 0.5).float()
+                orc = (render_pose(ga, Rg, tg, K) > 0.5).float()
                 pb = (tgt > 0.5).float()
                 mi = (pb * orc).sum((-1, -2)) / ((pb + orc) > 0).float().sum((-1, -2)).clamp(min=1)
                 mask_ious.extend(mi.cpu().tolist())
@@ -249,12 +263,12 @@ def main():
                 pm = torch.sigmoid(mask_head(tok)).squeeze(1)               # (B,mask_res,mask_res) on REAL image
                 tgt = F.interpolate(pm.unsqueeze(1), size=(H, H), mode='bilinear', align_corners=False).squeeze(1)
                 # DIAGNOSTIC: IoU of the predicted real mask vs the ORACLE (GT-pose) mask -> is it well-placed?
-                orc = (render_mesh(robot_pointcloud(ga, mesh_verts), Rg, tg, K, H, S) > 0.5).float()
+                orc = (render_pose(ga, Rg, tg, K) > 0.5).float()
                 pb = (tgt > 0.5).float()
                 mi = (pb * orc).sum((-1, -2)) / ((pb + orc) > 0).float().sum((-1, -2)).clamp(min=1)
                 mask_ious.extend(mi.cpu().tolist())
             else:
-                tgt = render_mesh(robot_pointcloud(ga, mesh_verts), Rg, tg, K, H, S)
+                tgt = render_pose(ga, Rg, tg, K)
                 if args.mask_degrade > 0:
                     tgt = degrade_mask(tgt, args.mask_degrade)
         d6 = matrix_to_rot6d(R0).clone().detach().requires_grad_(True)
@@ -265,7 +279,7 @@ def main():
         for _ in range(args.rc_iters):
             opt.zero_grad()
             th = torch.cat([pth, zc], 1); R = rot6d_to_matrix(d6)
-            mask = render_mesh(robot_pointcloud(th, mesh_verts), R, tt, K, H, S)
+            mask = render_pose(th, R, tt, K)
             loss = (1 - soft_iou(mask, tgt)).mean()
             fk = panda_forward_kinematics(th)
             cam = torch.einsum('bij,bpj->bpi', R, fk) + tt.unsqueeze(1); z = cam[..., 2].clamp(min=1e-3)
