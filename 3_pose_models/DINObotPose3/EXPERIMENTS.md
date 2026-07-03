@@ -906,3 +906,13 @@ Full deployable pipeline (auto bbox + crop + solve) + nvdr/SAM RC@448, 200 strid
 Takeaway: the existing stack (conf-gate solver + rot-adapt heads + exact-render RC) already carries
 RoboPEPP-level occlusion robustness; the mid-occlusion WIN comes from the solver+RC, not from any
 new occlusion-specific machinery. Survey catalog (docs/robot_pose_sota_survey.md) updated verdicts.
+
+## 2026-07-04 — multi-start RC (SAM-IoU basin selection) REFUTED — but diagnostically decisive
+Hypotheses = base-Z gauge rotations (±30/60°) of the RC init, winner by SAM-IoU (external evidence,
+unlike the refuted learned-selector MCL). Clean rs 0.8157 (0 switches — perfect do-no-harm), orb
+0.7650 (+0.000, 1 switch), 40%-occlusion 0.327 (20 switches fired, ADD unchanged).
+**Verdict: the remaining failures are NOT rotation basins.** orb: the rot head already pins the basin
+→ residual is detector 2D (attack via crop resolution). 40% occlusion: damage is UPSTREAM (θ/2D
+collapse at the pose stage, 0.315) — no rotation start rescues a corrupted θ anchor → head-level
+occlusion-aug training (T1/T2, running) is the right lever. Code kept behind --multi-start (default
+off, harmless). Write-up: docs/experiments/2026-07-04_multistart_rc.md
