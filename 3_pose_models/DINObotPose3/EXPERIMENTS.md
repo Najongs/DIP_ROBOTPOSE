@@ -865,3 +865,44 @@ is in-domain real-trained, not comparable).
 NEXT (levers, in EV order): (1) orb −0.010: RC + detector-side (2D) improvement, or 576+ render-h;
 (2) full-split re-lock for paper numbers; (3) occlusion catalog probes from the survey (robust silhouette
 weighting for external occluders, covariance-weighted PnP, masked-state prior via prior_w).
+
+---
+
+## 2026-07-03 — OCCLUSION TRACK: RoboPEPP-protocol bench + 3 levers (1 adopted, 2 refuted)
+
+**Bench** (`Eval/occlusion_bench.sh` + `occl_util.py`): RoboPEPP Fig.6 protocol reproduced exactly —
+black rect/circle masks covering {0,10,20,30,40}% of the GT-kp RoI on panda_synth_test_photo,
+DETERMINISTIC per (frame,ratio) so the pose stage and the SAM/RC stage see identical occluders.
+Full deployable pipeline (auto bbox + crop + solve) + nvdr/SAM RC@448, 200 strided frames.
+
+### 🔒 Occlusion curve (ours +RC, cov-pnp config) vs published (RoboPEPP Fig.6)
+| RoI occl | ours pose | ours +RC | RoboPEPP | HPE | RoboPose |
+|---|---|---|---|---|---|
+| 0% | 0.724 | 0.775 | 0.795 | 0.570 | 0.540 |
+| 10% | 0.667 | 0.726 | 0.730 | 0.505 | 0.420 |
+| 20% | 0.567 | **0.626** | 0.600 | 0.405 | 0.280 |
+| 30% | 0.481 | **0.525** | 0.470 | 0.320 | 0.210 |
+| 40% | 0.315 | 0.328 | 0.351 | 0.282 | 0.145 |
+- **WIN vs RoboPEPP at 20-30% (+0.026/+0.055), ~tie 10/40%, −0.02 at 0%** (their synth edge — we win real).
+  Degradation slope 0→40% identical (−0.447 vs −0.444) from a 0.02-lower start → occlusion robustness
+  per se ≥ RoboPEPP. RC stays positive UNDER occlusion (+0.06@10-20%) — the SAM+exact-render loop
+  does not collapse when the robot is partially masked.
+
+### Lever verdicts (ablated individually @20%, base pose 0.5610 / +RC 0.6156)
+- ✅ **cov-PnP ADOPTED** (`solve_batch(cov_inv=)`, `heatmap_cov_inv`, `selfbbox_eval --cov-pnp`):
+  anisotropic heatmap-second-moment Mahalanobis weighting. Do-no-harm at 0/40%, +0.006 pose /
+  +0.011 RC at 20%. Modest but free (no retrain).
+- ❌ **occl-robust silhouette REFUTED as designed** (`--occl-robust-w`): downweighting
+  "init-render ∧ ¬SAM" pixels removes the penalty for the render inflating past SAM → DEPTH BIAS
+  (−0.019 RC @20%, also hurts clean azure logic). Rescue would need an explicit occluder
+  segmentation (only downweight inside a DETECTED occluder), not blanket disagreement weighting.
+- ❌ **occlusion-adaptive population prior REFUTED** (`--prior-adaptive`): even at 0.005 it's
+  −0.09 @20%. Root cause structural, not scale: synth joints are INDEPENDENT (max |corr| 0.06) and
+  broadly spread (σ 0.5-1.0 rad), so pulling toward the population mean actively fights the true
+  config. Consistent with the June "mean-fallback dead end" refutation. The full learned
+  (DPoser-style) state prior was SKIPPED by the same pre-check — nothing beyond per-joint marginals
+  to learn. A prior helps only if conditioned on the FRAME (that's what theta_init already is).
+
+Takeaway: the existing stack (conf-gate solver + rot-adapt heads + exact-render RC) already carries
+RoboPEPP-level occlusion robustness; the mid-occlusion WIN comes from the solver+RC, not from any
+new occlusion-specific machinery. Survey catalog (docs/robot_pose_sota_survey.md) updated verdicts.
