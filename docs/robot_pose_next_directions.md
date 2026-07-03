@@ -23,13 +23,17 @@
 
 ## 2. 다음 시도 로드맵 (내 분석 — 진단 증거 기반 우선순위)
 
-### ① 멀티스타트 RC + SAM-IoU basin 선택 — 최고 EV, 학습 불필요
+### ① 멀티스타트 RC + SAM-IoU basin 선택 — ❌ 반증 (07-04, 진단 가치 큼)
+**결과**: 클린 무해(전환 0) 확인됐으나 orb +0.000(rot head가 이미 basin 고정), 40% 가림 +0.000(전환 20프레임 발화했지만 손상이 상류 θ 붕괴라 무효) → **잔여 실패는 R-basin이 아님**. orb→2D(④), 40%→head 학습(②)으로 공격 방향 확정. 상세: [experiments/2026-07-04_multistart_rc.md](experiments/2026-07-04_multistart_rc.md)
+
+<details><summary>원 가설 (기록용)</summary>
 - **근거**: 남은 실패의 공통 근원은 "wrong basin" — orb 실패 프레임(rot corr +0.58)과 40% 가림(pose 0.315로 붕괴 후 RC가 못 살림)은 모두 init이 틀린 분지에 있어 conservative refine이 못 빠져나오는 경우. 6월 MCL이 반증된 이유는 **selector가 학습 모델**이라 가설을 구분 못 해서였는데, 지금은 **SAM 마스크 + 정밀 렌더 IoU라는 외부 증거**가 생겼음 — 가설 선택기가 공짜로 확보된 상태.
 - **설계**: RC 시작점을 K개(현재 R_init + base-yaw ±30°/±60° 섭동, 또는 rot-head의 상위 K 후보)로 병렬 refine → 최종 SAM-IoU 최고 가설 채택. 배치 병렬이라 비용은 K배가 아니라 ~K/배치.
 - **검증**: 가림 벤치 40% + orb held-out에서 A/B. 게이트: 40% ≥ 0.351(RoboPEPP), orb +0.01, 클린 do-no-harm.
 - **위험**: IoU가 basin을 구분 못 하는 대칭 포즈 — do-no-harm 게이트(현 가설 IoU가 최고면 유지)로 방어.
+</details>
 
-### ② 가림-증강 head 재학습 — 유일한 고EV 학습 항목
+### ② 가림-증강 head 재학습 — 🔄 학습 중 (T1/T2, 07-04) — 유일한 고EV 학습 항목
 - **근거**: 40% 구간의 pose 붕괴(0.315)는 detector conf가 낮아지며 angle/rot head 입력이 OOD가 되는 것. RoboPEPP의 가림 강건성 원천이 학습 시 관절 마스킹인데, 우리는 head가 가림 입력을 본 적이 없음. **backbone 동결 + head만** kp_drop/occluder-페이스트 증강 fine-tune → 백본 반증 우회.
 - **주의(반증 경계)**: 6월 "occlusion-aware detector retraining 불필요" 판정은 **detector** 얘기 (conf가 이미 96% 캐치). 이건 **angle/rot head**의 가림-입력 강건화로 별개.
 - **비용**: head당 2-4h (GPU 1장). 검증: 가림 벤치 30-40% + 클린 do-no-harm.
