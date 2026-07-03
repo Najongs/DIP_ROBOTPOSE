@@ -916,3 +916,10 @@ unlike the refuted learned-selector MCL). Clean rs 0.8157 (0 switches — perfec
 collapse at the pose stage, 0.315) — no rotation start rescues a corrupted θ anchor → head-level
 occlusion-aug training (T1/T2, running) is the right lever. Code kept behind --multi-start (default
 off, harmless). Write-up: docs/experiments/2026-07-04_multistart_rc.md
+
+## 2026-07-04 — naive crop-resolution bump (512→768) REFUTED as a free lever
+selfbbox orb held-out @200 with --image-size 768 on the FROZEN 512-trained stack: 0.5818 vs 0.7176
+(median 32 vs 20mm + divergent tail mean 250mm). DINOv3 handles variable resolution, but the frozen
+detector conf calibration / kp-feature sampling / heads are 512-distribution-specialized. Higher-res
+crops require a RETRAIN CASCADE (crop detector @768 → angle/rot heads @768) — deferred; queue only if
+T1/T2 (occlusion-aug heads) leave orb as the binding gap. Roadmap ④ updated.
