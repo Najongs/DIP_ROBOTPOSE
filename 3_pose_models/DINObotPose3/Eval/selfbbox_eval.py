@@ -145,6 +145,9 @@ def main():
                     help='anisotropic heatmap-covariance (Mahalanobis) weighting in the final solve — continuous upgrade of the scalar conf weighting for occluded/diffuse keypoints')
     ap.add_argument('--prior-adaptive', type=float, default=0.0,
                     help='occlusion-adaptive configuration prior weight (masked-state prior, analytic per-joint Gaussian; scales with fraction of low-conf keypoints)')
+    ap.add_argument('--dark-decode', action='store_true',
+                    help='DARK sub-pixel heatmap decode (Taylor refine of the argmax peak) instead of soft-argmax — targets far/small-robot 2D precision (orb)')
+    ap.add_argument('--dark-sigma', type=float, default=2.5, help='DARK Gaussian modulation sigma (match training heatmap sigma)')
     args = ap.parse_args()
     _DUMP = {'fid': [], 'theta': [], 'kp_cam': [], 'gt3d': [], 'found': [], 'feat': [], 'reproj': []} if args.dump_npz else None
 
@@ -252,6 +255,9 @@ def main():
             # FINAL PASS: crop pipeline on the refined crop
             o2 = cropm(crop_img, Kc)
         init_ang = o2['joint_angles']; kp2d = o2['keypoints_2d']; conf = o2['confidence']
+        if args.dark_decode:
+            from decode_util import dark_decode
+            kp2d = dark_decode(o2['heatmaps_2d'], sigma=args.dark_sigma)   # sub-pixel re-decode
         R_init = o2.get('rot_matrix') if args.rot_head else None
         cov_inv = None
         if args.cov_pnp:
