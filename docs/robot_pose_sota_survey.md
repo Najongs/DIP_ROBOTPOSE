@@ -127,3 +127,25 @@
 - RoboPEPP arxiv.org/abs/2411.17662 · PoseDiff arxiv.org/abs/2509.24591 (**검증 필요**) · DreamGen arxiv.org/abs/2505.12705
 
 ### A1 (로봇 포즈 SOTA) — 완료 시 기입
+
+---
+
+## 6. 2라운드 아이디어 발굴 (2026-07-04, post-SOTA)
+
+SOTA 달성 후 남은 격차 4종에 대한 신규 문헌 탐색. done/refuted 목록으로 필터링, head/decoder 또는 test-time 레벨만.
+
+**핵심 통찰**: 계획했던 "photometric RGB RC"(로드맵 ③)는 틀린 버전 — 최신 흐름은 **DINO feature-metric RC**로, 렌더-실사 비교를 픽셀이 아닌 **frozen ViT 특징 공간**에서 수행 → albedo/조명 도메인 갭을 특징이 흡수. 우리는 frozen DINOv3 + nvdiffrast를 이미 보유하므로 **두 조각을 붙이면 끝, 학습 불필요**.
+
+| 순위 | 아이디어 | 공격 격차 | 비용 | 근거 |
+|---|---|---|---|---|
+| 1 | **DINO feature-metric RC** (MCLoc, AlignPose) | azure/근거리(d), 부분 (a)(c) | 낮음(재사용) | 렌더/실사를 DINO 특징 dense-map L2로 정합. MCLoc: 렌더 도메인 차이는 절대값만 바꾸고 상대차 보존→basin 안정. AlignPose: DINOv2가 dense-SIFT 대비 +10.8 AR, 투명/무텍스처에서 최대 이득 |
+| 2 | **Featuremetric sub-patch 키포인트 refine** (FoundPose) | orb far/small (a) −0.010 | 낮음(test-time) | 중간 DINO 레이어가 위치정보 최강(대칭/저텍스처에서 last layer보다↑). coarse patch(16px) 한계를 특징 재투영으로 sub-patch 보정 |
+| 3 | dense 2D-3D correspondence head (SurfEmb) | 40% 가림(c), synth갭(b) | 중-고(새 head) | per-pixel 다수결 → 40% 가림에도 붕괴 안 함. **순수 synth 학습으로 BOP SOTA**(우리 synth 갭 직격). 단 새 head+solver 빌드 |
+| 4 | 이방성 불확실도 head (CNF/RLE, CFRE) | (a)(c) 가중 | 낮음(head, 학습 중과 결합) | cov-PnP에 먹일 **캘리브레이션된 이방성 공분산**. 추론 비용 0(추론시 회귀망만) |
+| 5 | DARK / 구조적 heatmap decode | (a), bimodal→(c) | ~0(DARK) | Taylor 재국소화 sub-pixel 보정, 저해상도 열화 작음. soft-argmax bimodal 퇴화(가림 시 발생) 제거 |
+
+**Idea 1+2는 같은 프리미티브**(DINOv3 feature-metric alignment)를 RC(dense)와 키포인트(sparse sub-patch) 두 단계에 적용 → 특징 비교 모듈 1개 구현으로 둘 다. **단일 최고 EV 엔지니어링**.
+
+**하지 말 것(신규 부정 증거)**: training-free VLM 포즈(GPT-5.1/Gemini-3 등 관절각 프롬프트) — 평균오차 0.42-0.66 rad, 스케일링으로도 안 닫힘(arXiv:2512.06017). Gaussian-splat photometric RC(6DOPE-GS) — photometric이라 azure 도메인갭 재수입, Idea 1에 지배됨.
+
+출처: MCLoc arxiv.org/abs/2404.10438 · AlignPose arxiv.org/abs/2512.20538 · FoundPose arxiv.org/abs/2311.18809 · SurfEmb arxiv.org/abs/2111.13489 · CFRE arxiv.org/abs/2505.02287 · no-soft-argmax arxiv.org/abs/2508.14929 · DARK arxiv.org/abs/1910.06278

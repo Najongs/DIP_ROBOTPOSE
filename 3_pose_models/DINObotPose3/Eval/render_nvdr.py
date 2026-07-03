@@ -112,6 +112,40 @@ class NVDRSilhouette:
         depth, _ = dr.interpolate(z.unsqueeze(-1).contiguous(), rast, self.mesh['faces'])
         return (depth.squeeze(-1) * (rast[..., 3] > 0).float())          # (B,H,H)
 
+    def render_shaded(self, pts_robot, R, t, K, H, img_size, light_dir=(0.3, 0.3, 1.0)):
+        """Lambertian normal-shaded grayscale render (B,H,H) in [0,1], 0 outside the robot.
+        Matte shading looks far closer to a real matte robot than a depth map -> smaller domain
+        gap when both render and real photo are pushed through a frozen ViT (feature-metric RC)."""
+        dr = self.dr
+        B = pts_robot.shape[0]
+        cam = torch.einsum('bij,bpj->bpi', R, pts_robot) + t.unsqueeze(1)   # (B,V,3)
+        # per-face normals from the posed verts, interpolated over the triangle
+        f = self.mesh['faces'].long()
+        v0, v1, v2 = cam[:, f[:, 0]], cam[:, f[:, 1]], cam[:, f[:, 2]]      # (B,F,3)
+        fn = torch.cross(v1 - v0, v2 - v0, dim=-1)
+        fn = fn / fn.norm(dim=-1, keepdim=True).clamp(min=1e-8)
+        # scatter face normals to verts (area-agnostic average) for smooth interpolation
+        vn = torch.zeros_like(cam)
+        for k in range(3):
+            vn.index_add_(1, f[:, k], fn)
+        vn = vn / vn.norm(dim=-1, keepdim=True).clamp(min=1e-8)
+        x, y, z = cam[..., 0], cam[..., 1], cam[..., 2]
+        W = float(img_size)
+        fx, fy = K[:, 0, 0:1], K[:, 1, 1:2]
+        cx, cy = K[:, 0, 2:3], K[:, 1, 2:3]
+        n, fr = self.near, self.far
+        xc = x * (2.0 * fx / W) + z * (2.0 * cx / W - 1.0)
+        yc = y * (2.0 * fy / W) + z * (2.0 * cy / W - 1.0)
+        zc = z * (fr + n) / (fr - n) - (2.0 * fr * n) / (fr - n)
+        pos = torch.stack([xc, yc, zc, z], dim=-1).contiguous()
+        rast, _ = dr.rasterize(self.ctx, pos, self.mesh['faces'], resolution=[H, H])
+        ld = torch.tensor(light_dir, device=pts_robot.device, dtype=pts_robot.dtype)
+        ld = ld / ld.norm()
+        shade = (vn * ld).sum(-1, keepdim=True).abs().clamp(0, 1)           # (B,V,1) Lambertian (two-sided)
+        img, _ = dr.interpolate(shade.contiguous(), rast, self.mesh['faces'])
+        img = dr.antialias(img, rast, pos, self.mesh['faces'])
+        return (img.squeeze(-1) * (rast[..., 3] > 0).float()).clamp(0, 1)   # (B,H,H)
+
     def __call__(self, pts_robot, R, t, K, H, img_size):
         """pts_robot: (B,V,3) FK-posed verts (from .robot_verts). Returns soft mask (B,H,H)."""
         dr = self.dr
