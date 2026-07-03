@@ -10,10 +10,12 @@
 | [4_perception.md](4_perception.md) | `4_perception/` | DINOv3 파인튜닝(로봇포즈/깊이/사람포즈), 통합 파이프라인, FR5 SegFormer |
 | [5_apps.md](5_apps.md) | `5_apps/` | 충돌 위험 파이프라인 실행법 |
 | [datasets.md](datasets.md) | `datasets/` | 데이터셋 지도 (무엇이 어디에 있고 어떤 코드가 쓰는지) |
+| [workspace_overview.md](workspace_overview.md) | 전체 | 2026-07-03 재편 이력, git/데이터/심볼릭링크 참조 맵, 알려진 이슈, GPU 서버 동기화 절차 |
 
 ## 빠른 참조
 
 - 워크스페이스 전체 구조·규칙: 루트 [README.md](../README.md), [CLAUDE.md](../CLAUDE.md)
 - DINObotPose3 실험 상세 기록: [`3_pose_models/DINObotPose3/EXPERIMENTS.md`](../3_pose_models/DINObotPose3/EXPERIMENTS.md) (실험 일지), [`SUMMARY.md`](../3_pose_models/DINObotPose3/SUMMARY.md) (확정 결론·재개 방법)
 - DREAM SOTA 문헌 서베이 + 가림-강건 아이디어: [robot_pose_sota_survey.md](robot_pose_sota_survey.md) (2026-07-03, 프로토콜 3축 주의사항 포함)
+- 진행 요약 + 다음 시도 로드맵: [robot_pose_next_directions.md](robot_pose_next_directions.md) (2026-07-04, SOTA 이후 우선순위·반증 맵)
 - 통합 파이프라인 설치: [`4_perception/DINOv3_fine_tunning/PIPELINE_SETUP.md`](../4_perception/DINOv3_fine_tunning/PIPELINE_SETUP.md)

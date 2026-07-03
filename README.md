@@ -5,7 +5,7 @@
 
 > 2026-07-03 재편: 중첩 개별 git 제거 후 모노레포 통합, 카테고리 폴더 그룹핑, ICRA dataset(36G) datasets/로 통합, Meca500 중복 zip 제거(~1.2G).
 
-**문서**: 카테고리별 실험 진행 방법은 [docs/](docs/README.md), 작업 규칙은 [CLAUDE.md](CLAUDE.md).
+**문서**: 카테고리별 실험 진행 방법은 [docs/](docs/README.md), 작업 규칙은 [CLAUDE.md](CLAUDE.md), 재편 이력·참조 맵은 [docs/workspace_overview.md](docs/workspace_overview.md).
 
 ## 구조
 
