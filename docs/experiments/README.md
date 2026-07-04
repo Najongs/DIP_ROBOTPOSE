@@ -1,5 +1,7 @@
 # DINObotPose3 실험 기록 (curated)
 
+> **먼저 읽을 것: [OVERVIEW.md](OVERVIEW.md)** — 전체 진행 종합(성적표·채택/반증 맵·진행 중·로드맵).
+
 > 원본 실험 일지는 `3_pose_models/DINObotPose3/EXPERIMENTS.md` (append-only, 전체 이력).
 > 이 폴더는 **실험 단위의 정리본** — 목적/설정/결과/판정을 실험별 파일로. 새 실험은 `YYYY-MM-DD_이름.md`로 추가하고 이 표를 갱신.
 
