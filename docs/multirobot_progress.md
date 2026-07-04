@@ -42,8 +42,27 @@ realsense는 base+RC 완전 재현. 나머지는 base 일치(+RC 이득은 reals
 | 최종 pose (self-bbox eval) | ADD-AUC **0.3275** (oracle-bbox도 0.37) | ❌ 미흡 |
 
 **진단**: 검출기·rot head는 전이됐으나 angle head가 45° MAE이고, **솔버가 나쁜 θ init에서 자유 최적화(재투영 250iter)하며 오히려 발산**(raw 54° → refined 60°). 솔버는 rot head R(0.2°, 거의 oracle)를 이미 R_init으로 받음 → 완벽한 R로도 회복 안 됨. 원인은 단안 2D→θ 모호성 + 나쁜 init. bbox·데이터다양성(관절 std 25-80°)은 병목 아님.
-- 실험 중: **transformer angle head + Panda warm-start 제거**(Panda 카메라 편향이 FR3 4-뷰포인트와 충돌 가설) — `train_fr3_angle_tf.sh`, 마커 `outputs_fr3/ANGLE_TF_DONE`.
-- 대안(미시도): 솔버 θ 앵커 강화(anchor_init_w↑)·iter 축소·R 고정; 또는 self-train 반복.
+### 결정적 진단 (2026-07-05) — 근본 병목은 단안 2D→θ 모호성
+
+FR3 val에서 솔버 능력을 직접 테스트(GT 2D 키포인트 + Kabsch로 구한 GT 카메라 R):
+
+| θ init (+ GT R) | 회복 angle MAE | reproj |
+|---|---|---|
+| oracle (=GT) | **1.0°** | 0.2px |
+| GT ± 30° | **6.0°** | 0.6px |
+| cold (관절 평균) | 32° | **발산 (420k px)** |
+
+- **FK 규약 완전 일치** (Kabsch residual 0.0mm — FR3=Panda 확정).
+- **솔버는 정상**: 진실 ±30° 안에서 시작하면 6°로 수렴. 문제는 **나쁜 init에서 발산**. angle head의 45-66° 오차는 basin 밖.
+- **transformer head 실험 → 오히려 악화** (66° > MLP 45°, J0 111°). head 아키텍처로 해결 안 됨.
+- **uniform 멀티스타트(48 starts) → 40° 정체**: reproj는 0.82px로 낮아지지만 angle은 안 맞음. 즉 **저-reproj 오답 basin 다수 존재**(단안 모호성) + 6-DOF 공간 균일 커버리지 조합폭발. min-reproj 선택으로 basin 못 고름.
+
+**결론**: 검출기·rot head는 전이되나, **관절각 회복이 근본 병목**. DREAM Panda SOTA는 10만+ 합성으로 "2D→θ prior"(basin 안 init)를 학습해 이를 해결 — 실사 로봇(FR3/FR5/Meca)은 제한된 실사(~1만)로 이 prior를 못 배움. head 개선·솔버 멀티스타트로는 한계.
+
+**판단한 경로**:
+1. **합성 데이터 생성 (원칙적 해법, Phase 4)** — 로봇별 URDF+메시로 도메인랜덤화 합성 대량 생성 → Panda식 angle prior 학습. **선결: FR3/FR5/Meca 시각 메시/URDF 확보 필요**(현재 Panda 메시만 보유). nvdiffrast는 있음.
+2. **타깃 로컬 멀티스타트** (엔지니어링 전용, 합성 불필요) — head가 맞히는 J1/J3는 고정하고 틀리는 J0/J2/J4/J5만 head±{30,60}° 국소 탐색(3^4≈81 후보) → basin 브라켓 시도. 모듈러스 개선 가능성, 미검증.
+3. **RC/depth 활용** — 실루엣 RC(메시 필요) 또는 단안 depth로 basin 판별.
 
 ## Phase 2 — FR5 (6-DOF) 🔄 groundwork 완료
 
