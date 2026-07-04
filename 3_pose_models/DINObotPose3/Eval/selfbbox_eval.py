@@ -148,6 +148,9 @@ def main():
     ap.add_argument('--dark-decode', action='store_true',
                     help='DARK sub-pixel heatmap decode (Taylor refine of the argmax peak) instead of soft-argmax — targets far/small-robot 2D precision (orb)')
     ap.add_argument('--dark-sigma', type=float, default=2.5, help='DARK Gaussian modulation sigma (match training heatmap sigma)')
+    ap.add_argument('--ms-local', type=int, default=0,
+                    help='head-seeded local multi-start for the theta solve: N candidates = angle-head init + Gaussian(ms-sigma) perturbations, keep min-reproj. Fixes the monocular basin-finding for robots whose angle head cannot init within the solver basin (real-data robots without a synth angle prior).')
+    ap.add_argument('--ms-sigma', type=float, default=45.0, help='local multi-start perturbation std in degrees (around the angle-head init)')
     args = ap.parse_args()
     _DUMP = {'fid': [], 'theta': [], 'kp_cam': [], 'gt3d': [], 'found': [], 'feat': [], 'reproj': []} if args.dump_npz else None
 
@@ -263,10 +266,29 @@ def main():
         if args.cov_pnp:
             from solve_pose_kinematic import heatmap_cov_inv
             cov_inv = heatmap_cov_inv(o2['heatmaps_2d'], kp2d)
-        refined, kp_cam, reproj2 = solve_batch(kp2d, conf, Kc, fix_joint7=True, iters=args.iters,
-                                         lr=2e-2, img_size=IS, device=device, prior_w=0.0,
-                                         theta_init=init_ang, conf_gate=args.conf_gate, R_init=R_init,
-                                         cov_inv=cov_inv, prior_adaptive=args.prior_adaptive)
+        if args.ms_local > 0:
+            _sig = math.radians(args.ms_sigma)
+            _gen = torch.Generator(device=device).manual_seed(0)
+            refined = kp_cam = reproj2 = _best = None
+            for _s in range(args.ms_local):
+                _ti = init_ang if _s == 0 else init_ang + torch.randn(init_ang.shape, generator=_gen, device=device, dtype=init_ang.dtype) * _sig
+                _th, _kc, _rp = solve_batch(kp2d, conf, Kc, fix_joint7=True, iters=args.iters,
+                                            lr=2e-2, img_size=IS, device=device, prior_w=0.0,
+                                            theta_init=_ti, conf_gate=args.conf_gate, R_init=R_init,
+                                            cov_inv=cov_inv, prior_adaptive=args.prior_adaptive)
+                if _best is None:
+                    _best, refined, kp_cam, reproj2 = _rp, _th, _kc, _rp
+                else:
+                    _b = _rp < _best
+                    _best = torch.where(_b, _rp, _best)
+                    refined = torch.where(_b.unsqueeze(1), _th, refined)
+                    kp_cam = torch.where(_b.unsqueeze(1).unsqueeze(2), _kc, kp_cam)
+                    reproj2 = _best
+        else:
+            refined, kp_cam, reproj2 = solve_batch(kp2d, conf, Kc, fix_joint7=True, iters=args.iters,
+                                             lr=2e-2, img_size=IS, device=device, prior_w=0.0,
+                                             theta_init=init_ang, conf_gate=args.conf_gate, R_init=R_init,
+                                             cov_inv=cov_inv, prior_adaptive=args.prior_adaptive)
         raw_err += wrapped_abs_deg(init_ang[:, :6], gt).sum(0).cpu()
         ref_err += wrapped_abs_deg(refined[:, :6], gt).sum(0).cpu()
         valid = (gt3d.abs().sum(-1) > 0)
