@@ -33,3 +33,12 @@
 
 ## 수렴 관측 (Ep13-17)
 clean val angle MAE 수렴: occaug 8.79°, light 8.51° — **둘 다 배포 crop head(~9.09°)보다 낮음**(clean 정확도 회복). 단 Ep1 pose ADD는 −0.009 클린/+0.014~0.018 가림이었음(proxy≠eval-target). best 체크포인트로 완료 후 가림 벤치 전 구간 최종 A/B 예정.
+
+## ✅ 최종 결과 (수렴 best, +DARK+cov, pose 스테이지 매칭 A/B, synth_photo 200)
+| 가림 | base+DARK | occaug+DARK | Δ |
+|---|---|---|---|
+| 0% | 0.7532 | 0.7551 | **+0.0019 (do-no-harm!)** |
+| 20% | 0.6100 | 0.6199 | **+0.0099** |
+| 40% | 0.3757 | 0.3923 | **+0.0166** |
+
+**판정: Pareto 승리 (트레이드오프 아님).** Ep1의 클린 회귀(−0.009)는 undertraining 아티팩트였고, **수렴까지 학습하니 0%에서 do-no-harm(+0.002)이면서 가림 구간 개선**. occaug pose 40%=0.392가 **RoboPEPP 40%(0.351)를 pose만으로 넘음**(이전 우리 base+RC 0.328보다도 높음). 채택 후보: (a) 가림 강건성 config, (b) self-train과 결합(occ-aug→self-train). rot occaug 페어와 함께. light 변형은 clean val MAE 더 낮음(8.47°) — 완료 후 비교.
