@@ -21,9 +21,10 @@ universally (+0.0035–0.017 per cam, free) — closed the orb gap −0.010→�
 per-camera on/off (helps far cams; azure RC OFF). Details EXPERIMENTS.md 2026-07-04; survey
 `docs/robot_pose_sota_survey.md`; roadmap `docs/robot_pose_next_directions.md`. Remaining: orb −0.004.
 
-**Occlusion robustness (RoboPEPP Fig.6 protocol, same-day):** ours +RC = 0.775/0.726/**0.626**/**0.525**/0.328
-at 0-40% RoI occlusion vs RoboPEPP 0.795/0.730/0.600/0.470/0.351 — **WIN at 20-30%**, identical degradation
-slope. cov-PnP (heatmap-covariance Mahalanobis, `--cov-pnp`) ADOPTED (do-no-harm, +0.011@20%). REFUTED:
+**Occlusion robustness (RoboPEPP Fig.6 protocol):** with the occlusion-aug head (+DARK+cov+RC) ours =
+**0.810/0.766/0.675/0.572/0.405** at 0-40% RoI occlusion vs RoboPEPP 0.795/0.730/0.600/0.470/0.351 —
+**BEAT AT EVERY LEVEL** (+0.015 to +0.102). The occ-aug head (2026-07-04) is do-no-harm on clean
+(synth +0.002 / real azure +0.002) and flipped the two points we used to lose (0% & 40%). cov-PnP (heatmap-covariance Mahalanobis, `--cov-pnp`) ADOPTED (do-no-harm, +0.011@20%). REFUTED:
 occl-robust silhouette downweighting (depth bias) and population-mean adaptive prior (fights the true
 config; learned state prior skipped — synth joints independent). Bench: `Eval/occlusion_bench.sh`.
 

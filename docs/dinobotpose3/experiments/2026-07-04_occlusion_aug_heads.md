@@ -50,3 +50,14 @@ clean val angle MAE 수렴: occaug 8.79°, light 8.51° — **둘 다 배포 cro
 | kinect (배포=self-train) | 0.6841 | 0.746 | **−0.06** (occaug는 self-train 부재) |
 
 **해석**: occaug는 crop 계열 배포 카메라(azure)를 대체 가능하나, self-train head 배포 카메라(kinect/rs/orb)는 real self-train 부재로 뒤짐. **최선 배포 = occ-aug→self-train 스택**(가림 증강 후 카메라별 self-train)으로 둘 다 확보 — 향후 과제. 현재 채택: 가림 강건성 config + azure 대체 후보.
+
+## 🔒 최종 가림 곡선 (occaug head +DARK+cov+RC, synth_photo 200)
+| 가림 | occaug+RC | RoboPEPP | 이전(base+RC) | Δ vs RoboPEPP |
+|---|---|---|---|---|
+| 0% | **0.810** | 0.795 | 0.775 | +0.015 |
+| 10% | **0.766** | 0.730 | 0.726 | +0.036 |
+| 20% | **0.675** | 0.600 | 0.626 | +0.075 |
+| 30% | **0.572** | 0.470 | 0.525 | +0.102 |
+| 40% | **0.405** | 0.351 | 0.328 | +0.054 |
+
+**전 가림 구간 RoboPEPP 초과 (0% 포함).** 이전 곡선이 지던 0%(−0.020)·40%(−0.023)를 occaug head가 둘 다 뒤집음. 가림 강건성이 이제 RoboPEPP 대비 명확한 우위 — 셀링포인트 역전.
