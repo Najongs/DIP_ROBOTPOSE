@@ -1,6 +1,7 @@
-# 데이터 구조 (Data)
+# 데이터 구조 (Data) — DREAM / Panda
 
 > DREAM 벤치마크 (NVIDIA, Franka Panda). 데이터는 `datasets/ICRA_multiview/Converted_dataset/`.
+> **다른 로봇(FR5/FR3/Meca500/Meca_insertion) 데이터 구조: [multi_robot.md](multi_robot.md)**
 
 ## 위치 & 심링크
 

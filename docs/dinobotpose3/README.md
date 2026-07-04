@@ -10,7 +10,7 @@ DREAM 벤치마크 단안 로봇 포즈 SOTA (현재 mean **0.799** vs RoboPEPP 
 |---|---|
 | [00_overview.md](00_overview.md) | 세션 진행 종합 (성적·결정·현황) |
 | [architecture/](architecture/model.md) | 모델 구조 — 백본/헤드/솔버/RC 파이프라인 |
-| [data/](data/dataset.md) | 데이터 구조 — DREAM 스플릿, JSON 포맷, 키포인트, 심링크 |
+| [data/](data/dataset.md) | 데이터 구조 — DREAM/Panda([dataset](data/dataset.md)) + 멀티로봇 FR5/FR3/Meca500([multi_robot](data/multi_robot.md)) |
 | [training/](training/training.md) | 학습 — 스테이지, 손실 항, 자가학습, 체크포인트, GPU 주의 |
 | [evaluation/](evaluation/evaluation.md) | 평가 — 프로토콜 3축, 지표, 하네스, 배포 성적, 재현 게이트 |
 | [experiments/](experiments/README.md) | 실험별 기록 (날짜별, 판정 포함) |
