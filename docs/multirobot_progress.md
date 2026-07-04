@@ -32,6 +32,25 @@ realsense는 base+RC 완전 재현. 나머지는 base 일치(+RC 이득은 reals
 
 완료 마커: `TRAIN/outputs_fr3/PIPELINE_DONE`. 예상 ~4-5h.
 
+### FR3 파인튜닝 결과 (2026-07-05) — ADD-AUC 0.33 (미흡), 병목 = angle recovery
+
+| 스테이지 | 결과 | 판정 |
+|---|---|---|
+| crop 검출기 (파인튜닝 후) | val L2 **9.5px**, PCK@10 0.76 (zero-shot 24.6px → 개선) | ✅ 전이 성공 |
+| rot head | val geo median **0.21°**, t-err 3mm | ✅ 매우 우수 |
+| **angle head** | val MAE **45°** (J0 51/J2 66/J4·J5 54; J3만 13) | ❌ **병목** |
+| 최종 pose (self-bbox eval) | ADD-AUC **0.3275** (oracle-bbox도 0.37) | ❌ 미흡 |
+
+**진단**: 검출기·rot head는 전이됐으나 angle head가 45° MAE이고, **솔버가 나쁜 θ init에서 자유 최적화(재투영 250iter)하며 오히려 발산**(raw 54° → refined 60°). 솔버는 rot head R(0.2°, 거의 oracle)를 이미 R_init으로 받음 → 완벽한 R로도 회복 안 됨. 원인은 단안 2D→θ 모호성 + 나쁜 init. bbox·데이터다양성(관절 std 25-80°)은 병목 아님.
+- 실험 중: **transformer angle head + Panda warm-start 제거**(Panda 카메라 편향이 FR3 4-뷰포인트와 충돌 가설) — `train_fr3_angle_tf.sh`, 마커 `outputs_fr3/ANGLE_TF_DONE`.
+- 대안(미시도): 솔버 θ 앵커 강화(anchor_init_w↑)·iter 축소·R 고정; 또는 self-train 반복.
+
+## Phase 2 — FR5 (6-DOF) 🔄 groundwork 완료
+
+- **데이터 blocker 해결**: FR5 json image_path(`../dataset/Fr5/`)를 절대경로로 교정한 세션 split 생성 → `Converted_dataset/{fr5_train(7844),fr5_val(1296)}` (val=Fr5_6th 세션). 로더 정상 적재(7키포인트/6각도).
+- **남은 핵심 작업(6-DOF 일반화)**: pck_eval/selfbbox_eval/model_angle/solve_pose_kinematic이 Panda 7-DOF 키포인트명·FK 하드코딩 → FR5(7키포인트 `Fr5_link0-6`, 6각도, DH FK)용 robot-config 파라미터화 필요. 검출기(7ch)는 차원 호환이라 전이 가능성 있음(FR3처럼).
+- **주의**: FR3에서 드러난 angle-recovery 병목이 FR5/Meca에도 적용될 것 → FR3 transformer 실험 결과로 접근법 검증 후 FR5 파이프라인 복제가 효율적.
+
 ## 데이터 준비도 (Phase 2/3 참고)
 
 | 로봇 | DREAM json | GT 재투영 | 특이 |
