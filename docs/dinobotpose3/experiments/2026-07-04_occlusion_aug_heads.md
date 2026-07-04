@@ -42,3 +42,11 @@ clean val angle MAE 수렴: occaug 8.79°, light 8.51° — **둘 다 배포 cro
 | 40% | 0.3757 | 0.3923 | **+0.0166** |
 
 **판정: Pareto 승리 (트레이드오프 아님).** Ep1의 클린 회귀(−0.009)는 undertraining 아티팩트였고, **수렴까지 학습하니 0%에서 do-no-harm(+0.002)이면서 가림 구간 개선**. occaug pose 40%=0.392가 **RoboPEPP 40%(0.351)를 pose만으로 넘음**(이전 우리 base+RC 0.328보다도 높음). 채택 후보: (a) 가림 강건성 config, (b) self-train과 결합(occ-aug→self-train). rot occaug 페어와 함께. light 변형은 clean val MAE 더 낮음(8.47°) — 완료 후 비교.
+
+## real 카메라 do-no-harm (pose 스테이지, 300f)
+| 카메라 | occaug | 배포 head | Δ |
+|---|---|---|---|
+| azure (배포=crop 계열) | 0.8010 | 0.7993 | **+0.002 do-no-harm** |
+| kinect (배포=self-train) | 0.6841 | 0.746 | **−0.06** (occaug는 self-train 부재) |
+
+**해석**: occaug는 crop 계열 배포 카메라(azure)를 대체 가능하나, self-train head 배포 카메라(kinect/rs/orb)는 real self-train 부재로 뒤짐. **최선 배포 = occ-aug→self-train 스택**(가림 증강 후 카메라별 self-train)으로 둘 다 확보 — 향후 과제. 현재 채택: 가림 강건성 config + azure 대체 후보.
