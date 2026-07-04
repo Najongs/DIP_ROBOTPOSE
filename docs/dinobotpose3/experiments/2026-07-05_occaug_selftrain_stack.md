@@ -14,5 +14,14 @@ light 가림-증강 head는 클린·가림 둘 다 최고이나, real 카메라(
 2. 가림 강건성 유지: 스택 head로 가림 벤치 → light 곡선(0.812/…/0.429) 근접 유지
 3. 통과 시 배포 head 교체 → 정확도+강건성 동시 SOTA
 
+## 스택 전 light head 기준 (real pose, held-out 300, +DARK+cov)
+| 카메라 | light (스택 전) | 배포 self-train | 격차 |
+|---|---|---|---|
+| realsense | 0.745 | 0.755 | −0.010 |
+| orb | 0.681 | 0.733 | −0.052 |
+| kinect | 0.684 | 0.745 | −0.061 |
+
+예상대로 light head는 real 적응 부재로 배포 self-train에 뒤짐(orb/kinect가 self-train 이득 큼). **스택 목표**: self-train이 이 격차를 메우며 가림 강건성 유지.
+
 ## 결과
-(학습 완료 후 기입)
+(스택 학습 완료 후 기입)
