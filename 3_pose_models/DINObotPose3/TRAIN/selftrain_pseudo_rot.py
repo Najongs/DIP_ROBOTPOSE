@@ -116,6 +116,8 @@ def main():
     ap.add_argument('--lr', type=float, default=3e-4)
     ap.add_argument('--rot-lambda', type=float, default=1.0, help='weight on the chordal rot loss toward solver R*')
     ap.add_argument('--synth-ratio', type=float, default=1.0)
+    ap.add_argument('--occlude-aug', type=float, default=0.0,
+                    help='paste occluders on the synth anti-forget batch during self-train — preserves the occ-aug head robustness while adapting to real (occ-aug -> self-train stack)')
     ap.add_argument('--output-dir', default='./outputs_selftrain')
     args = ap.parse_args()
 
@@ -199,6 +201,11 @@ def main():
                 try: sb = next(synth_it)
                 except StopIteration: synth_it = iter(synth_loader); sb = next(synth_it)
                 si = sb['image'].to(device); sK = scale_K(sb['camera_K'], sb['original_size'], args.image_size).to(device)
+                if args.occlude_aug > 0:
+                    import sys as _s, os as _o
+                    _s.path.append(_o.path.join(_o.path.dirname(_o.path.abspath(__file__)), '../Eval'))
+                    from occl_util import paste_random_occluders_
+                    paste_random_occluders_(si, sb['keypoints'].numpy(), sb['valid_mask'].numpy(), args.occlude_aug)
                 sg = sb['angles'].to(device).clone(); sg[:, 6] = 0.0
                 sod = m(si, sK); ssc = sod['sin_cos']; sg6 = sg[:, :6]
                 sgt = torch.stack([torch.sin(sg6), torch.cos(sg6)], dim=-1)
