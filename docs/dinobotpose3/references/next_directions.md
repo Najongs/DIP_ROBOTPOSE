@@ -75,7 +75,7 @@
 
 RoboTAG를 auto-bbox 동일 프로토콜에서 우리가 mean 79.9 vs 74.0으로 승(3/4 split). 유일한 패는 **azure(RoboTAG 83.1 vs 우리 79.2)** — 이들의 closed-loop 2D-3D 일관성 + depth regulator가 근거리 카메라(우리 RC-off 약점)에 강함.
 
-### ⑦ azure용 depth-consistency 학습 항 (RoboTAG 벤치)
+### ⑦ azure depth-consistency 학습 항 — ❌ 반증 (07-04: reproj head-항 azure −0.014)
 - **근거**: azure는 우리가 유일하게 RoboTAG에 지고, RC를 끈 카메라(test-time 여지 없음). RoboTAG의 azure 우위는 **학습 시** depth/3D 일관성에서 옴. 우리 솔버는 FK 재투영만 강제, depth 브랜치 없음.
 - **설계**: angle/rot head 학습에 RoboTAG식 cross-dim 일관성 항 추가 — 예측 3D 키포인트를 (2D-lift + FK) 양쪽에 정렬하는 손실. backbone 동결 유지, head 레벨.
 - **주의**: azure는 이미 RoboPEPP +3.9로 앞섬 → EV는 "RoboTAG까지 넘기"용. 우선순위 중.
