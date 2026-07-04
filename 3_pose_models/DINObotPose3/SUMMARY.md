@@ -2,7 +2,7 @@
 
 **Goal:** single-image robot (Panda) pose + joint-angle estimator that beats **RoboPEPP** on the 6 DREAM-Panda splits (metric: ADD-AUC@100mm).
 
-## 🏆 2026-07-04 — mean 0.799 vs RoboPEPP 0.780 (4 real splits); +DARK decode
+## 🏆 2026-07-05 — mean 0.804 vs RoboPEPP 0.780; +occ-aug→self-train stack (accuracy + occlusion)
 
 The 06-09 renderer blocker was broken with **nvdiffrast** (exact visual-mesh differentiable silhouette,
 local build on the NAS box) + **SAM ViT-B** true-robot masks (init-render-consistent mask selection).
@@ -10,11 +10,14 @@ Deployable render-and-compare (`Eval/rc_refine_from_dump.py`) on top of the crop
 + **cov-PnP** (heatmap-covariance Mahalanobis) + **DARK sub-pixel decode** (both free, no training):
 | cam | deployable (+DARK) | was (07-03) | RoboPEPP | gap |
 |---|---|---|---|---|
-| realsense | **0.8213** (+RC@448) | 0.8183 | 0.805 | **+0.016 BEAT** |
-| kinect360 | **0.8132** (+RC@448) | 0.8112 | 0.785 | **+0.028 BEAT** |
+| realsense | **0.8213** (deployed head +RC@448) | 0.8183 | 0.805 | **+0.016 BEAT** |
+| kinect360 | **0.8303** (STACK head +RC@448) | 0.8132 | 0.785 | **+0.045 BEAT** |
 | azure | **0.7916** (crop base, **RC OFF**) | 0.7881 | 0.753 | **+0.039 BEAT** |
-| orb | **0.7714** (+RC@512) | 0.7647 | 0.775 | −0.004 ≈MATCH |
-| **MEAN** | **0.7994** | 0.7956 | 0.780 | **+0.019** |
+| orb | **0.7726** (STACK head +RC@512) | 0.7714 | 0.775 | −0.002 ≈MATCH |
+| **MEAN** | **0.8039** | 0.7994 | 0.780 | **+0.024** |
+occ-aug→self-train stack (2026-07-05): light occlusion-aug head → per-camera self-train with occlusion-aug
+on the synth anti-forget batch — recovers real adaptation WHILE retaining occlusion robustness. kinect +0.017,
+orb +0.001, both now occlusion-robust (40% 0.39 > RoboPEPP 0.351); realsense keeps its already-optimal head.
 Protocol: predicted angles + fully-automatic bbox (stricter than RoboPEPP's GT-bbox headline); rs/kinect/orb
 anti-leak held-out 800/cam. DARK decode (`--dark-decode`, `Eval/decode_util.py`) lifts pose 2D precision
 universally (+0.0035–0.017 per cam, free) — closed the orb gap −0.010→−0.004. RC = depth/scale corrector →
