@@ -11,4 +11,6 @@
 | DARK sub-pixel 디코딩 (2R Idea 3) | 07-04 | ✅ 채택 — 전 카메라 pose +0.005~0.007, 무료 | [2026-07-04_dark_decode.md](2026-07-04_dark_decode.md) |
 | 가림-증강 head fine-tune (T1 angle / T2 rot) | 07-04 | 🔄 학습 중 (GPU4/GPU0) | [2026-07-04_occlusion_aug_heads.md](2026-07-04_occlusion_aug_heads.md) |
 
+| RoboTAG식 reproj-consistency angle head | 07-04 | 🔄 학습 중 (azure 격차) | [2026-07-04_robotag_reproj_consistency.md](2026-07-04_robotag_reproj_consistency.md) |
+
 관련 문서: [SOTA 서베이](../robot_pose_sota_survey.md) · [다음 시도 로드맵](../robot_pose_next_directions.md) · 반증 맵은 로드맵 §3
