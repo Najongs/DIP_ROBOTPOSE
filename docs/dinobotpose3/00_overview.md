@@ -1,5 +1,7 @@
 # DINObotPose3 — 세션 진행 오버뷰 (2026-07-03 ~ 07-04)
 
+> 📁 문서 구성: [architecture](architecture/model.md) · [data](data/dataset.md) · [training](training/training.md) · [evaluation](evaluation/evaluation.md) · [experiments](experiments/README.md) · [references](references/sota_survey.md) · 인덱스 [README](README.md)
+
 > DREAM 벤치마크 SOTA 달성과 그 이후 개선/탐색의 전체 요약. 세부는 각 실험 파일, 원본 일지는 `../../3_pose_models/DINObotPose3/EXPERIMENTS.md`, 확정 결론은 `SUMMARY.md`.
 
 ---
@@ -38,9 +40,9 @@ backbone은 **frozen이 최적**(적응 계열 3회 반증). 카메라별 config
 
 | 레버 | 이득 | 비용 | 세부 |
 |---|---|---|---|
-| **nvdiffrast+SAM render-and-compare** | 07-03 SOTA 0.796 달성 (rs/kinect/azure BEAT) | 없음(테스트타임) | [render_compare](2026-07-03_render_compare_sota.md) |
-| **cov-PnP** (히트맵 이방성 공분산 Mahalanobis) | 가림 +0.011@20%, do-no-harm | 없음 | [occlusion_track](2026-07-03_occlusion_track.md) |
-| **DARK sub-pixel 디코딩** | 전 카메라 pose +0.005~0.017, orb 격차 −0.010→−0.004, mean 0.796→0.799 | 없음(추론) | [dark_decode](2026-07-04_dark_decode.md) |
+| **nvdiffrast+SAM render-and-compare** | 07-03 SOTA 0.796 달성 (rs/kinect/azure BEAT) | 없음(테스트타임) | [render_compare](experiments/2026-07-03_render_compare_sota.md) |
+| **cov-PnP** (히트맵 이방성 공분산 Mahalanobis) | 가림 +0.011@20%, do-no-harm | 없음 | [occlusion_track](experiments/2026-07-03_occlusion_track.md) |
+| **DARK sub-pixel 디코딩** | 전 카메라 pose +0.005~0.017, orb 격차 −0.010→−0.004, mean 0.796→0.799 | 없음(추론) | [dark_decode](experiments/2026-07-04_dark_decode.md) |
 
 세 레버 모두 **학습 불필요** — 테스트타임/솔버/디코드 레벨. 이게 이 파이프라인의 강점(frozen backbone의 sub-pixel 정밀도 보존).
 

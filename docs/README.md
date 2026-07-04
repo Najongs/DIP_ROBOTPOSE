@@ -15,8 +15,6 @@
 ## 빠른 참조
 
 - 워크스페이스 전체 구조·규칙: 루트 [README.md](../README.md), [CLAUDE.md](../CLAUDE.md)
-- DINObotPose3 실험 상세 기록: [`3_pose_models/DINObotPose3/EXPERIMENTS.md`](../3_pose_models/DINObotPose3/EXPERIMENTS.md) (실험 일지), [`SUMMARY.md`](../3_pose_models/DINObotPose3/SUMMARY.md) (확정 결론·재개 방법)
-- DREAM SOTA 문헌 서베이 + 가림-강건 아이디어: [robot_pose_sota_survey.md](robot_pose_sota_survey.md) (2026-07-03, 프로토콜 3축 주의사항 포함)
-- **DINObotPose3 세션 진행 오버뷰**: [experiments/OVERVIEW.md](experiments/OVERVIEW.md) (성적표·채택/반증 맵·진행 중 실험)
-- 진행 요약 + 다음 시도 로드맵: [robot_pose_next_directions.md](robot_pose_next_directions.md) (2026-07-04, SOTA 이후 우선순위·반증 맵)
+- **DINObotPose3 문서 (체계 정리)**: [dinobotpose3/](dinobotpose3/README.md) — 오버뷰·architecture·data·training·evaluation·experiments·references
+- DINObotPose3 원본 로그: [`EXPERIMENTS.md`](../3_pose_models/DINObotPose3/EXPERIMENTS.md)(일지) · [`SUMMARY.md`](../3_pose_models/DINObotPose3/SUMMARY.md)(확정 결론)
 - 통합 파이프라인 설치: [`4_perception/DINOv3_fine_tunning/PIPELINE_SETUP.md`](../4_perception/DINOv3_fine_tunning/PIPELINE_SETUP.md)

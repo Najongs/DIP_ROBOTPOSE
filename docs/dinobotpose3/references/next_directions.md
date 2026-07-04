@@ -24,7 +24,7 @@
 ## 2. 다음 시도 로드맵 (내 분석 — 진단 증거 기반 우선순위)
 
 ### ① 멀티스타트 RC + SAM-IoU basin 선택 — ❌ 반증 (07-04, 진단 가치 큼)
-**결과**: 클린 무해(전환 0) 확인됐으나 orb +0.000(rot head가 이미 basin 고정), 40% 가림 +0.000(전환 20프레임 발화했지만 손상이 상류 θ 붕괴라 무효) → **잔여 실패는 R-basin이 아님**. orb→2D(④), 40%→head 학습(②)으로 공격 방향 확정. 상세: [experiments/2026-07-04_multistart_rc.md](experiments/2026-07-04_multistart_rc.md)
+**결과**: 클린 무해(전환 0) 확인됐으나 orb +0.000(rot head가 이미 basin 고정), 40% 가림 +0.000(전환 20프레임 발화했지만 손상이 상류 θ 붕괴라 무효) → **잔여 실패는 R-basin이 아님**. orb→2D(④), 40%→head 학습(②)으로 공격 방향 확정. 상세: [experiments/2026-07-04_multistart_rc.md](../experiments/2026-07-04_multistart_rc.md)
 
 <details><summary>원 가설 (기록용)</summary>
 - **근거**: 남은 실패의 공통 근원은 "wrong basin" — orb 실패 프레임(rot corr +0.58)과 40% 가림(pose 0.315로 붕괴 후 RC가 못 살림)은 모두 init이 틀린 분지에 있어 conservative refine이 못 빠져나오는 경우. 6월 MCL이 반증된 이유는 **selector가 학습 모델**이라 가설을 구분 못 해서였는데, 지금은 **SAM 마스크 + 정밀 렌더 IoU라는 외부 증거**가 생겼음 — 가설 선택기가 공짜로 확보된 상태.
