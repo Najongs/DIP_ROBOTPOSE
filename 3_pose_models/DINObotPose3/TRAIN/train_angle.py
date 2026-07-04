@@ -17,6 +17,9 @@ from tqdm import tqdm
 
 from model_angle import AnglePredictor
 from model_v4 import panda_forward_kinematics
+import sys as _sys, os as _os
+_sys.path.append(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '../Eval'))
+from silhouette_mesh_probe import kabsch_batch
 from dataset import PoseEstimationDataset
 
 try:
@@ -111,6 +114,25 @@ def main(args):
             fk_gt = panda_forward_kinematics(gt)
             fk_loss = F.mse_loss(fk_pred[has], fk_gt[has])
             loss = sc_loss + args.fk_weight * fk_loss
+            # RoboTAG-style cross-dimensional (2D<->3D) consistency: project FK(pred_angles) through
+            # the GT camera pose (Kabsch of FK(gt) onto camera-frame GT keypoints) and match GT 2D.
+            # Adds the camera-frame reprojection signal the robot-frame fk_loss lacks — sharpens
+            # angles where small errors move 2D (near cameras / azure, our RoboTAG-relative weakness).
+            if args.reproj_weight > 0 and 'keypoints_3d' in batch:
+                kp3d = batch['keypoints_3d'].to(device)              # (B,7,3) camera frame
+                kp2d = batch['keypoints'].to(device).float()        # (B,7,2) @ IS
+                vm = batch['valid_mask'].to(device).float()         # (B,7)
+                with torch.no_grad():
+                    Rg, tg = kabsch_batch(fk_gt.detach(), kp3d)      # GT camera pose
+                cam = torch.einsum('bij,bpj->bpi', Rg, fk_pred) + tg.unsqueeze(1)
+                z = cam[..., 2].clamp(min=1e-3)
+                u = cam[..., 0] / z * K[:, 0, 0:1] + K[:, 0, 2:3]
+                v = cam[..., 1] / z * K[:, 1, 1:2] + K[:, 1, 2:3]
+                proj = torch.stack([u, v], -1)
+                valid_ok = ((kp3d.abs().sum(-1) > 1e-6) & (kp3d[..., 2] > 0)).float() * vm
+                rp = (F.smooth_l1_loss(proj / args.image_size, kp2d / args.image_size,
+                                       reduction='none').sum(-1) * valid_ok)[has]
+                loss = loss + args.reproj_weight * rp.sum() / valid_ok[has].sum().clamp(min=1)
 
             opt.zero_grad(); loss.backward(); opt.step()
             run_loss += loss.item()
@@ -173,6 +195,8 @@ if __name__ == '__main__':
                    help='train-time occlusion augmentation: with prob 0.5 paste black occluders covering U(0.05,THIS) of the robot RoI (frozen detector -> head learns to handle degraded conf/keypoints)')
     p.add_argument('--kp-drop', type=float, default=0.0,
                    help='keypoint-level occlusion aug: randomly displace+deconfidence keypoints (model_angle.forward kp_drop)')
+    p.add_argument('--reproj-weight', type=float, default=0.0,
+                   help='RoboTAG-style camera-frame reprojection consistency (project FK(pred) via GT pose, match GT 2D) — adds the 2D<->3D alignment the robot-frame fk_loss lacks')
     p.add_argument('--init-head', default=None, help='warm-start angle_head from this state dict')
     p.add_argument('--kp-jitter', type=float, default=0.0,
                    help='train-time Gaussian px noise on detected 2D before geo/sampling (J0 noise-robustness)')
