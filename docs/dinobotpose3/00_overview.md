@@ -13,10 +13,10 @@ DREAM 4개 real split, **동일 프로토콜(predicted angles + 완전 자동 bb
 | 카메라 | 우리(현재) | RoboPEPP | RoboTAG | 판정 |
 |---|---|---|---|---|
 | realsense | **0.821** | 0.805 | 0.783 | BEAT |
-| kinect360 | **0.813** | 0.785 | 0.757 | BEAT |
+| kinect360 | **0.830** (stack) | 0.785 | 0.757 | BEAT |
 | azure | **0.792** | 0.753 | 0.831 | RoboPEPP BEAT, RoboTAG에 −0.039 |
-| orb | **0.771** | 0.775(GT)/0.344(auto) | 0.588 | RoboPEPP GT에 −0.004, auto/RoboTAG는 압승 |
-| **mean(4)** | **0.799** | 0.780 | 0.740 | **+0.019 / +0.059** |
+| orb | **0.773** (stack) | 0.775(GT)/0.344(auto) | 0.588 | RoboPEPP GT에 −0.002, auto/RoboTAG 압승 |
+| **mean(4)** | **0.804** | 0.780 | 0.740 | **+0.024 / +0.064** |
 
 핵심: 완전 자동 bbox(bbox-from-solved)가 RoboPEPP/RoboTAG를 침몰시키는 orb auto-detection 붕괴를 해결 → 동일 프로토콜에서 우리가 최고. 유일 상대 열세는 azure(RoboTAG 0.831).
 
