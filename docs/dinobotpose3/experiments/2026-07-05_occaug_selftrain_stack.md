@@ -51,3 +51,11 @@ light 가림-증강 head는 클린·가림 둘 다 최고이나, real 카메라(
 | **mean** | | **0.8039** | 0.7994 | **+0.0045** |
 
 **판정: 스택 성공.** kinect 배포 +0.017(real 적응 회복)이면서 가림 40% 0.393 > base(0.376) > RoboPEPP(0.351) 유지. realsense 스택은 가림 강건성을 **거의 완전 유지**(0%/20% light 동급 이상). self-train이 강건성을 일부 씻지만(40% light 0.420→스택 0.393-0.396), `--occlude-aug 0.3`이 base 이상으로 지킴. **real 적응 + 가림 강건성 동시 확보** — 세션 목표 실현. (강건성 완전 유지엔 occlude-aug 강도↑ 추가 실험 여지)
+
+## realsense도 스택으로 전환 (사용자 요청: 강건성 확보)
+realsense 배포를 스택 head로 전환 → 4개 중 **3개(rs/kinect/orb) 가림 강건 head** 확보 (azure만 미강건, 단 RC off라 무관).
+- **가림-강건 배포 config**: rs 0.8165 + kinect 0.8303 + azure 0.7916 + orb 0.7726 → mean **0.8028** (강건성 확보)
+- max-정확도 config: rs 0.8213(기존) → mean 0.8039 (rs 강건성 없음)
+- 차이는 mean −0.001 — realsense 강건성(40% 0.396 vs 기존 head base 0.376)의 대가.
+
+**개선 시도 (진행 중)**: 기존 스택은 light head에서 재self-train(−0.005). 개선판 = **배포 realsense head(0.821, 이미 real 적응)에서 가림 증강만 fine-tune** → real 적응 유지 + 강건성 추가로 −0.005 회수 목표. 결과 나오면 더 나은 쪽 채택.
