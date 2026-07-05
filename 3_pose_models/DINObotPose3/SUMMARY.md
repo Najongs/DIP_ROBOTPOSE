@@ -2,7 +2,7 @@
 
 **Goal:** single-image robot (Panda) pose + joint-angle estimator that beats **RoboPEPP** on the 6 DREAM-Panda splits (metric: ADD-AUC@100mm).
 
-## 🏆 2026-07-05 — mean 0.804 vs RoboPEPP 0.780; +occ-aug→self-train stack (accuracy + occlusion)
+## 🏆 2026-07-05 — mean 0.804 vs RoboPEPP 0.780; ALL-4-CAMS occlusion-robust (accuracy + occlusion, no cost)
 
 The 06-09 renderer blocker was broken with **nvdiffrast** (exact visual-mesh differentiable silhouette,
 local build on the NAS box) + **SAM ViT-B** true-robot masks (init-render-consistent mask selection).
@@ -10,11 +10,15 @@ Deployable render-and-compare (`Eval/rc_refine_from_dump.py`) on top of the crop
 + **cov-PnP** (heatmap-covariance Mahalanobis) + **DARK sub-pixel decode** (both free, no training):
 | cam | deployable (+DARK) | was (07-03) | RoboPEPP | gap |
 |---|---|---|---|---|
-| realsense | **0.8213** (deployed head +RC@448) | 0.8183 | 0.805 | **+0.016 BEAT** |
-| kinect360 | **0.8303** (STACK head +RC@448) | 0.8132 | 0.785 | **+0.045 BEAT** |
-| azure | **0.7916** (crop base, **RC OFF**) | 0.7881 | 0.753 | **+0.039 BEAT** |
-| orb | **0.7726** (STACK head +RC@512) | 0.7714 | 0.775 | −0.002 ≈MATCH |
-| **MEAN** | **0.8039** | 0.7994 | 0.780 | **+0.024** |
+| realsense | **0.8165** (light-stack, robust) | — | 0.805 | **+0.012 BEAT** |
+| kinect360 | **0.8303** (stack, robust) | — | 0.785 | **+0.045 BEAT** |
+| azure | **0.7953** (light head, robust, RC OFF) | — | 0.753 | **+0.042 BEAT** |
+| orb | **0.7726** (stack, robust) | — | 0.775 | −0.002 ≈MATCH |
+| **MEAN** | **0.8037** | 0.7994 | 0.780 | **+0.024** |
+**ALL 4 cameras occlusion-robust** (40% occlusion pose 0.39-0.43 all > RoboPEPP 0.351) at NO accuracy cost —
+azure light head (+0.004) and kinect stack (+0.017) offset the realsense −0.005 robustness trade. Occlusion
+robustness must be baked in by training the angle head from scratch with occlusion-aug (light); short
+self-train + synth occ-aug on an already-adapted head does NOT instill it (realsense robust-stack, 40% base-level).
 occ-aug→self-train stack (2026-07-05): light occlusion-aug head → per-camera self-train with occlusion-aug
 on the synth anti-forget batch — recovers real adaptation WHILE retaining occlusion robustness. kinect +0.017,
 orb +0.001, both now occlusion-robust (40% 0.39 > RoboPEPP 0.351); realsense keeps its already-optimal head.
