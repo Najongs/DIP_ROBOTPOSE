@@ -59,3 +59,17 @@ realsense 배포를 스택 head로 전환 → 4개 중 **3개(rs/kinect/orb) 가
 - 차이는 mean −0.001 — realsense 강건성(40% 0.396 vs 기존 head base 0.376)의 대가.
 
 **개선 시도 (진행 중)**: 기존 스택은 light head에서 재self-train(−0.005). 개선판 = **배포 realsense head(0.821, 이미 real 적응)에서 가림 증강만 fine-tune** → real 적응 유지 + 강건성 추가로 −0.005 회수 목표. 결과 나오면 더 나은 쪽 채택.
+
+## azure도 강건성 확보 — light head 직접 전환 (self-train ~0)
+azure는 sim2real 갭 작아 self-train ~0 → **light head 직접 사용**이 최적. light head azure(full-1000, RC off) = **0.7953 vs 기존 crop base 0.7916 = +0.004** — 정확도까지 올리며 가림 강건성 확보(강건성은 light 곡선 0.812/…/0.429).
+
+## 🔒 전 카메라 가림 강건 배포 테이블
+| 카메라 | 강건 head | 값 | 기존 |
+|---|---|---|---|
+| realsense | 스택 | 0.8165 | 0.8213 |
+| kinect | 스택 | 0.8303 | 0.8132 |
+| azure | **light** | **0.7953** | 0.7916 |
+| orb | 스택 | 0.7726 | 0.7714 |
+| **mean** | | **0.8037** | 0.7994 |
+
+**전 카메라(4/4) 가림 강건 + mean 0.804 = max-정확도와 동일.** azure light(+0.004)·kinect 스택(+0.017)이 realsense 스택(−0.005)을 상쇄 → **정확도 손실 없이 전 카메라 가림 강건성 확보.** (realsense 개선 스택·azure 스택으로 추가 상승 여지 확인 중)
