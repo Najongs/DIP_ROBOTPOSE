@@ -12,9 +12,9 @@ DREAM 4개 real split, **동일 프로토콜(predicted angles + 완전 자동 bb
 
 | 카메라 | 우리(현재) | RoboPEPP | RoboTAG | 판정 |
 |---|---|---|---|---|
-| realsense | **0.821** | 0.805 | 0.783 | BEAT |
+| realsense | **0.817** (강건) | 0.805 | 0.783 | BEAT |
 | kinect360 | **0.830** (stack) | 0.785 | 0.757 | BEAT |
-| azure | **0.792** | 0.753 | 0.831 | RoboPEPP BEAT, RoboTAG에 −0.039 |
+| azure | **0.795** (강건) | 0.753 | 0.831 | RoboPEPP BEAT, RoboTAG −0.036 |
 | orb | **0.773** (stack) | 0.775(GT)/0.344(auto) | 0.588 | RoboPEPP GT에 −0.002, auto/RoboTAG 압승 |
 | **mean(4)** | **0.804** | 0.780 | 0.740 | **+0.024 / +0.064** |
 
@@ -85,18 +85,10 @@ backbone은 **frozen이 최적**(적응 계열 3회 반증). 카메라별 config
 
 ---
 
-## 🔄 진행 중 (5-GPU, 2026-07-04 시점)
+## ✅ 완료 (2026-07-05)
 
-| 실험 | 상태 | 판정 대기 |
-|---|---|---|
-| 가림-증강 angle head (occaug) | Ep17/20 | 가림 벤치 30-40% + 클린 do-no-harm |
-| 경량 가림-증강 (light) | Ep14/20 | Pareto 개선 여부(클린 −0.009 축소) |
-| 가림-증강 rot head | ✅ 완료(geo 3.27°) | angle과 짝지어 평가 |
-| **RoboTAG reproj-consistency** w50/w150 | Ep1 | azure ADD 개선(기준 0.792) |
+occ-aug→self-train 스택 완료 — **전 4개 카메라 가림 강건 + mean 0.804**(정확도 손실 0). 상세 [experiments/2026-07-05](experiments/2026-07-05_occaug_selftrain_stack.md).
 
-occaug head = 강건성/정확도 트레이드오프(Ep1 기준 +0.014/0.018 가림, −0.009 클린) → 별도 "가림 강건성 config" 포지션. 완료 후 최종 A/B.
-
----
 
 ## 남은 방향 (로드맵, `../robot_pose_next_directions.md`)
 

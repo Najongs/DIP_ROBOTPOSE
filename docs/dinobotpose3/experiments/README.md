@@ -15,6 +15,6 @@
 
 | RoboTAG식 reproj-consistency angle head | 07-04 | 🔄 학습 중 (azure 격차) | [2026-07-04_robotag_reproj_consistency.md](2026-07-04_robotag_reproj_consistency.md) |
 
-| occ-aug → self-train 스택 | 07-05 | ✅ mean 0.799→0.804 (kinect 0.830) | [2026-07-05_occaug_selftrain_stack.md](2026-07-05_occaug_selftrain_stack.md) |
+| occ-aug → self-train 스택 | 07-05 | ✅ 전 4카메라 가림 강건 + mean 0.804 (손실 0) | [2026-07-05_occaug_selftrain_stack.md](2026-07-05_occaug_selftrain_stack.md) |
 
 관련 문서: [SOTA 서베이](../references/sota_survey.md) · [다음 시도 로드맵](../references/next_directions.md) · 반증 맵은 로드맵 §3
