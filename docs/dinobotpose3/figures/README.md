@@ -26,8 +26,10 @@ python docs/dinobotpose3/figures/make_figs.py
 
 | 파일 | 내용 |
 |---|---|
-| `qual_{cam}_clean.png` | 클린 프레임 6장 오버레이 — RED이 실제 로봇 팔에 밀착 (ADD 15~43mm) |
-| `qual_{cam}_ladder.png` | **동일 프레임 가림 0→40% 에스컬레이션** — 가림체가 팔을 덮어도 RED이 GT 추종, 우아한 열화 |
+| `qual_{cam}_clean.png` | (스켈레톤) 클린 6장 — RED 예측이 실제 팔에 밀착 (ADD 15~43mm) |
+| `qual_{cam}_ladder.png` | (스켈레톤) 가림 0→40% 에스컬레이션 — RED이 GT 추종, 우아한 열화 |
+| `qual_{cam}_mesh.png` | **(메쉬 실루엣) 예측 포즈로 렌더한 Panda 메쉬(nvdiffrast, 오렌지)를 실제 이미지에 반투명 오버레이** — 팔 전체가 실제 로봇에 링크 단위로 정합. azure 특히 픽셀-퍼펙트 |
+| `qual_{cam}_mesh_ladder.png` | (메쉬) 가림 0→40% — 가림체가 팔을 덮어도 메쉬가 추론된 전신 포즈로 가림체 위에 렌더 = "숨은 팔의 위치를 안다"는 시각 증거 |
 
 관측(kinect ladder, frame #2400): ADD 13→15→34→70→107mm (0/10/20/30/40%), 40%에서 3/7 키포인트가 가림체 뒤(CYAN)인데도 포즈 근사 유지 = **"가려져도 대략 추론"의 시각적 증거**. azure ladder(#3000): 19→27→26→43→141mm. realsense(#2700): 13→14→102→153→137mm.
 
@@ -46,7 +48,17 @@ CUDA_VISIBLE_DEVICES=$G python viz_occlusion.py --detector $DET \
   --mlp-head ../TRAIN/outputs_angle/angle_occaug_light_20260704_015400/best_angle_head.pth \
   --val-dir ../Dataset/Converted_dataset/DREAM_real/panda-3cam_azure \
   --ladder "3000:0,0.1,0.2,0.3,0.4" --cols 5 --out viz_outputs/qual_azure_ladder.png
+# 메쉬 실루엣 오버레이 (예측 포즈로 Panda 메쉬 렌더 → 실제 이미지 위 반투명)
+CUDA_VISIBLE_DEVICES=$G python viz_mesh.py --detector $DET --mlp-head $CLEAN \
+  --val-dir ../Dataset/Converted_dataset/DREAM_real/panda-3cam_azure \
+  --indices 40,1000,2000,3000,4000,5000 --gt-skel --out viz_outputs/qual_azure_mesh.png
+# 메쉬 + 가림 에스컬레이션 (가림-강건 head)
+CUDA_VISIBLE_DEVICES=$G python viz_mesh.py --detector $DET \
+  --mlp-head ../TRAIN/outputs_angle/angle_occaug_light_20260704_015400/best_angle_head.pth \
+  --val-dir ../Dataset/Converted_dataset/DREAM_real/panda-3cam_kinect360 \
+  --ladder "2400:0,0.1,0.2,0.3,0.4" --cols 5 --out viz_outputs/qual_kinect_mesh_ladder.png
 ```
+메쉬 오버레이는 pipeline이 푼 키포인트에서 Kabsch로 카메라 포즈(R,t)를 복원 → `render_nvdr.render_shaded`로 정확 메쉬를 예측 포즈에 렌더 → 실제 이미지에 alpha-blend. RC(render-and-compare)가 최적화하는 그 실루엣 정합을 눈으로 확인하는 것.
 
 ## 핵심 수치 (2026-07-06 1000-프레임 재잠금)
 
