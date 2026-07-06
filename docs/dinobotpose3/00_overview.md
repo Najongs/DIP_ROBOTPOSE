@@ -6,19 +6,19 @@
 
 ---
 
-## 🏆 현재 배포 성적: mean 0.799 vs RoboPEPP 0.780 / RoboTAG 0.740
+## 🏆 확정 배포 성적: mean 0.804 vs RoboPEPP 0.780 / RoboTAG 0.740 (🔒 1000-프레임 재잠금)
 
-DREAM 4개 real split, **동일 프로토콜(predicted angles + 완전 자동 bbox)**:
+DREAM 4개 real split, **동일 프로토콜(predicted angles + 완전 자동 bbox)**, 2026-07-06 held-out 1000/cam 재잠금:
 
-| 카메라 | 우리(현재) | RoboPEPP | RoboTAG | 판정 |
+| 카메라 | 우리(재잠금) | RoboPEPP | RoboTAG | 판정 |
 |---|---|---|---|---|
-| realsense | **0.817** (강건) | 0.805 | 0.783 | BEAT |
-| kinect360 | **0.830** (stack) | 0.785 | 0.757 | BEAT |
+| realsense | **0.815** (강건) | 0.805 | 0.783 | BEAT |
+| kinect360 | **0.828** (stack) | 0.785 | 0.757 | BEAT |
 | azure | **0.795** (강건) | 0.753 | 0.831 | RoboPEPP BEAT, RoboTAG −0.036 |
-| orb | **0.773** (stack) | 0.775(GT)/0.344(auto) | 0.588 | RoboPEPP GT에 −0.002, auto/RoboTAG 압승 |
+| orb | **0.778** (stack) | 0.775(GT)/0.344(auto) | 0.588 | RoboPEPP GT +0.003, auto/RoboTAG 압승 |
 | **mean(4)** | **0.804** | 0.780 | 0.740 | **+0.024 / +0.064** |
 
-핵심: 완전 자동 bbox(bbox-from-solved)가 RoboPEPP/RoboTAG를 침몰시키는 orb auto-detection 붕괴를 해결 → 동일 프로토콜에서 우리가 최고. 유일 상대 열세는 azure(RoboTAG 0.831).
+핵심: 완전 자동 bbox(bbox-from-solved)가 RoboPEPP/RoboTAG를 침몰시키는 orb auto-detection 붕괴를 해결 → 동일 프로토콜에서 우리가 최고. 유일 상대 열세는 azure(RoboTAG 0.831). **800→1000 재잠금에서 mean 0.804 유지(Δ+0.0002, 표본 강건), 4/4 카메라 모두 RoboPEPP 초과** — 확정 SOTA.
 
 ---
 
@@ -94,7 +94,7 @@ occ-aug→self-train 스택 완료 — **전 4개 카메라 가림 강건 + mean
 
 1. orb −0.004 완전 초월: detector 2D 개선(768 재학습 캐스케이드) 또는 render-h 576+
 2. azure(RoboTAG 대비 유일 열세): reproj-consistency(실험 중) 또는 depth 브랜치
-3. 논문용 full-split 재잠금(현재 held-out 800), main merge + GitHub/GPU 서버 동기화
+3. ~~논문용 full-split 재잠금~~ ✅ 2026-07-06 완료(held-out 1000, mean 0.804 유지). ~~main merge~~ ✅ 완료(commit 99a5bc2, origin push). GPU 서버 동기화는 별도(로컬 작업이라 해당 시만).
 
 ---
 

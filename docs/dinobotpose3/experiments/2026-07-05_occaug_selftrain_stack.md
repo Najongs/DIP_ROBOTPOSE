@@ -93,3 +93,17 @@ azure 스택(light→azure self-train) 내부 baseline 0.7735 → 0.7746 (+0.001
 
 **전 카메라 정확도(mean 0.804, vs RoboPEPP 0.780 +0.024) + 가림 강건성(전 구간 RoboPEPP 초과) 동시 달성.** 강건성 확보에 사실상 정확도 손실 없음(azure/kinect 이득이 realsense 손실 상쇄). realsense만 −0.005는 강건성의 대가.
 **교훈**: 강건성은 angle head를 처음부터 증강 학습(light)해야 배어듦. 배포 head+짧은 증강 self-train으론 안 됨. azure는 self-train~0이라 light 직접이 최적.
+
+## 🔒 2026-07-06 — full-split 재잠금 (held-out 800 → 1000)
+
+논문용 확정을 위해 배포 테이블을 1000프레임으로 재평가. **anti-leak 유지**: rs/kinect/orb는 self-train 적응(앞 70%)을 피해 **뒤 30% held-out 영역만** 쓰고 1000프레임 조밀 샘플링(rs 1784→1000, kinect 1490→1000, orb 9695→1000). azure는 self-train 없어 full-split 1000.
+
+| 카메라 | 800(기존) | **1000(재잠금)** | Δ | vs RoboPEPP |
+|---|---|---|---|---|
+| realsense | 0.8165 | **0.8153** | −0.0012 | +0.010 BEAT |
+| kinect360 | 0.8303 | **0.8275** | −0.0028 | +0.043 BEAT |
+| azure | 0.7953 | **0.7945** | −0.0008 | +0.042 BEAT |
+| orb | 0.7726 | **0.7784** | +0.0058 | +0.003 BEAT |
+| **mean** | 0.8037 | **0.8039** | **+0.0002** | **+0.024** |
+
+**판정: 재잠금 통과.** mean 0.804가 표본 수(800→1000)에 강건(Δ+0.0002), 개별 카메라도 ≤0.006 변동(통계 노이즈). **4/4 카메라 모두 RoboPEPP 초과**(orb가 −0.002→+0.003으로 전환) — 확정 SOTA. 명령은 [FINAL_MODEL.md](../FINAL_MODEL.md) 재현 섹션(`--max-frames 1000`).

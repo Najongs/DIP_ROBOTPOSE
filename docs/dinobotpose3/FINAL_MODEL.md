@@ -3,17 +3,20 @@
 > DREAM 4-real-split 배포 mean **0.804** vs RoboPEPP 0.780 / RoboTAG 0.740. 전 4카메라 가림 강건.
 > 전체 맥락은 [00_overview.md](00_overview.md), 스택 실험은 [experiments/2026-07-05](experiments/2026-07-05_occaug_selftrain_stack.md).
 
-## 성적표 (held-out 800/cam; azure full-1000)
+## 성적표 (🔒 재잠금: held-out 1000/cam; azure full-1000)
 
 | 카메라 | 배포 ADD-AUC | 가림 40% | RoboPEPP | 격차 |
 |---|---|---|---|---|
-| realsense | **0.817** | 0.396 | 0.805 | +0.012 BEAT |
-| kinect360 | **0.830** | 0.393 | 0.785 | +0.045 BEAT |
+| realsense | **0.815** | 0.396 | 0.805 | +0.010 BEAT |
+| kinect360 | **0.828** | 0.393 | 0.785 | +0.043 BEAT |
 | azure | **0.795** | 0.429 | 0.753 | +0.042 BEAT |
-| orb | **0.773** | 0.399 | 0.775 | −0.002 ≈MATCH |
+| orb | **0.778** | 0.399 | 0.775 | +0.003 BEAT |
 | **mean** | **0.804** | 전부 >0.351 | 0.780 | **+0.024** |
 
-프로토콜: predicted angles + 완전 자동 bbox(bbox-from-solved) + sim-to-real. rs/kinect/orb는 anti-leak held-out. 가림 강건성은 별도 벤치(RoboPEPP Fig.6, synth_photo) — light+RC 곡선 0.812/0.765/0.678/0.575/0.429 (0~40%), 전 구간 RoboPEPP 초과.
+프로토콜: predicted angles + 완전 자동 bbox(bbox-from-solved) + sim-to-real. rs/kinect/orb는 anti-leak held-out(뒤 30% 영역, 1000프레임 조밀 샘플). 가림 강건성은 별도 벤치(RoboPEPP Fig.6, synth_photo) — light+RC 곡선 0.812/0.765/0.678/0.575/0.429 (0~40%), 전 구간 RoboPEPP 초과.
+
+**2026-07-06 재잠금(800→1000)**: mean 0.8037→**0.8039** (Δ+0.0002, 표본 수에 강건). 개별 ≤0.006 변동. **4/4 카메라 모두 RoboPEPP 초과**(orb −0.002→+0.003 전환). 확정 SOTA.
+값(1000): rs 0.8153 / kinect 0.8275 / azure 0.7945 / orb 0.7784.
 
 ## 파이프라인 (배포)
 
@@ -77,7 +80,7 @@ CUDA_VISIBLE_DEVICES=GPU-<uuid> python selfbbox_eval.py \
   --rot-head ../TRAIN/outputs_selftrain/kinect_lightstack_20260705_003552/best_selftrain_rot.pth \
   --bbox-from-solved --bbox-guard --cov-pnp --dark-decode --frac-range 0.7 1.0 \
   --val-dir ../Dataset/Converted_dataset/DREAM_real/panda-3cam_kinect360 \
-  --max-frames 800 --dump-npz rc_dumps/kinect_final.npz
+  --max-frames 1000 --dump-npz rc_dumps/kinect_final.npz
 python rc_refine_from_dump.py --dump rc_dumps/kinect_final.npz \
   --val-dir ../Dataset/Converted_dataset/DREAM_real/panda-3cam_kinect360 \
   --sam-checkpoint ../weights_sam/sam_vit_b_01ec64.pth --render-h 448

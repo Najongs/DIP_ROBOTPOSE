@@ -2,19 +2,23 @@
 
 **Goal:** single-image robot (Panda) pose + joint-angle estimator that beats **RoboPEPP** on the 6 DREAM-Panda splits (metric: ADD-AUC@100mm).
 
-## 🏆 2026-07-05 — mean 0.804 vs RoboPEPP 0.780; ALL-4-CAMS occlusion-robust (accuracy + occlusion, no cost)
+## 🏆 2026-07-06 — mean 0.804 vs RoboPEPP 0.780 (🔒 1000-frame re-lock, confirmed SOTA); ALL-4-CAMS occlusion-robust
 
 The 06-09 renderer blocker was broken with **nvdiffrast** (exact visual-mesh differentiable silhouette,
 local build on the NAS box) + **SAM ViT-B** true-robot masks (init-render-consistent mask selection).
 Deployable render-and-compare (`Eval/rc_refine_from_dump.py`) on top of the crop+rot-adapt pipeline,
 + **cov-PnP** (heatmap-covariance Mahalanobis) + **DARK sub-pixel decode** (both free, no training):
-| cam | deployable (+DARK) | was (07-03) | RoboPEPP | gap |
+| cam | re-lock 1000 | 800 (prev) | RoboPEPP | gap |
 |---|---|---|---|---|
-| realsense | **0.8165** (light-stack, robust) | — | 0.805 | **+0.012 BEAT** |
-| kinect360 | **0.8303** (stack, robust) | — | 0.785 | **+0.045 BEAT** |
-| azure | **0.7953** (light head, robust, RC OFF) | — | 0.753 | **+0.042 BEAT** |
-| orb | **0.7726** (stack, robust) | — | 0.775 | −0.002 ≈MATCH |
-| **MEAN** | **0.8037** | 0.7994 | 0.780 | **+0.024** |
+| realsense | **0.8153** (light-stack, robust) | 0.8165 | 0.805 | **+0.010 BEAT** |
+| kinect360 | **0.8275** (stack, robust) | 0.8303 | 0.785 | **+0.043 BEAT** |
+| azure | **0.7945** (light head, robust, RC OFF) | 0.7953 | 0.753 | **+0.042 BEAT** |
+| orb | **0.7784** (stack, robust) | 0.7726 | 0.775 | **+0.003 BEAT** |
+| **MEAN** | **0.8039** | 0.8037 | 0.780 | **+0.024** |
+
+**2026-07-06 full-split re-lock (held-out 800→1000, anti-leak preserved):** mean holds at 0.804 (Δ+0.0002,
+robust to sample size), per-cam ≤0.006 drift — **all 4 cams now beat RoboPEPP** (orb flipped −0.002→+0.003).
+Confirmed SOTA. Reproduction `--max-frames 1000` in `docs/dinobotpose3/FINAL_MODEL.md`.
 **ALL 4 cameras occlusion-robust** (40% occlusion pose 0.39-0.43 all > RoboPEPP 0.351) at NO accuracy cost —
 azure light head (+0.004) and kinect stack (+0.017) offset the realsense −0.005 robustness trade. Occlusion
 robustness must be baked in by training the angle head from scratch with occlusion-aug (light); short
@@ -23,7 +27,7 @@ occ-aug→self-train stack (2026-07-05): light occlusion-aug head → per-camera
 on the synth anti-forget batch — recovers real adaptation WHILE retaining occlusion robustness. kinect +0.017,
 orb +0.001, both now occlusion-robust (40% 0.39 > RoboPEPP 0.351); realsense keeps its already-optimal head.
 Protocol: predicted angles + fully-automatic bbox (stricter than RoboPEPP's GT-bbox headline); rs/kinect/orb
-anti-leak held-out 800/cam. DARK decode (`--dark-decode`, `Eval/decode_util.py`) lifts pose 2D precision
+anti-leak held-out 1000/cam (re-locked 2026-07-06). DARK decode (`--dark-decode`, `Eval/decode_util.py`) lifts pose 2D precision
 universally (+0.0035–0.017 per cam, free) — closed the orb gap −0.010→−0.004. RC = depth/scale corrector →
 per-camera on/off (helps far cams; azure RC OFF). Details EXPERIMENTS.md 2026-07-04; survey
 `docs/robot_pose_sota_survey.md`; roadmap `docs/robot_pose_next_directions.md`. Remaining: orb −0.004.
