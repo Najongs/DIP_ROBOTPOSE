@@ -16,7 +16,7 @@ DREAM 벤치마크 단안 로봇 포즈 SOTA (배포 mean **0.804** vs RoboPEPP 
 | [training/](training/training.md) | 학습 — 스테이지, 손실 항, 자가학습, 체크포인트, GPU 주의 |
 | [evaluation/](evaluation/evaluation.md) | 평가 — 프로토콜 3축, 지표, 하네스, 배포 성적, 재현 게이트 |
 | [experiments/](experiments/README.md) | 실험별 기록 (날짜별, 판정 포함) |
-| [references/](references/sota_survey.md) | 문헌 조사(SOTA 서베이) + 다음 방향 로드맵 |
+| [references/](references/sota_survey.md) | 문헌 조사(SOTA 서베이) + [related_work](references/related_work.md)(RoboPose/CtRNet 대비 정직한 포지셔닝) + 다음 방향 로드맵 |
 
 ## 원본 로그 (프로젝트 내)
 

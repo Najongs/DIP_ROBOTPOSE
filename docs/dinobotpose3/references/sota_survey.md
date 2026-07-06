@@ -18,8 +18,8 @@
 | DREAM (R101-H) | ICRA'20 | keypoint+PnP | 68.9 | 24.4 | 76.1 | 61.9 | 57.8 | known | 가림 무대응 |
 | RoboPose | CVPR'21 | render&compare | 70.4 | 77.6 | 74.3 | 70.4 | 73.2 | predicted | init bbox 의존 (auto orb 32.7) |
 | SGTAPose | CVPR'23 | temporal | 67.8 | 2.1 | 87.6 | 72.3 | 57.5 | known | kinect 붕괴 |
-| CtRNet | CVPR'23 | self-sup kp+seg | 89.9 | 79.5 | 90.8 | 85.3 | 86.4 | **known** | real self-train — 비교 불가(쉬운 축 2개) |
-| CtRNet-X | '24 | +VLM 가시링크 선택 | — | — | — | — | ~86.2 | **known** | out-of-view 처리 최고 수준 |
+| CtRNet | CVPR'23 | self-sup kp+seg(실루엣 R&C=학습손실) | 89.9 | 79.5 | 90.8 | 85.3 | 86.4 | **known** | real self-train — 비교 불가(쉬운 축 2개) |
+| CtRNet-X | ICRA'25 | +CLIP 가시부품→키포인트 선택 | — | — | — | — | 86.2 | **known** | 부분가시 처리; CtRNet 85.96→86.23. **known-angle이라 우리 predicted와 비교 불가** ([related_work](related_work.md)) |
 | HoRoPose | ECCV'24 | RootNet식 depth | 82.2 | 76.0 | 75.2 | 75.2 | 77.2 | predicted | root-depth로 orb 강건 |
 | GISR | RA-L'24 | 실루엣 정제 | 80.6 | 73.9 | 79.3 | — | — | predicted | orb는 seg 파인튜닝 |
 | **RoboPEPP** | CVPR'25 | masking-pretrain+PnP | **75.3** | **78.5** | **80.5** | **77.5** | **77.9** | predicted | **GT-bbox 헤드라인** (auto orb≈34); 가림 최강(40% 가림 AUC 35.1) |
