@@ -20,6 +20,34 @@ python docs/dinobotpose3/figures/make_figs.py
 | `fig6_milestones` | 세션 진행 마일스톤 mean(RoboPEPP 0.780→render-compare 0.796→+DARK 0.799→+stack 0.804), 전부 학습 불필요(self-train 제외) | [00_overview.md](../00_overview.md) 채택 레버, dark_decode 실험 |
 | `fig7_occ_mechanism` | 가림 강건성의 출처 — clean head vs occ-aug light vs 배포 스택, 40%에서 light 0.420 vs base 0.376(+0.044). 처음부터 증강 학습해야 배어듦 | [experiments/2026-07-05](../experiments/2026-07-05_occaug_selftrain_stack.md), occlusion_aug_heads |
 
+## 정성 확인 (qualitative overlay) — `qualitative/`
+
+실제 DREAM 프레임 위에 파이프라인 추정 포즈를 겹쳐 **눈으로** 확인. GREEN=GT 스켈레톤, RED=예측 FK 재투영(모델 실제 포즈), YELLOW=검출 원시 2D, CYAN=가림체 뒤라 conf-gate된(운동학이 추론한) 키포인트. PNG는 gitignore(재생성 가능) — 스크립트는 추적됨.
+
+| 파일 | 내용 |
+|---|---|
+| `qual_{cam}_clean.png` | 클린 프레임 6장 오버레이 — RED이 실제 로봇 팔에 밀착 (ADD 15~43mm) |
+| `qual_{cam}_ladder.png` | **동일 프레임 가림 0→40% 에스컬레이션** — 가림체가 팔을 덮어도 RED이 GT 추종, 우아한 열화 |
+
+관측(kinect ladder, frame #2400): ADD 13→15→34→70→107mm (0/10/20/30/40%), 40%에서 3/7 키포인트가 가림체 뒤(CYAN)인데도 포즈 근사 유지 = **"가려져도 대략 추론"의 시각적 증거**. azure ladder(#3000): 19→27→26→43→141mm. realsense(#2700): 13→14→102→153→137mm.
+
+재생성:
+```bash
+cd 3_pose_models/DINObotPose3/Eval
+G=GPU-<uuid>
+DET=../TRAIN/outputs_heatmap/stage1_unfrozen_20260602_145811/best_heatmap.pth
+# 클린 오버레이
+CUDA_VISIBLE_DEVICES=$G python viz_results.py --detector $DET \
+  --mlp-head ../TRAIN/outputs_angle/angle_20260603_013948/best_angle_head.pth \
+  --val-dir ../Dataset/Converted_dataset/DREAM_real/panda-3cam_azure \
+  --indices 40,1000,2000,3000,4000,5000 --out viz_outputs/qual_azure_clean.png
+# 가림 에스컬레이션 (가림-강건 light head)
+CUDA_VISIBLE_DEVICES=$G python viz_occlusion.py --detector $DET \
+  --mlp-head ../TRAIN/outputs_angle/angle_occaug_light_20260704_015400/best_angle_head.pth \
+  --val-dir ../Dataset/Converted_dataset/DREAM_real/panda-3cam_azure \
+  --ladder "3000:0,0.1,0.2,0.3,0.4" --cols 5 --out viz_outputs/qual_azure_ladder.png
+```
+
 ## 핵심 수치 (2026-07-06 1000-프레임 재잠금)
 
 | cam | Ours | RoboPEPP | RoboTAG |
