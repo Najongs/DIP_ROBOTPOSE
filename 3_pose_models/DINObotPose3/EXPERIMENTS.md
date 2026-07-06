@@ -774,3 +774,174 @@ approximate render pushes the pose wrong -> diverges.
   tooling**: the self-contained learned mask caps the gain at ~+0.01, and the SAM route needs PyTorch3D.
   Clean next-session task: get PyTorch3D (or nvdiffrast) working -> exact-mesh render -> SAM/CtRNet true mask
   -> realize the +0.108 (realsense 0.745 -> ~0.85). Until then, deployable best stays mean 0.759.
+
+---
+
+## 2026-07-03 — ✅ NAS-monorepo MIGRATION + full baseline REPRODUCTION (sota-dream branch)
+
+Work moved to the LOCAL NAS box (4×3090 + A6000, all idle; env `dino` torch 2.10+cu128) — the remote
+GPU-server node is down to 1 healthy GPU. Checkpoints (7.4GB, best_* only) rsynced into
+`TRAIN/outputs_*`; datasets wired via gitignored `Dataset/` symlinks mirroring the remote layout
+(`Converted_dataset/DREAM_real -> datasets/ICRA_multiview/.../DREAM_to_DREAM` etc. — note eval code
+resolves `meta.image_path` LEXICALLY through `..`, so the top-level `Dataset/DREAM_real`/`DREAM_syn`
+links are required, not just the Converted_dataset ones). `ab_eval.sh` made location-agnostic
+(cd-from-script-path, HF_HOME guard).
+
+**Reproduction vs locked remote numbers (deterministic `selfbbox_eval`/EvalDataset sampling):**
+| config | local | remote ref | Δ |
+|---|---|---|---|
+| realsense crop+selftrain+refine-2 @1000 | 0.7497 | 0.745 | +0.005 |
+| realsense ROT-ADAPT held-out @800 | 0.7525 | 0.755 | −0.003 |
+| azure crop base @1000 | 0.7829 | 0.788 | −0.005 |
+| orb ROT-ADAPT held-out @800 | 0.7154 | 0.715 | +0.000 |
+| kinect self-det non-crop @1000 | 0.7577 | 0.776 | −0.018 ⚠️ |
+| ab_eval 5-split smoke @300 (non-crop plain) | mean 0.694 | 0.689 | +0.005 |
+
+⚠️ kinect gap is NOT a migration bug: `refine_eval` uses the UNSORTED `PoseEstimationDataset`
+(listdir order = filesystem-dependent) → a different 1000-frame subset per machine. All
+`selfbbox_eval` (sorted+strided EvalDataset) numbers reproduce within ±0.005. → re-lock kinect with
+deterministic sampling for the final table; prefer EvalDataset-style sampling everywhere.
+
+**SAM-vs-splat "before" state reproduced** (`silhouette_mesh_probe --sam-checkpoint`, visual splat,
+realsense 100): SAM IoU 0.345 (remote 0.36), render-compare with SAM target DIVERGES (−0.43) — the
+known renderer-fidelity wall. Phase-2 gate: exact-mesh nvdiffrast render must lift GT-pose-render vs
+SAM IoU to ≥0.7.
+
+**Built:** `Eval/render_nvdr.py` — nvdiffrast CUDA-raster silhouette of the VISUAL meshes (faces,
+batched clip-space projection from K, dr.antialias edge gradients), drop-in for the splat
+`render_mesh`, with a smoke test (IoU vs splat + real-image overlays). Blocked on `pip install
+nvdiffrast` (GitHub source; awaiting user-run install). Pose dumps for cross-checking saved to
+`Eval/rc_dumps/{realsense,azure,orb}_*.npz`.
+
+## 2026-07-03 — 문헌 서베이: 타깃 0.780 유지 확정 + 가림 아이디어 랭킹
+Full survey: `docs/robot_pose_sota_survey.md`. 핵심: (1) PoseDiff의 0.96은 real-학습 in-domain — 비교 무효,
+**동일 프로토콜(predicted angles + sim-to-real)에서 RoboPEPP 0.780이 여전히 프론티어** (RoboPEPP 수치
+75.3/78.5/80.5/77.5 원문 검증, 단 GT-bbox 헤드라인이며 auto-bbox면 orb ~34 — **우리 bbox-from-solved는
+완전 자동이라 더 엄격한 조건**). (2) 가림-강건 top 아이디어: 가림-로버스트 실루엣(RC 픽셀 가중),
+공분산 가중 PnP(IRLS 확장), masked-state prior(prior_w 훅), CtRNet-X식 가시 링크 선택. V-JEPA/백본 계열
+기각 재확인(V-JEPA 2.1 논문이 우리 반증 독립 확인). RoboTAG(arXiv:2511.07717)만 주시.
+
+---
+
+## 2026-07-03 — 🔒🔒🔒 SOTA: nvdiffrast+SAM render-and-compare DEPLOYED — mean 0.796 vs RoboPEPP 0.780
+
+**The 06-09 blocker (renderer fidelity) is broken.** nvdiffrast (pip source build, CUDA raster, no GL)
+renders the EXACT visual meshes (+both gripper fingers baked into the hand frame) → GT-pose render now
+overlays the real robot pixel-accurately. SAM-vs-render agreement jumped 0.345→0.68 (GT-pose gate),
+0.85 (init-pose, deployment prompts) — the shape-inconsistency that made SAM targets diverge is gone.
+
+**Deployable pipeline addition** (`Eval/rc_refine_from_dump.py`): refine the deployed crop+rot-adapt
+poses (from `selfbbox_eval --dump-npz`) against SAM ViT-B masks: prompts = projected dump-pose keypoints
+(+bbox), mask candidate SELECTED by IoU vs the init-pose render (render-consistency selection, not SAM
+score), conservative opt (Adam 5e-4, soft-IoU + reproj anchor w=100), do-no-harm gate min-iou 0.35.
+
+**Resolution scaling (realsense 200-slice): 224 +0.041 → 320 +0.067 → 448 +0.078 → 512 +0.078 (saturates).**
+Lock render-h=448 (rs/kinect), 512 (orb — smaller/farther, kept climbing to 512).
+
+### 🔒 FINAL DEPLOYABLE TABLE (anti-leak held-out 800/cam for rs/kinect/orb; azure full-split @1000)
+| cam | base (rot-adapt deploy) | +RC | RoboPEPP | gap |
+|---|---|---|---|---|
+| realsense | 0.7525 | **0.8183** (+0.066) | 0.805 | **+0.013 BEAT** |
+| kinect360 | 0.7462 (crop cfg) | **0.8112** (+0.065) | 0.785 | **+0.026 BEAT** |
+| azure | 0.7881 (crop base, RC OFF) | — | 0.753 | **+0.035 BEAT** |
+| orb | 0.7154 | **0.7647** (+0.049) | 0.775 | −0.010 |
+| **MEAN** | | **0.7956** | 0.780 | **+0.016 SOTA** |
+
+- **kinect CONFIG SWITCH**: crop+rot-adapt+RC 0.811 > old non-crop self-det 0.776.
+- **azure RC OFF**: near camera (Z 0.87m), depth already right → RC −0.047 (mask noise perturbs depth;
+  uv-shift guard ineffective — the damage is IN the depth direction). Consistent with mechanism: RC is a
+  depth/scale corrector; per-camera on/off matches the failure decomposition (t-error #1 on rs/orb only).
+- Protocol honesty: predicted angles + FULLY AUTOMATIC bbox (bbox-from-solved) — STRICTER than RoboPEPP's
+  GT-bbox headline (their auto-bbox orb ≈34). rs/kinect/orb numbers are anti-leak held-out (self-trained
+  heads); deltas are same-frame A/B. + SAM ViT-B added to the pipeline (inference cost note).
+- orb residual −0.010: RC recovered +0.049 but orb has a real 2D-detector component too (06-08 decomp).
+
+Migration/infra: local NAS box (4×3090+A6000), env `dino`; checkpoints mirrored from GPU server; baselines
+reproduced ±0.005 before any new work (see 2026-07-03 migration entry). Tools: `Eval/render_nvdr.py`
+(exact-mesh silhouette, drop-in), `Eval/nvdr_sam_gate.py` (fidelity gate), `Eval/rc_refine_from_dump.py`.
+Survey: `docs/robot_pose_sota_survey.md` (RoboPEPP 0.780 confirmed as same-protocol frontier; PoseDiff 0.96
+is in-domain real-trained, not comparable).
+
+NEXT (levers, in EV order): (1) orb −0.010: RC + detector-side (2D) improvement, or 576+ render-h;
+(2) full-split re-lock for paper numbers; (3) occlusion catalog probes from the survey (robust silhouette
+weighting for external occluders, covariance-weighted PnP, masked-state prior via prior_w).
+
+---
+
+## 2026-07-03 — OCCLUSION TRACK: RoboPEPP-protocol bench + 3 levers (1 adopted, 2 refuted)
+
+**Bench** (`Eval/occlusion_bench.sh` + `occl_util.py`): RoboPEPP Fig.6 protocol reproduced exactly —
+black rect/circle masks covering {0,10,20,30,40}% of the GT-kp RoI on panda_synth_test_photo,
+DETERMINISTIC per (frame,ratio) so the pose stage and the SAM/RC stage see identical occluders.
+Full deployable pipeline (auto bbox + crop + solve) + nvdr/SAM RC@448, 200 strided frames.
+
+### 🔒 Occlusion curve (ours +RC, cov-pnp config) vs published (RoboPEPP Fig.6)
+| RoI occl | ours pose | ours +RC | RoboPEPP | HPE | RoboPose |
+|---|---|---|---|---|---|
+| 0% | 0.724 | 0.775 | 0.795 | 0.570 | 0.540 |
+| 10% | 0.667 | 0.726 | 0.730 | 0.505 | 0.420 |
+| 20% | 0.567 | **0.626** | 0.600 | 0.405 | 0.280 |
+| 30% | 0.481 | **0.525** | 0.470 | 0.320 | 0.210 |
+| 40% | 0.315 | 0.328 | 0.351 | 0.282 | 0.145 |
+- **WIN vs RoboPEPP at 20-30% (+0.026/+0.055), ~tie 10/40%, −0.02 at 0%** (their synth edge — we win real).
+  Degradation slope 0→40% identical (−0.447 vs −0.444) from a 0.02-lower start → occlusion robustness
+  per se ≥ RoboPEPP. RC stays positive UNDER occlusion (+0.06@10-20%) — the SAM+exact-render loop
+  does not collapse when the robot is partially masked.
+
+### Lever verdicts (ablated individually @20%, base pose 0.5610 / +RC 0.6156)
+- ✅ **cov-PnP ADOPTED** (`solve_batch(cov_inv=)`, `heatmap_cov_inv`, `selfbbox_eval --cov-pnp`):
+  anisotropic heatmap-second-moment Mahalanobis weighting. Do-no-harm at 0/40%, +0.006 pose /
+  +0.011 RC at 20%. Modest but free (no retrain).
+- ❌ **occl-robust silhouette REFUTED as designed** (`--occl-robust-w`): downweighting
+  "init-render ∧ ¬SAM" pixels removes the penalty for the render inflating past SAM → DEPTH BIAS
+  (−0.019 RC @20%, also hurts clean azure logic). Rescue would need an explicit occluder
+  segmentation (only downweight inside a DETECTED occluder), not blanket disagreement weighting.
+- ❌ **occlusion-adaptive population prior REFUTED** (`--prior-adaptive`): even at 0.005 it's
+  −0.09 @20%. Root cause structural, not scale: synth joints are INDEPENDENT (max |corr| 0.06) and
+  broadly spread (σ 0.5-1.0 rad), so pulling toward the population mean actively fights the true
+  config. Consistent with the June "mean-fallback dead end" refutation. The full learned
+  (DPoser-style) state prior was SKIPPED by the same pre-check — nothing beyond per-joint marginals
+  to learn. A prior helps only if conditioned on the FRAME (that's what theta_init already is).
+
+Takeaway: the existing stack (conf-gate solver + rot-adapt heads + exact-render RC) already carries
+RoboPEPP-level occlusion robustness; the mid-occlusion WIN comes from the solver+RC, not from any
+new occlusion-specific machinery. Survey catalog (docs/robot_pose_sota_survey.md) updated verdicts.
+
+## 2026-07-04 — multi-start RC (SAM-IoU basin selection) REFUTED — but diagnostically decisive
+Hypotheses = base-Z gauge rotations (±30/60°) of the RC init, winner by SAM-IoU (external evidence,
+unlike the refuted learned-selector MCL). Clean rs 0.8157 (0 switches — perfect do-no-harm), orb
+0.7650 (+0.000, 1 switch), 40%-occlusion 0.327 (20 switches fired, ADD unchanged).
+**Verdict: the remaining failures are NOT rotation basins.** orb: the rot head already pins the basin
+→ residual is detector 2D (attack via crop resolution). 40% occlusion: damage is UPSTREAM (θ/2D
+collapse at the pose stage, 0.315) — no rotation start rescues a corrupted θ anchor → head-level
+occlusion-aug training (T1/T2, running) is the right lever. Code kept behind --multi-start (default
+off, harmless). Write-up: docs/experiments/2026-07-04_multistart_rc.md
+
+## 2026-07-04 — naive crop-resolution bump (512→768) REFUTED as a free lever
+selfbbox orb held-out @200 with --image-size 768 on the FROZEN 512-trained stack: 0.5818 vs 0.7176
+(median 32 vs 20mm + divergent tail mean 250mm). DINOv3 handles variable resolution, but the frozen
+detector conf calibration / kp-feature sampling / heads are 512-distribution-specialized. Higher-res
+crops require a RETRAIN CASCADE (crop detector @768 → angle/rot heads @768) — deferred; queue only if
+T1/T2 (occlusion-aug heads) leave orb as the binding gap. Roadmap ④ updated.
+
+## 2026-07-04 — DARK decode ADOPTED → mean 0.796→0.799, orb gap −0.010→−0.004
+Survey round-2 (docs/robot_pose_sota_survey.md §6) ranked DINO feature-metric RC #1, but it proved
+REDUNDANT with our silhouette RC (azure no headroom; realsense +0.002, silhouette already saturates
+the depth signal; 40%-occl +0.005 tail-only) — well-conditioned `--feat-w` kept but not deployed.
+edge-NCC-as-loss also refuted (discriminates GT in the probe but diverges as an objective, −0.10/−0.18).
+
+The WIN was Idea 3 — **DARK sub-pixel heatmap decode** (`Eval/decode_util.py`, `--dark-decode`):
+Gaussian-modulate + Taylor-refine the argmax from log-heatmap 1st/2nd derivatives (1px clamp). Free,
+no training. Pose-stage matched A/B (300f): orb +0.0074, azure +0.0045, realsense +0.0050 — universal
+do-no-harm gain (mean ADD drops = far/small-frame tail fixed, DARK's low-res strength). Stacked with RC:
+| cam | deployed was | +DARK | RoboPEPP | gap |
+|---|---|---|---|---|
+| realsense | 0.8183 | 0.8213 | 0.805 | +0.016 |
+| kinect360 | 0.8112 | 0.8132 | 0.785 | +0.028 |
+| azure(RC off) | 0.7881 | 0.7916 | 0.753 | +0.039 |
+| orb | 0.7647 | 0.7714 | 0.775 | −0.004 |
+| MEAN | 0.7956 | 0.7994 | 0.780 | +0.019 |
+orb −0.010→−0.004 (near-MATCH). ADOPT --dark-decode + --cov-pnp in the deployed config. Multi-start RC,
+768-crop, feature-metric RC, edge-NCC, occl-robust silhouette, population prior all refuted this session.
+Occlusion-aug heads (T1/T2) still training — robustness/accuracy tradeoff (+0.014/0.018 occluded, −0.009
+clean @Ep1), positioned as a separate robustness config. Docs: docs/experiments/*.

@@ -285,7 +285,7 @@ def main():
     # Robot datasets to process
     robot_datasets = [
         ("Fr5_to_DREAM", "Fr5"),
-        ("franka_research3_to_DREAM", "Research3"),
+        ("franka_research3_to_DREAM_modified", "Research3"),
         ("Meca_insertion_to_DREAM", "MecaInsertion"),
         ("Meca500_to_DREAM", "Meca500"),
     ]

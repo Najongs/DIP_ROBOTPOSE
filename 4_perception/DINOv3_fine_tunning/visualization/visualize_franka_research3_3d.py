@@ -32,7 +32,7 @@ POSE1_ARUCO_JSON_PATH = "/home/najo/NAS/DIP/datasets/ICRA_multiview/franka_resea
 POSE2_ARUCO_JSON_PATH = "/home/najo/NAS/DIP/datasets/ICRA_multiview/franka_research3/pose2_aruco_pose_summary.json"
 CALIB_DIR = "/home/najo/NAS/DIP/datasets/ICRA_multiview/franka_research3/franka_research3_calib_cam_from_conf"
 CHECKPOINT_PATH = "/home/najo/NAS/DIP/4_perception/DINOv3_fine_tunning/checkpoints_total_dino_conv_only/best_model.pth"
-JSON_DIR = "/home/najo/NAS/DIP/datasets/ICRA_multiview/Converted_dataset/franka_research3_to_DREAM"
+JSON_DIR = "/home/najo/NAS/DIP/datasets/ICRA_multiview/Converted_dataset/franka_research3_to_DREAM_modified"
 
 SERIAL_TO_VIEW = {
     '41182735': "view1",

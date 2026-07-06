@@ -139,6 +139,15 @@ def main():
                          'roi_align/K crop pipeline from detected-bbox error; should reproduce the '
                          'dataset.py GT-crop ADD (~0.768 realsense) if the crop math is correct')
     ap.add_argument('--dump-npz', default=None, help='save (fid, theta, kp_cam, gt3d, found) for cross-env render-compare')
+    ap.add_argument('--occlude-ratio', type=float, default=0.0,
+                    help='RoboPEPP-protocol synthetic occlusion: paint deterministic black rect/circle masks covering this fraction of the GT-keypoint RoI (seeded per frame+ratio so downstream RC sees identical occluders)')
+    ap.add_argument('--cov-pnp', action='store_true',
+                    help='anisotropic heatmap-covariance (Mahalanobis) weighting in the final solve — continuous upgrade of the scalar conf weighting for occluded/diffuse keypoints')
+    ap.add_argument('--prior-adaptive', type=float, default=0.0,
+                    help='occlusion-adaptive configuration prior weight (masked-state prior, analytic per-joint Gaussian; scales with fraction of low-conf keypoints)')
+    ap.add_argument('--dark-decode', action='store_true',
+                    help='DARK sub-pixel heatmap decode (Taylor refine of the argmax peak) instead of soft-argmax — targets far/small-robot 2D precision (orb)')
+    ap.add_argument('--dark-sigma', type=float, default=2.5, help='DARK Gaussian modulation sigma (match training heatmap sigma)')
     args = ap.parse_args()
     _DUMP = {'fid': [], 'theta': [], 'kp_cam': [], 'gt3d': [], 'found': [], 'feat': [], 'reproj': []} if args.dump_npz else None
 
@@ -170,6 +179,10 @@ def main():
     adds = []
     for batch in tqdm(loader, desc="selfbbox eval"):
         img = batch['image'].to(device)
+        if args.occlude_ratio > 0:
+            from occl_util import paste_occluders_batch_
+            paste_occluders_batch_(img, batch['keypoints'].numpy(), batch['valid_mask'].numpy(),
+                                   args.occlude_ratio, batch['name'])
         gt = batch['angles'].to(device)[:, :6]
         gt3d = batch['keypoints_3d'].to(device)
         K = scale_K(batch['camera_K'], batch['original_size'], IS).to(device)
@@ -242,10 +255,18 @@ def main():
             # FINAL PASS: crop pipeline on the refined crop
             o2 = cropm(crop_img, Kc)
         init_ang = o2['joint_angles']; kp2d = o2['keypoints_2d']; conf = o2['confidence']
+        if args.dark_decode:
+            from decode_util import dark_decode
+            kp2d = dark_decode(o2['heatmaps_2d'], sigma=args.dark_sigma)   # sub-pixel re-decode
         R_init = o2.get('rot_matrix') if args.rot_head else None
+        cov_inv = None
+        if args.cov_pnp:
+            from solve_pose_kinematic import heatmap_cov_inv
+            cov_inv = heatmap_cov_inv(o2['heatmaps_2d'], kp2d)
         refined, kp_cam, reproj2 = solve_batch(kp2d, conf, Kc, fix_joint7=True, iters=args.iters,
                                          lr=2e-2, img_size=IS, device=device, prior_w=0.0,
-                                         theta_init=init_ang, conf_gate=args.conf_gate, R_init=R_init)
+                                         theta_init=init_ang, conf_gate=args.conf_gate, R_init=R_init,
+                                         cov_inv=cov_inv, prior_adaptive=args.prior_adaptive)
         raw_err += wrapped_abs_deg(init_ang[:, :6], gt).sum(0).cpu()
         ref_err += wrapped_abs_deg(refined[:, :6], gt).sum(0).cpu()
         valid = (gt3d.abs().sum(-1) > 0)

@@ -2,7 +2,7 @@
 
 ## DINObotPose3 (계열 최신·주력)
 
-목적: DINOv3-ViT-B/16 백본 기반 Franka Panda 단안 6D 포즈 — 2D 키포인트 검출 → 관절각/회전 예측 → 운동학 솔버 정제. DREAM 벤치마크에서 RoboPEPP와 경쟁 (MEAN ADD-AUC 0.759 vs 0.780, azure에서는 0.788로 승리).
+목적: DINOv3-ViT-B/16 백본 기반 Franka Panda 단안 6D 포즈 — 2D 키포인트 검출 → 관절각/회전 예측 → 운동학 솔버 정제 → nvdiffrast+SAM render-and-compare. **2026-07-04 DREAM 4-real-split SOTA: MEAN ADD-AUC 0.799 vs RoboPEPP 0.780** (완전 자동 bbox 프로토콜), 가림 벤치 20-30% 구간도 승. 진행/로드맵: [dinobotpose3/](dinobotpose3/README.md).
 
 **먼저 읽을 것**: `EXPERIMENTS.md`(실험 일지 전체), `SUMMARY.md`(확정 결론 + WORKED/REFUTED 목록 + HOW TO RESUME). 새 실험 전 SUMMARY의 REFUTED 목록을 확인해 중복 실험을 피할 것.
 

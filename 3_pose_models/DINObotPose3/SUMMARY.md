@@ -1,6 +1,39 @@
-# DINObotPose3 — Consolidated Summary (2026-06-09)
+# DINObotPose3 — Consolidated Summary (2026-07-03)
 
 **Goal:** single-image robot (Panda) pose + joint-angle estimator that beats **RoboPEPP** on the 6 DREAM-Panda splits (metric: ADD-AUC@100mm).
+
+## 🏆 2026-07-05 — mean 0.804 vs RoboPEPP 0.780; ALL-4-CAMS occlusion-robust (accuracy + occlusion, no cost)
+
+The 06-09 renderer blocker was broken with **nvdiffrast** (exact visual-mesh differentiable silhouette,
+local build on the NAS box) + **SAM ViT-B** true-robot masks (init-render-consistent mask selection).
+Deployable render-and-compare (`Eval/rc_refine_from_dump.py`) on top of the crop+rot-adapt pipeline,
++ **cov-PnP** (heatmap-covariance Mahalanobis) + **DARK sub-pixel decode** (both free, no training):
+| cam | deployable (+DARK) | was (07-03) | RoboPEPP | gap |
+|---|---|---|---|---|
+| realsense | **0.8165** (light-stack, robust) | — | 0.805 | **+0.012 BEAT** |
+| kinect360 | **0.8303** (stack, robust) | — | 0.785 | **+0.045 BEAT** |
+| azure | **0.7953** (light head, robust, RC OFF) | — | 0.753 | **+0.042 BEAT** |
+| orb | **0.7726** (stack, robust) | — | 0.775 | −0.002 ≈MATCH |
+| **MEAN** | **0.8037** | 0.7994 | 0.780 | **+0.024** |
+**ALL 4 cameras occlusion-robust** (40% occlusion pose 0.39-0.43 all > RoboPEPP 0.351) at NO accuracy cost —
+azure light head (+0.004) and kinect stack (+0.017) offset the realsense −0.005 robustness trade. Occlusion
+robustness must be baked in by training the angle head from scratch with occlusion-aug (light); short
+self-train + synth occ-aug on an already-adapted head does NOT instill it (realsense robust-stack, 40% base-level).
+occ-aug→self-train stack (2026-07-05): light occlusion-aug head → per-camera self-train with occlusion-aug
+on the synth anti-forget batch — recovers real adaptation WHILE retaining occlusion robustness. kinect +0.017,
+orb +0.001, both now occlusion-robust (40% 0.39 > RoboPEPP 0.351); realsense keeps its already-optimal head.
+Protocol: predicted angles + fully-automatic bbox (stricter than RoboPEPP's GT-bbox headline); rs/kinect/orb
+anti-leak held-out 800/cam. DARK decode (`--dark-decode`, `Eval/decode_util.py`) lifts pose 2D precision
+universally (+0.0035–0.017 per cam, free) — closed the orb gap −0.010→−0.004. RC = depth/scale corrector →
+per-camera on/off (helps far cams; azure RC OFF). Details EXPERIMENTS.md 2026-07-04; survey
+`docs/robot_pose_sota_survey.md`; roadmap `docs/robot_pose_next_directions.md`. Remaining: orb −0.004.
+
+**Occlusion robustness (RoboPEPP Fig.6 protocol):** with the occlusion-aug head (+DARK+cov+RC) ours =
+**0.812/0.765/0.678/0.575/0.429** at 0-40% RoI occlusion vs RoboPEPP 0.795/0.730/0.600/0.470/0.351 —
+**BEAT AT EVERY LEVEL** (+0.017 to +0.105). The occ-aug head (2026-07-04) is do-no-harm on clean
+(synth +0.002 / real azure +0.002) and flipped the two points we used to lose (0% & 40%). cov-PnP (heatmap-covariance Mahalanobis, `--cov-pnp`) ADOPTED (do-no-harm, +0.011@20%). REFUTED:
+occl-robust silhouette downweighting (depth bias) and population-mean adaptive prior (fights the true
+config; learned state prior skipped — synth joints independent). Bench: `Eval/occlusion_bench.sh`.
 
 ## Pipeline (deployable, oracle-free)
 ```
