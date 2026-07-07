@@ -45,7 +45,8 @@ def main(args):
     print(f"Device: {device} | available={torch.cuda.is_available()}")
     assert torch.cuda.is_available(), "Refusing to train on CPU (check GPU UUID selection)."
 
-    kp_names = ['link0', 'link2', 'link3', 'link4', 'link6', 'link7', 'hand']
+    kp_names = (args.keypoint_names.split(',') if getattr(args, 'keypoint_names', None)
+                else ['link0', 'link2', 'link3', 'link4', 'link6', 'link7', 'hand'])
     train_ds = PoseEstimationDataset(
         data_dir=args.train_dir, keypoint_names=kp_names,
         image_size=(args.image_size, args.image_size),
@@ -95,7 +96,7 @@ def main(args):
         for batch in pbar:
             imgs = batch['image'].to(device)
             gt = batch['angles'].to(device).clone()
-            gt[:, 6] = 0.0
+            if gt.shape[1] > 6: gt[:, 6] = 0.0            # Panda: fix joint7=0 (Meca has only 6 angles)
             has = batch['has_angles'].to(device).bool() if 'has_angles' in batch else torch.ones(len(imgs), dtype=torch.bool, device=device)
             K = scale_K(batch['camera_K'], batch['original_size'], args.image_size).to(device)
 
@@ -109,11 +110,15 @@ def main(args):
             gt6 = gt[:, :6]
             gt_sc = torch.stack([torch.sin(gt6), torch.cos(gt6)], dim=-1)
             sc_loss = F.smooth_l1_loss(sc[has], gt_sc[has])
-            # FK robot-frame consistency
-            fk_pred = panda_forward_kinematics(out_d['joint_angles'])
-            fk_gt = panda_forward_kinematics(gt)
-            fk_loss = F.mse_loss(fk_pred[has], fk_gt[has])
-            loss = sc_loss + args.fk_weight * fk_loss
+            loss = sc_loss
+            # FK robot-frame consistency (Panda/FR3 only; needs 7-angle panda FK). Skipped for
+            # robots without a wired-up FK by passing --fk-weight 0 --reproj-weight 0.
+            if args.fk_weight > 0 or args.reproj_weight > 0:
+                fk_pred = panda_forward_kinematics(out_d['joint_angles'])
+                fk_gt = panda_forward_kinematics(gt)
+            if args.fk_weight > 0:
+                fk_loss = F.mse_loss(fk_pred[has], fk_gt[has])
+                loss = loss + args.fk_weight * fk_loss
             # RoboTAG-style cross-dimensional (2D<->3D) consistency: project FK(pred_angles) through
             # the GT camera pose (Kabsch of FK(gt) onto camera-frame GT keypoints) and match GT 2D.
             # Adds the camera-frame reprojection signal the robot-frame fk_loss lacks — sharpens
@@ -145,7 +150,8 @@ def main(args):
         with torch.no_grad():
             for batch in val_loader:
                 imgs = batch['image'].to(device)
-                gt = batch['angles'].to(device).clone(); gt[:, 6] = 0.0
+                gt = batch['angles'].to(device).clone()
+                if gt.shape[1] > 6: gt[:, 6] = 0.0
                 has = batch['has_angles'].bool() if 'has_angles' in batch else torch.ones(len(imgs), dtype=torch.bool)
                 K = scale_K(batch['camera_K'], batch['original_size'], args.image_size).to(device)
                 pred = model(imgs, K)['joint_angles']
@@ -178,6 +184,8 @@ if __name__ == '__main__':
     p.add_argument('--detector-ckpt', required=True, help='Stage-1 detector checkpoint (backbone+keypoint_head)')
     p.add_argument('--train-dir', required=True)
     p.add_argument('--val-dir', required=True)
+    p.add_argument('--keypoint-names', default=None,
+                   help='comma-separated (substring-matched). Meca500: link0,link1,link2,link3,link4,link5,link6')
     p.add_argument('--output-dir', default='./outputs_angle')
     p.add_argument('--model-name', default='facebook/dinov3-vitb16-pretrain-lvd1689m')
     p.add_argument('--image-size', type=int, default=512)

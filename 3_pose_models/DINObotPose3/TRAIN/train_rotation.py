@@ -42,16 +42,28 @@ def geodesic_deg(Rp, Rg):
     return torch.acos(c.clamp(-1 + 1e-6, 1 - 1e-6)) * 180 / math.pi
 
 
+_FK = panda_forward_kinematics   # robot forward-kinematics used to build the GT R,t (swap per --fk-robot)
+
+
 def gt_pose(gt_angles, kp3d, valid):
-    """GT robot->camera (R,t) via Kabsch. gt_angles (B,7), kp3d (B,7,3), valid (B,7)."""
-    ga = gt_angles.clone(); ga[:, 6] = 0.0
-    fk = panda_forward_kinematics(ga)               # (B,7,3) robot frame
+    """GT robot->camera (R,t) via Kabsch. gt_angles (B,>=6), kp3d (B,7,3), valid (B,7)."""
+    ga = gt_angles.clone()
+    if ga.shape[1] > 6: ga[:, 6] = 0.0              # Panda fixes joint7=0 (Meca has 6 angles)
+    fk = _FK(ga)                                    # (B,7,3) robot frame
     return kabsch_batch(fk, kp3d, valid.float())    # (B,3,3),(B,3)
 
 
 def main(args):
+    global _FK
     device = torch.device('cuda'); assert torch.cuda.is_available()
-    kp_names = ['link0', 'link2', 'link3', 'link4', 'link6', 'link7', 'hand']
+    if args.fk_robot in ('meca500', 'fr5'):
+        import sys as _s, os as _o
+        _s.path.append(_o.path.join(_o.path.dirname(_o.path.abspath(__file__)), '../Eval'))
+        from robot_fk import meca500_forward_kinematics, fr5_forward_kinematics
+        _FK = meca500_forward_kinematics if args.fk_robot == 'meca500' else fr5_forward_kinematics
+        print(f'==> using {args.fk_robot} FK for GT rotation labels')
+    kp_names = (args.keypoint_names.split(',') if args.keypoint_names
+                else ['link0', 'link2', 'link3', 'link4', 'link6', 'link7', 'hand'])
     mk = lambda d, aug: PoseEstimationDataset(
         data_dir=d, keypoint_names=kp_names, image_size=(args.image_size, args.image_size),
         heatmap_size=(args.image_size, args.image_size), augment=aug, aug_level='strong',
@@ -145,6 +157,10 @@ if __name__ == '__main__':
     p = argparse.ArgumentParser()
     p.add_argument('--detector-ckpt', required=True)
     p.add_argument('--train-dir', required=True); p.add_argument('--val-dir', required=True)
+    p.add_argument('--keypoint-names', default=None,
+                   help='comma-separated. Meca500: link0,link1,link2,link3,link4,link5,link6')
+    p.add_argument('--fk-robot', default='panda', choices=['panda', 'meca500', 'fr5'],
+                   help='FK used to build GT robot->camera rotation labels')
     p.add_argument('--output-dir', default='./outputs_rotation')
     p.add_argument('--model-name', default='facebook/dinov3-vitb16-pretrain-lvd1689m')
     p.add_argument('--image-size', type=int, default=512); p.add_argument('--batch-size', type=int, default=32)

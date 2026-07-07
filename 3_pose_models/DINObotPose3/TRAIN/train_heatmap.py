@@ -120,7 +120,8 @@ def main(args):
     is_main, output_dir = rank == 0, Path(args.output_dir)
     random.seed(args.seed + rank); np.random.seed(args.seed + rank); torch.manual_seed(args.seed + rank)
 
-    keypoint_names = ['link0', 'link2', 'link3', 'link4', 'link6', 'link7', 'hand']
+    keypoint_names = (args.keypoint_names.split(',') if getattr(args, 'keypoint_names', None)
+                      else ['link0', 'link2', 'link3', 'link4', 'link6', 'link7', 'hand'])
     # SigLIP/SigLIP2 expect mean=std=0.5 ([-1,1]); DINOv3 uses ImageNet stats.
     if "siglip" in args.model_name:
         norm_mean, norm_std = [0.5, 0.5, 0.5], [0.5, 0.5, 0.5]
@@ -310,4 +311,6 @@ if __name__ == '__main__':
     parser.add_argument('--wandb-project', type=str, default='dinov3-heatmap-only')
     parser.add_argument('--wandb-run-name', type=str, default=None)
     parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--keypoint-names', type=str, default=None,
+                        help='comma-separated keypoint suffixes (default = Panda 7). Meca500/FR5 6-DOF: link0,link1,link2,link3,link4,link5,link6')
     main(parser.parse_args())

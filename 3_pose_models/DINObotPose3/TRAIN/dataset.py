@@ -627,8 +627,13 @@ class PoseEstimationDataset(Dataset):
                 image=np.array(image),
                 keypoints=keypoints
             )
-            image = PILImage.fromarray(augmented['image'])
-            keypoints = np.array(augmented['keypoints'])
+            aug_kps = np.array(augmented['keypoints'])
+            # albumentations can DUPLICATE keypoints when several are coincident (e.g. Meca500
+            # spherical-wrist kp4≡kp5), breaking the index↔keypoint correspondence. remove_invisible
+            # is False so a legitimate count change never happens -> a mismatch means the bug; skip aug.
+            if aug_kps.shape[0] == keypoints.shape[0]:
+                image = PILImage.fromarray(augmented['image'])
+                keypoints = aug_kps
 
         # 이미지 크기 변경에 따른 keypoint 좌표 조정
         scale_x = self.heatmap_size[1] / original_size[0]
