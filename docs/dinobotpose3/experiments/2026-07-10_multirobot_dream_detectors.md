@@ -57,6 +57,25 @@
 - 체크포인트: `outputs_heatmap/kuka_dream_detector_20260709_183119/{best,last}_heatmap.pth`
 - 해석: Panda 검출기에서 시작해 KUKA 키포인트로 fine-tune → AUC +0.11. **transfer가 유효**(from-scratch 대비 빠른 수렴, epoch0부터 0.62).
 
+#### L2 진단 — "높은 평균 L2(105px)"는 품질 문제가 아니라 **link-identity 혼동 tail**
+
+test_dr 800프레임 per-keypoint 분해(`scratchpad/kuka_perkp.py`, hard-argmax 디코드):
+
+| keypoint | mean | **median** | p99 | PCK@10 | >50px |
+|---|---|---|---|---|---|
+| iiwa7_link_1 | 99.1 | 1.6 | 1587 | 78% | 15.1% |
+| iiwa7_link_2 | 87.0 | 1.9 | 1433 | 79% | 13.9% |
+| iiwa7_link_3 | 69.7 | 2.4 | 1220 | 77% | 14.7% |
+| iiwa7_link_4 | 72.0 | 3.0 | 1160 | 78% | 11.4% |
+| iiwa7_link_5 | 30.7 | 1.9 | 507 | 85% | 8.6% |
+| iiwa7_link_6 | 25.0 | 2.3 | 404 | 84% | 7.5% |
+| iiwa7_link_7 | 33.7 | 1.7 | 554 | 85% | 6.5% |
+| **ALL** | **60.0** | **2.1** | 1144 | 81% | 11.2% |
+
+- **중앙값 2.1px** — 대부분 키포인트는 정밀하게 잡힌다. 평균을 끌어올리는 건 **catastrophic(>50px) 11.2%**(전체 오차 질량의 **94%**).
+- **catastrophic의 90%가 다른 키포인트 GT로 스냅** = link-identity 혼동. 근위 링크(link_1~3)가 특히 심하고(자기가림 잦음), 원위/손목(link_5~7)으로 오검(예: link_1 catastrophic 118건 중 L7:42, L6:23). iiwa7의 닮은 원통형 7마디 + base 자기가림이 원인.
+- **함의**: (a) 검출기 자체는 우수(median 2px), (b) 더 학습·백본 교체로 안 풀리는 2D 본질적 모호성, (c) **DINObotPose3 솔버(conf-gate + cov-PnP)가 Panda에서 이미 처리하는 유형** — link이 엉뚱한 마디로 스냅되면 재투영 outlier로 튀어 robust PnP가 기각. 즉 **raw 2D AUC 0.735는 최종 포즈 정확도를 과소평가**하며, 솔버 단계에서 대부분 복구될 것으로 기대. (Baxter는 arm이 크게 벌어져 혼동이 적음 → L2 30px대, 아래 참조.)
+
 ### Baxter 좌완 — 🔄 학습 중 (`baxter_left_dream_detector_20260710_152926`)
 
 동일 설정 5-GPU. 로그 `TRAIN/logs/baxter_left_detector_20260710_152926.log`. 완료 시 표 갱신.
