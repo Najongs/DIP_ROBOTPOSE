@@ -484,6 +484,7 @@ class PoseEstimationDataset(Dataset):
         keypoint_positions = np.zeros((len(self.keypoint_names), 2), dtype=np.float32)
         keypoint_positions_3d = np.zeros((len(self.keypoint_names), 3), dtype=np.float32)
         keypoint_found = [False] * len(self.keypoint_names)
+        keypoint_match_priority = [-1] * len(self.keypoint_names)
 
         # NDDS 형식에서 keypoint 추출
         if 'objects' in data:
@@ -491,14 +492,26 @@ class PoseEstimationDataset(Dataset):
                 if 'keypoints' in obj:
                     for kp in obj['keypoints']:
                         kp_name = kp['name']
-                        # 부분 일치 검사 (예: 'panda_link0'에서 'link0' 찾기)
+                        kp_name_l = kp_name.lower()
+                        kp_is_collision = '(collision' in kp_name_l
+                        # 부분 일치 검사 (예: 'panda_link0'에서 'link0' 찾기).
+                        # Exact/non-collision labels must beat collision aliases in original DREAM
+                        # robot dumps, where both visual and collision keypoints share substrings.
                         target_idx = -1
+                        target_priority = -1
                         for i, name in enumerate(self.keypoint_names):
-                            if name in kp_name:
+                            name_l = name.lower()
+                            if name_l == kp_name_l:
                                 target_idx = i
+                                target_priority = 3
                                 break
+                            if name_l in kp_name_l:
+                                priority = 1 if kp_is_collision else 2
+                                if priority > target_priority:
+                                    target_idx = i
+                                    target_priority = priority
                         
-                        if target_idx != -1:
+                        if target_idx != -1 and target_priority >= keypoint_match_priority[target_idx]:
                             keypoint_positions[target_idx] = [
                                 kp['projected_location'][0],
                                 kp['projected_location'][1]
@@ -510,6 +523,7 @@ class PoseEstimationDataset(Dataset):
                                     kp['location'][2]
                                 ]
                             keypoint_found[target_idx] = True
+                            keypoint_match_priority[target_idx] = target_priority
 
         # Mark missing keypoints with negative coordinates
         for i, found in enumerate(keypoint_found):
