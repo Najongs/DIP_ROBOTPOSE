@@ -2,7 +2,8 @@
 
 > 목적: Panda로 SOTA를 낸 DINObotPose3 **검출기(heatmap keypoint detector)**가 DREAM의 다른 로봇
 > (**KUKA iiwa7**, **Baxter 좌완)에도 일반화되는지 — Panda 검출기에서 fine-tune 시 성능이 오르는지 확인.**
-> 판정: KUKA ✅ 학습 완료(합성 test AUC 0.735), Baxter 🔄 학습 중.
+> 판정: KUKA ✅ (합성 test 2D AUC 0.735) · Baxter ✅ (합성 test 2D AUC **0.817**). 둘 다 Panda 검출기 transfer로 학습.
+> 공통 발견: 높은 평균 L2는 품질 문제가 아니라 **link-identity 혼동 tail**(catastrophic의 90%+가 타 키포인트로 스냅) — 솔버가 복구할 유형.
 
 ---
 
@@ -76,9 +77,36 @@ test_dr 800프레임 per-keypoint 분해(`scratchpad/kuka_perkp.py`, hard-argmax
 - **catastrophic의 90%가 다른 키포인트 GT로 스냅** = link-identity 혼동. 근위 링크(link_1~3)가 특히 심하고(자기가림 잦음), 원위/손목(link_5~7)으로 오검(예: link_1 catastrophic 118건 중 L7:42, L6:23). iiwa7의 닮은 원통형 7마디 + base 자기가림이 원인.
 - **함의**: (a) 검출기 자체는 우수(median 2px), (b) 더 학습·백본 교체로 안 풀리는 2D 본질적 모호성, (c) **DINObotPose3 솔버(conf-gate + cov-PnP)가 Panda에서 이미 처리하는 유형** — link이 엉뚱한 마디로 스냅되면 재투영 outlier로 튀어 robust PnP가 기각. 즉 **raw 2D AUC 0.735는 최종 포즈 정확도를 과소평가**하며, 솔버 단계에서 대부분 복구될 것으로 기대. (Baxter는 arm이 크게 벌어져 혼동이 적음 → L2 30px대, 아래 참조.)
 
-### Baxter 좌완 — 🔄 학습 중 (`baxter_left_dream_detector_20260710_152926`)
+### Baxter 좌완 — ✅ 완료 (`baxter_left_dream_detector_20260710_152926`)
 
-동일 설정 5-GPU. 로그 `TRAIN/logs/baxter_left_detector_20260710_152926.log`. 완료 시 표 갱신.
+20 epoch, AUC **0.7239 → 0.8174** (KUKA보다 훨씬 높고, **epoch 0(0.724)부터 KUKA 최종 수준** — transfer가 Baxter에서 더 잘 먹힘).
+
+| | Epoch 0 | Epoch 10 | Epoch 19 (best) |
+|---|---|---|---|
+| Val Loss | 0.0551 | 0.0377 | **0.0346** |
+| 2D AUC | 0.7239 | 0.8063 | **0.8174** |
+| L2 (px) | 30.2 | 22.3 | **21.4** |
+
+- 체크포인트: `outputs_heatmap/baxter_left_dream_detector_20260710_152926/{best,last}_heatmap.pth`
+
+#### L2 진단 — KUKA와 **같은 혼동 메커니즘, 정반대 위치**
+
+test_dr 800프레임 per-keypoint 분해(`scratchpad/baxter_perkp.py`):
+
+| keypoint | mean | **median** | p99 | PCK@10 | >50px | in/tot |
+|---|---|---|---|---|---|---|
+| left_s0 (어깨) | 4.6 | 1.0 | 102 | 96% | 1.6% | 800/800 |
+| left_s1 | 5.1 | 1.3 | 117 | 96% | 1.8% | 800/800 |
+| left_e0 | 7.3 | 1.4 | 200 | 94% | 3.1% | 800/800 |
+| left_e1 (팔꿈치) | 10.4 | 1.6 | 208 | 91% | 4.6% | 788/800 |
+| left_w0 | 13.5 | 1.8 | 314 | 88% | 5.4% | 777/800 |
+| left_w1 | 61.7 | 1.8 | 782 | 82% | 13.8% | 683/800 |
+| left_w2 (손목끝) | 78.4 | 2.3 | 1120 | 76% | 16.1% | 670/800 |
+| **ALL** | **23.9** | **1.5** | 643 | 89% | 6.2% | — |
+
+- 중앙값 **1.5px**, catastrophic(>50px) **6.2%**(전체 오차의 89%). link-혼동 **93%**. → KUKA와 동일한 tail-driven 구조지만 **전체적으로 더 깨끗**(KUKA cat 11.2% / mean 60px 대비).
+- **혼동 위치가 KUKA와 반대**: KUKA는 근위(base) 링크가 혼동, Baxter는 **원위(손목 w1·w2)**가 혼동(cat 14~16%, off-frame도 잦아 in-frame 683/670). 어깨(s0/s1)는 크고 고정돼 거의 완벽(cat 1.6%).
+- **통합 해석**: 두 로봇 모두 "**팔에서 작고·자기유사하고·자주 가려지거나 off-frame 되는 끝단**"이 혼동된다. KUKA는 base(Allegro hand가 있는 원위가 특징적 → base가 상대적으로 헷갈림), Baxter는 wrist(어깨가 특징적 → wrist가 헷갈림). **어느 쪽이든 솔버의 운동학 체인 + conf-gate + cov-PnP가 재투영 outlier로 걸러 복구할 유형** — Panda에서 검증된 그 메커니즘.
 
 ---
 
