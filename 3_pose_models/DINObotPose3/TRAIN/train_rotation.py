@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from model_angle import AnglePredictor, kabsch_batch
-from model_v4 import panda_forward_kinematics
+from model_v4 import panda_forward_kinematics, iiwa7_forward_kinematics
 from dataset import PoseEstimationDataset
 
 try:
@@ -56,19 +56,24 @@ def gt_pose(gt_angles, kp3d, valid):
 def main(args):
     global _FK
     device = torch.device('cuda'); assert torch.cuda.is_available()
-    if args.fk_robot in ('meca500', 'fr5'):
+    if args.fk_robot in ('kuka', 'iiwa7'):
+        _FK = iiwa7_forward_kinematics
+        print('==> using iiwa7 FK for GT rotation labels')
+    elif args.fk_robot in ('meca500', 'fr5'):
         import sys as _s, os as _o
         _s.path.append(_o.path.join(_o.path.dirname(_o.path.abspath(__file__)), '../Eval'))
         from robot_fk import meca500_forward_kinematics, fr5_forward_kinematics
         _FK = meca500_forward_kinematics if args.fk_robot == 'meca500' else fr5_forward_kinematics
         print(f'==> using {args.fk_robot} FK for GT rotation labels')
+    ang_names = args.angle_joint_names.split(',') if getattr(args, 'angle_joint_names', None) else None
     kp_names = (args.keypoint_names.split(',') if args.keypoint_names
                 else ['link0', 'link2', 'link3', 'link4', 'link6', 'link7', 'hand'])
     mk = lambda d, aug: PoseEstimationDataset(
         data_dir=d, keypoint_names=kp_names, image_size=(args.image_size, args.image_size),
         heatmap_size=(args.image_size, args.image_size), augment=aug, aug_level='strong',
         include_angles=True, sigma=2.5,
-        crop_to_robot=args.crop_to_robot, crop_margin=args.crop_margin)
+        crop_to_robot=args.crop_to_robot, crop_margin=args.crop_margin,
+        angle_joint_names=ang_names)
     train_ds, val_ds = mk(args.train_dir, True), mk(args.val_dir, False)
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True,
                               num_workers=args.num_workers, pin_memory=True, drop_last=True)
@@ -159,8 +164,11 @@ if __name__ == '__main__':
     p.add_argument('--train-dir', required=True); p.add_argument('--val-dir', required=True)
     p.add_argument('--keypoint-names', default=None,
                    help='comma-separated. Meca500: link0,link1,link2,link3,link4,link5,link6')
-    p.add_argument('--fk-robot', default='panda', choices=['panda', 'meca500', 'fr5'],
+    p.add_argument('--fk-robot', default='panda', choices=['panda', 'meca500', 'fr5', 'kuka', 'iiwa7'],
                    help='FK used to build GT robot->camera rotation labels')
+    p.add_argument('--angle-joint-names', default=None,
+                   help='comma-separated sim_state joint names for GT angles (KUKA: iiwa7_joint_1..7). '
+                        'Default None = sim_state[:7] (Panda).')
     p.add_argument('--output-dir', default='./outputs_rotation')
     p.add_argument('--model-name', default='facebook/dinov3-vitb16-pretrain-lvd1689m')
     p.add_argument('--image-size', type=int, default=512); p.add_argument('--batch-size', type=int, default=32)

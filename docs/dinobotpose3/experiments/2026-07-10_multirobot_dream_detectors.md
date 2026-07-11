@@ -110,22 +110,43 @@ test_dr 800프레임 per-keypoint 분해(`scratchpad/baxter_perkp.py`):
 
 ---
 
+## KUKA 포즈 파이프라인 준비 (2026-07-11) — FK + 각도/회전 head 배선
+
+검출기 다음 단계(관절각→FK→솔버)를 KUKA에 대해 **준비 완료**(학습은 미실행).
+
+### iiwa7 FK — DREAM 데이터로 피팅·검증 (`model_v4.iiwa7_forward_kinematics`)
+- DREAM kuka는 **표준 iiwa7 URDF와 링크 길이가 다름**(측정 오프셋 [0.15,0.19,0.21,0.19,0.21,0.1995,0.1012]m). 그래서 표준값 대신 **데이터로 fixed joint transform을 피팅**(scipy LM, sim_state 관절각↔키포인트 3D). J1은 물리 base(0,0,0.15)로 고정. 유도·검증 스크립트: `Eval/iiwa7_fk_fit.py`.
+- **검증: link_1..7 원점 재현 RMS = train/held-out/test 모두 0.003mm** (합성 라벨 정밀도 한계). torch 버전 test셋 0.005mm, 미분가능.
+- 손목 J6/J7이 복합 오프셋(iiwa 특유 0.0607m wrist offset)이라 단순 축-정렬 가정이 실패했고, 피팅이 이를 자동 복원.
+- ⚠️ 위치는 정확하나 **중간 프레임 방향은 gauge**(위치만 관측 가능) — 솔버/PnP엔 무해, **mesh render-and-compare 전엔 재검토** 필요.
+- joint_7은 link_7 원점을 안 움직여(자기축 회전) Panda처럼 **6각도 예측 + joint7=0**으로 키포인트 위치 정확.
+
+### 배선 (로봇 무관화)
+- `dataset.py`: **관절각 로딩 버그 수정** — 기존 `sim_state.joints[:7]`은 KUKA에서 `iiwa7_base_link_iiwa7_joint`(고정 0)를 먼저 잡아 **θ7 누락**. `angle_joint_names` 인자로 이름 기반 선택(None=기존 Panda 동작 유지). 검증: raw JSON joint_1..7과 일치.
+- `train_angle.py`·`train_rotation.py`: `--fk-robot {panda,kuka,...}` + `--angle-joint-names`로 FK·GT각도 선택.
+- 스모크 테스트: angle 경로(forward→iiwa7 FK loss→backward, grad_norm 81 OK), rotation 경로(Kabsch GT 라벨 재투영 잔차 0.00mm) 통과.
+- 스크립트: `run_train_kuka_{angle,rotation}.sh` (로컬, frozen backbone 단일 GPU, UUID 선택).
+
 ## 재현
 
 ```bash
 cd 3_pose_models/DINObotPose3/TRAIN
-GPU_IDS=0,1,2,3,4 WANDB_MODE=offline bash run_train_kuka_detector.sh          # KUKA
-GPU_IDS=0,1,2,3,4 WANDB_MODE=offline bash run_train_baxter_left_detector.sh   # Baxter 좌완
-# STAMP=<...> 로 출력 디렉토리 고정 가능
+# 검출기 (5-GPU)
+GPU_IDS=0,1,2,3,4 WANDB_MODE=offline bash run_train_kuka_detector.sh
+GPU_IDS=0,1,2,3,4 WANDB_MODE=offline bash run_train_baxter_left_detector.sh
+# KUKA 각도/회전 head (단일 GPU, UUID)
+GPU=GPU-<uuid> bash run_train_kuka_angle.sh
+GPU=GPU-<uuid> bash run_train_kuka_rotation.sh
 ```
 
-## 남은 일 (검출기 그 다음)
+## 남은 일
 
-검출기는 **파이프라인 첫 단계**일 뿐. Panda급 포즈 추정(ADD-AUC)까지 가려면 로봇별로 추가 필요:
-1. **관절각/회전 head** (`train_angle.py`/`train_rotation.py`) — 로봇별 재학습.
-2. **운동학 모델(FK)** — KUKA iiwa7 / Baxter의 DH·URDF FK 함수. 현재 `model_v4.panda_forward_kinematics`는 Panda 전용 → 로봇별 FK 필요(솔버·mesh RC·Kabsch가 전부 FK 의존).
-3. **real 평가셋** — KUKA/Baxter real DREAM 데이터 확보 시에만 real SOTA 비교 가능.
+1. ✅ **iiwa7 FK** — 완료·검증(0.003mm). Baxter FK는 미구현(동일 방식으로 피팅 가능).
+2. ✅ **관절각/회전 head 배선** — 완료·스모크 통과. **KUKA head 학습은 미실행**(다음 단계).
+3. **솔버 연결** — KUKA용 solve/eval 경로에 iiwa7 FK 연결 → 진단이 예측한 "솔버가 link 혼동 복구"를 포즈로 확인.
+4. **mesh RC 전 FK 방향 gauge 정리** (iiwa7 URDF 메쉬 정합 시).
+5. **real 평가셋** — KUKA/Baxter real DREAM 확보 시에만 real SOTA 비교 가능.
 
-→ 지금 단계 결론은 "**검출기는 타 로봇으로 일반화되고 fine-tune 이득 있음**"까지. 전체 포즈 SOTA 확장은 위 3개가 전제.
+→ 검출기 일반화 + fine-tune 이득 확인 완료, **KUKA 포즈 파이프라인 준비 완료**. 다음은 KUKA head 학습 → 솔버 연결 → 포즈 정확도 측정.
 
 관련: [multi_robot.md](../data/multi_robot.md)(FR5/FR3/Meca 실촬영, 별개 트랙) · [FINAL_MODEL.md](../FINAL_MODEL.md)(Panda 배포) · [training.md](../training/training.md)

@@ -503,6 +503,41 @@ def panda_forward_kinematics(joint_angles):
     return torch.stack(keypoints, dim=1)
 
 
+# KUKA iiwa7 (DREAM kuka_allegro). Fixed joint transforms FIT to DREAM synthetic data
+# (kuka_synth_{train,test}_dr, sim_state joint angles vs keypoint 3D locations) — reproduces
+# link_1..7 origins to 0.003mm RMS across the full joint distribution (train/held-out/test).
+# NOTE: J1 pinned to physical base (0,0,0.15); the 3D POSITIONS are exact and are all the
+# kinematic solver/PnP needs. Intermediate-frame ORIENTATIONS are data-fit (gauge), not
+# URDF-canonical — revisit before mesh render-and-compare. Offset magnitudes measured constant:
+# [0.15,0.19,0.21,0.19,0.21,0.1995,0.1012]m; wrist J6/J7 carry the classic iiwa 0.0607m offset.
+_IIWA7_JOINTS = [
+    {'xyz': (0.000000, 0.000000, 0.150000), 'rpy': (0.000000, 0.000000, 0.000000)},
+    {'xyz': (-0.081983, 0.051227, 0.163568), 'rpy': (1.865504, 0.373009, 3.188495)},
+    {'xyz': (0.015935, 0.209395, -0.000017), 'rpy': (1.570870, 0.016876, 3.065619)},
+    {'xyz': (0.000002, -0.000004, 0.190000), 'rpy': (1.570770, 0.266807, 0.016807)},
+    {'xyz': (-0.055366, 0.202570, 0.000011), 'rpy': (-1.570841, 3.477888, 0.266833)},
+    {'xyz': (0.020034, 0.057294, 0.190001), 'rpy': (1.570855, -0.539054, -0.336375)},
+    {'xyz': (0.041580, 0.069515, 0.060698), 'rpy': (-1.570796, 3.141593, 0.000000)},
+]
+# iiwa7 joint limits (LBR iiwa 7 R800, rad): ±170,±120,±170,±120,±170,±120,±175 deg
+_IIWA7_JOINT_LIMITS = [(-2.9671, 2.9671), (-2.0944, 2.0944), (-2.9671, 2.9671),
+                       (-2.0944, 2.0944), (-2.9671, 2.9671), (-2.0944, 2.0944), (-3.0543, 3.0543)]
+
+def iiwa7_forward_kinematics(joint_angles):
+    """joint_angles: (B,7) rad (iiwa7_joint_1..7) -> (B,7,3) robot-frame keypoints link_1..7.
+    Matches DREAM kuka detector keypoint set (iiwa7_link_1..7)."""
+    B = joint_angles.shape[0]; device, dtype = joint_angles.device, joint_angles.dtype
+    fixed = [torch.tensor(_make_transform(j['xyz'], j['rpy']), device=device, dtype=dtype) for j in _IIWA7_JOINTS]
+    cumul = torch.eye(4, device=device, dtype=dtype).unsqueeze(0).expand(B, -1, -1)
+    keypoints = []
+    for i in range(7):
+        R_joint = torch.eye(4, device=device, dtype=dtype).unsqueeze(0).expand(B, -1, -1).clone()
+        R_joint[:, :3, :3] = _rotation_matrix_z(joint_angles[:, i])
+        cumul = cumul @ fixed[i].unsqueeze(0) @ R_joint
+        keypoints.append(cumul[:, :3, 3])
+    return torch.stack(keypoints, dim=1)
+
+
 class DirectJointAngleHead(nn.Module):
     """
     Feature + UV with confidence weighting.

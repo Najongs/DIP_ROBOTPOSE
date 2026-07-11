@@ -16,7 +16,9 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from model_angle import AnglePredictor
-from model_v4 import panda_forward_kinematics
+from model_v4 import panda_forward_kinematics, iiwa7_forward_kinematics
+_FK_BY_ROBOT = {'panda': panda_forward_kinematics, 'fr3': panda_forward_kinematics,
+                'kuka': iiwa7_forward_kinematics, 'iiwa7': iiwa7_forward_kinematics}
 import sys as _sys, os as _os
 _sys.path.append(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '../Eval'))
 from silhouette_mesh_probe import kabsch_batch
@@ -47,18 +49,23 @@ def main(args):
 
     kp_names = (args.keypoint_names.split(',') if getattr(args, 'keypoint_names', None)
                 else ['link0', 'link2', 'link3', 'link4', 'link6', 'link7', 'hand'])
+    ang_names = args.angle_joint_names.split(',') if getattr(args, 'angle_joint_names', None) else None
+    fk_fn = _FK_BY_ROBOT[args.fk_robot]
+    print(f"==> FK robot: {args.fk_robot} | angle joints: {ang_names or 'sim_state[:7]'}")
     train_ds = PoseEstimationDataset(
         data_dir=args.train_dir, keypoint_names=kp_names,
         image_size=(args.image_size, args.image_size),
         heatmap_size=(args.image_size, args.image_size),
         augment=True, aug_level='strong', include_angles=True, sigma=2.5,
-        crop_to_robot=args.crop_to_robot, crop_margin=args.crop_margin)
+        crop_to_robot=args.crop_to_robot, crop_margin=args.crop_margin,
+        angle_joint_names=ang_names)
     val_ds = PoseEstimationDataset(
         data_dir=args.val_dir, keypoint_names=kp_names,
         image_size=(args.image_size, args.image_size),
         heatmap_size=(args.image_size, args.image_size),
         augment=False, include_angles=True, sigma=2.5,
-        crop_to_robot=args.crop_to_robot, crop_margin=args.crop_margin)
+        crop_to_robot=args.crop_to_robot, crop_margin=args.crop_margin,
+        angle_joint_names=ang_names)
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True,
                               num_workers=args.num_workers, pin_memory=True, drop_last=True)
     val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False,
@@ -114,8 +121,8 @@ def main(args):
             # FK robot-frame consistency (Panda/FR3 only; needs 7-angle panda FK). Skipped for
             # robots without a wired-up FK by passing --fk-weight 0 --reproj-weight 0.
             if args.fk_weight > 0 or args.reproj_weight > 0:
-                fk_pred = panda_forward_kinematics(out_d['joint_angles'])
-                fk_gt = panda_forward_kinematics(gt)
+                fk_pred = fk_fn(out_d['joint_angles'])
+                fk_gt = fk_fn(gt)
             if args.fk_weight > 0:
                 fk_loss = F.mse_loss(fk_pred[has], fk_gt[has])
                 loss = loss + args.fk_weight * fk_loss
@@ -186,6 +193,11 @@ if __name__ == '__main__':
     p.add_argument('--val-dir', required=True)
     p.add_argument('--keypoint-names', default=None,
                    help='comma-separated (substring-matched). Meca500: link0,link1,link2,link3,link4,link5,link6')
+    p.add_argument('--fk-robot', default='panda', choices=['panda', 'fr3', 'kuka', 'iiwa7'],
+                   help='robot forward-kinematics for FK/reproj consistency loss')
+    p.add_argument('--angle-joint-names', default=None,
+                   help='comma-separated sim_state joint names for GT angles (order). '
+                        'KUKA: iiwa7_joint_1,...,iiwa7_joint_7. Default None = sim_state[:7] (Panda).')
     p.add_argument('--output-dir', default='./outputs_angle')
     p.add_argument('--model-name', default='facebook/dinov3-vitb16-pretrain-lvd1689m')
     p.add_argument('--image-size', type=int, default=512)

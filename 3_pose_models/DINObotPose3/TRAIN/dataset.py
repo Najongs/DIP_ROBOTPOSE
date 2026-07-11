@@ -124,6 +124,9 @@ class PoseEstimationDataset(Dataset):
         norm_std: Optional[List[float]] = None,   # backbone normalization std  (default ImageNet)
         crop_to_robot: bool = False,  # square-crop around the robot (GT-keypoint bbox) before resize
         crop_margin: float = 1.5,     # bbox expansion factor (random in [1.3, margin] when augmenting)
+        angle_joint_names: Optional[List[str]] = None,  # explicit sim_state joint names for GT angles
+        # (in order). None -> legacy joints[:7] (correct for Panda). Needed for robots whose sim_state
+        # has non-arm joints first (e.g. KUKA 'iiwa7_base_link_iiwa7_joint' -> use iiwa7_joint_1..7).
     ):
         """
         Args:
@@ -154,6 +157,7 @@ class PoseEstimationDataset(Dataset):
         self.sigma = sigma
         self.multi_robot = multi_robot
         self.robot_types = robot_types
+        self.angle_joint_names = angle_joint_names
         self.fda_beta = fda_beta
         self.fda_prob = fda_prob
         self.occlusion_prob = occlusion_prob
@@ -541,10 +545,16 @@ class PoseEstimationDataset(Dataset):
             # Default fallback (should not happen with proper data)
             keypoints['camera_K'] = np.eye(3, dtype=np.float32)
 
-        # Joint angles from sim_state.joints (first 7 joint positions)
+        # Joint angles from sim_state.joints. Default: first 7 (correct for Panda). When
+        # angle_joint_names is given, select those joints BY NAME in order (robot-agnostic;
+        # KUKA sim_state leads with 'iiwa7_base_link_iiwa7_joint' so positional [:7] drops joint_7).
         if self.include_angles and 'sim_state' in data and 'joints' in data['sim_state']:
             joints = data['sim_state']['joints']
-            angles = np.array([j['position'] for j in joints[:7]], dtype=np.float32)
+            if self.angle_joint_names:
+                pos = {j['name'].split('/')[-1]: j['position'] for j in joints}
+                angles = np.array([pos.get(n, 0.0) for n in self.angle_joint_names], dtype=np.float32)
+            else:
+                angles = np.array([j['position'] for j in joints[:7]], dtype=np.float32)
             keypoints['angles'] = angles  # radians, no normalization (FK needs raw radians)
 
         return keypoints
