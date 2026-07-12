@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from model_angle import AnglePredictor, kabsch_batch
-from model_v4 import panda_forward_kinematics, iiwa7_forward_kinematics
+from model_v4 import panda_forward_kinematics, iiwa7_forward_kinematics, baxter_left_forward_kinematics
 from dataset import PoseEstimationDataset
 
 try:
@@ -59,6 +59,9 @@ def main(args):
     if args.fk_robot in ('kuka', 'iiwa7'):
         _FK = iiwa7_forward_kinematics
         print('==> using iiwa7 FK for GT rotation labels')
+    elif args.fk_robot in ('baxter', 'baxter_left'):
+        _FK = baxter_left_forward_kinematics
+        print('==> using baxter-left FK for GT rotation labels')
     elif args.fk_robot in ('meca500', 'fr5'):
         import sys as _s, os as _o
         _s.path.append(_o.path.join(_o.path.dirname(_o.path.abspath(__file__)), '../Eval'))
@@ -164,7 +167,8 @@ if __name__ == '__main__':
     p.add_argument('--train-dir', required=True); p.add_argument('--val-dir', required=True)
     p.add_argument('--keypoint-names', default=None,
                    help='comma-separated. Meca500: link0,link1,link2,link3,link4,link5,link6')
-    p.add_argument('--fk-robot', default='panda', choices=['panda', 'meca500', 'fr5', 'kuka', 'iiwa7'],
+    p.add_argument('--fk-robot', default='panda',
+                   choices=['panda', 'meca500', 'fr5', 'kuka', 'iiwa7', 'baxter', 'baxter_left'],
                    help='FK used to build GT robot->camera rotation labels')
     p.add_argument('--angle-joint-names', default=None,
                    help='comma-separated sim_state joint names for GT angles (KUKA: iiwa7_joint_1..7). '

@@ -16,9 +16,10 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from model_angle import AnglePredictor
-from model_v4 import panda_forward_kinematics, iiwa7_forward_kinematics
+from model_v4 import panda_forward_kinematics, iiwa7_forward_kinematics, baxter_left_forward_kinematics
 _FK_BY_ROBOT = {'panda': panda_forward_kinematics, 'fr3': panda_forward_kinematics,
-                'kuka': iiwa7_forward_kinematics, 'iiwa7': iiwa7_forward_kinematics}
+                'kuka': iiwa7_forward_kinematics, 'iiwa7': iiwa7_forward_kinematics,
+                'baxter': baxter_left_forward_kinematics, 'baxter_left': baxter_left_forward_kinematics}
 import sys as _sys, os as _os
 _sys.path.append(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '../Eval'))
 from silhouette_mesh_probe import kabsch_batch
@@ -193,7 +194,7 @@ if __name__ == '__main__':
     p.add_argument('--val-dir', required=True)
     p.add_argument('--keypoint-names', default=None,
                    help='comma-separated (substring-matched). Meca500: link0,link1,link2,link3,link4,link5,link6')
-    p.add_argument('--fk-robot', default='panda', choices=['panda', 'fr3', 'kuka', 'iiwa7'],
+    p.add_argument('--fk-robot', default='panda', choices=['panda', 'fr3', 'kuka', 'iiwa7', 'baxter', 'baxter_left'],
                    help='robot forward-kinematics for FK/reproj consistency loss')
     p.add_argument('--angle-joint-names', default=None,
                    help='comma-separated sim_state joint names for GT angles (order). '

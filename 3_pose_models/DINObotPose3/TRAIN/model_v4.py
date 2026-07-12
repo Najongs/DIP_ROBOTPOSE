@@ -538,6 +538,39 @@ def iiwa7_forward_kinematics(joint_angles):
     return torch.stack(keypoints, dim=1)
 
 
+# Baxter LEFT arm (DREAM baxter). Fixed joint transforms FIT to DREAM baxter synthetic data
+# (40-start scipy LM; single-start hit local minima) — reproduces left_{s0,s1,e0,e1,w0,w1,w2}
+# origins to 0.003mm RMS (train/held-out/test). Positions exact (solver/PnP ready); intermediate
+# frame orientations are gauge (J1 not pinned). Derivation: Eval/baxter_fk_fit.py.
+# Last joint (left_w2) does not move its own keypoint -> unobservable (head predicts s0..w1, w2=0).
+_BAXTER_LEFT_JOINTS = [
+    {'xyz': (0.000000, 0.000000, 0.278138), 'rpy': (1.201124, 1.097729, -1.273329)},
+    {'xyz': (-0.144622, -0.095069, 0.218853), 'rpy': (2.657936, -2.326256, 1.468750)},
+    {'xyz': (0.074866, 0.069275, -0.000001), 'rpy': (2.526099, 1.570785, -3.010447)},
+    {'xyz': (-0.000000, 0.068998, 0.262420), 'rpy': (1.570789, 2.806062, 4.712390)},
+    {'xyz': (-0.034109, -0.097813, -0.000001), 'rpy': (-1.570785, 2.031842, 2.806071)},
+    {'xyz': (0.004449, 0.008956, 0.270700), 'rpy': (1.570800, 0.209421, -2.031830)},
+    {'xyz': (-0.024111, 0.113441, -0.000000), 'rpy': (1.896772, 2.661118, -1.469447)},
+]
+# Baxter left-arm joint limits (rad): s0,s1,e0,e1,w0,w1,w2
+_BAXTER_LEFT_JOINT_LIMITS = [(-1.7016, 1.7016), (-2.147, 1.047), (-3.0541, 3.0541),
+                             (-0.05, 2.618), (-3.059, 3.059), (-1.5707, 2.094), (-3.059, 3.059)]
+
+def baxter_left_forward_kinematics(joint_angles):
+    """joint_angles: (B,7) rad (left_s0,s1,e0,e1,w0,w1,w2) -> (B,7,3) robot-frame keypoints.
+    Matches DREAM baxter detector keypoint set (left_s0..left_w2)."""
+    B = joint_angles.shape[0]; device, dtype = joint_angles.device, joint_angles.dtype
+    fixed = [torch.tensor(_make_transform(j['xyz'], j['rpy']), device=device, dtype=dtype) for j in _BAXTER_LEFT_JOINTS]
+    cumul = torch.eye(4, device=device, dtype=dtype).unsqueeze(0).expand(B, -1, -1)
+    keypoints = []
+    for i in range(7):
+        R_joint = torch.eye(4, device=device, dtype=dtype).unsqueeze(0).expand(B, -1, -1).clone()
+        R_joint[:, :3, :3] = _rotation_matrix_z(joint_angles[:, i])
+        cumul = cumul @ fixed[i].unsqueeze(0) @ R_joint
+        keypoints.append(cumul[:, :3, 3])
+    return torch.stack(keypoints, dim=1)
+
+
 class DirectJointAngleHead(nn.Module):
     """
     Feature + UV with confidence weighting.
