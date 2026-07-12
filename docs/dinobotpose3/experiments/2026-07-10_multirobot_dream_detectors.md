@@ -139,14 +139,28 @@ GPU=GPU-<uuid> bash run_train_kuka_angle.sh
 GPU=GPU-<uuid> bash run_train_kuka_rotation.sh
 ```
 
+### 솔버 연결 (2026-07-12, `Eval/kuka_add_eval.py`)
+meca_add_eval.py 방식 — 배포 SOTA 솔버(`solve_pose_kinematic`)를 **수정 없이 monkeypatch**(FK/limits/mean을 iiwa7로 교체). ADD-AUC@100mm 측정. **head 학습 중(Ep~15) 예비 측정으로 파이프라인 검증 + 최적 모드 발견**:
+
+| 검증 | 결과 |
+|---|---|
+| **구조 정합** (GT각도+GT포즈) | **ADD 0.00mm, AUC 0.9999** — FK·단위·대응 전부 정상 |
+| 솔버 각도정제 (oracle 2D+R에서도) | ❌ **발산** (J2 7.5°→25°) — link-혼동이 재투영을 잘못된 basin으로. **Meca 선례 "솔버 각도정제 금지"와 동일** |
+| head-direct (t 재투영 재계산) | ❌ ADD 632mm — R 9°오차+깊이 모호성으로 **t가 깊이 발산** |
+| **`--direct-pose`** (head각도 + rot-head R,t 직접) | ✅ **ADD-AUC 0.22, median 82mm** (검출 2D, Ep~15 미수렴) |
+
+- **채택 모드 = `--direct-pose`**: 각도정제·t재계산 둘 다 끄고 head 각도 + rot-head R,t를 직접 신뢰. iiwa7엔 재투영 최적화가 해로움(link-혼동 + 깊이 모호성).
+- 현 병목은 **미수렴 rot-head**(R 8.9°, t-err 82mm) — GT각도든 head각도든 ADD 동일(97 vs 100mm)이라 **각도는 이미 충분**, rot-head 수렴 시 ADD 상승 예상.
+- ⚠️ 위 수치는 **head 미수렴(Ep~15) 예비치**. 수렴 후 재측정 필요.
+
 ## 남은 일
 
 1. ✅ **iiwa7 FK** — 완료·검증(0.003mm). Baxter FK는 미구현(동일 방식으로 피팅 가능).
-2. ✅ **관절각/회전 head 배선** — 완료·스모크 통과. **KUKA head 학습은 미실행**(다음 단계).
-3. **솔버 연결** — KUKA용 solve/eval 경로에 iiwa7 FK 연결 → 진단이 예측한 "솔버가 link 혼동 복구"를 포즈로 확인.
+2. ✅ **관절각/회전 head 배선** — 완료·스모크 통과. head 학습 진행 중(angle 60ep/rot 30ep).
+3. ✅ **솔버 연결** — `kuka_add_eval.py`, 구조 검증 0.00mm, 채택 모드 `--direct-pose`. **head 수렴 후 최종 ADD 측정 대기**.
 4. **mesh RC 전 FK 방향 gauge 정리** (iiwa7 URDF 메쉬 정합 시).
 5. **real 평가셋** — KUKA/Baxter real DREAM 확보 시에만 real SOTA 비교 가능.
 
-→ 검출기 일반화 + fine-tune 이득 확인 완료, **KUKA 포즈 파이프라인 준비 완료**. 다음은 KUKA head 학습 → 솔버 연결 → 포즈 정확도 측정.
+→ 검출기 일반화 + KUKA 포즈 파이프라인(FK·head·솔버) **연결·검증 완료**. head 수렴 시 `--direct-pose`로 최종 ADD 측정.
 
 관련: [multi_robot.md](../data/multi_robot.md)(FR5/FR3/Meca 실촬영, 별개 트랙) · [FINAL_MODEL.md](../FINAL_MODEL.md)(Panda 배포) · [training.md](../training/training.md)
