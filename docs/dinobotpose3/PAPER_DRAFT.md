@@ -42,9 +42,9 @@
 1. **Predicted-joint + 자동 bbox 최고 성능**: DREAM 실측 4-스플릿 평균 ADD-AUC 0.804로 RoboPEPP(0.780)·RoboTAG(0.740)를 능가한다. RoboPEPP의 헤드라인이 GT-bbox인 반면 우리는 완전 자동이다.
 2. **테스트-타임·학습불필요 렌더-비교 깊이 보정기**: 렌더-비교를 *발명*한 것이 아니라(RoboPose'21, CtRNet'23 선행), 제로샷 SAM 마스크 + 동결 DINOv3 키포인트 프론트엔드 위에서 predicted-joint·자동-bbox 체제에 맞게 **학습 없이 재구성**하고, 카메라별로 선택 적용한다.
 3. **가림 강건성**: 약한 가림 증강 + 카메라별 자가학습 스택으로, 평가한 전(全) 가림 수준(0–40%)에서 RoboPEPP를 상회한다.
-4. **일반화 연구(부록/후속)**: 동일 파이프라인을 KUKA iiwa7·Baxter로 확장하여 검출·FK·포즈까지 일반화됨을 보이고, 로봇별 병목(관측성 천장 등)을 분석한다.
+4. **DREAM의 세 로봇 모두 평가**: DREAM은 Panda·KUKA·Baxter를 포함하는 벤치마크다. 실측 데이터가 있는 Panda에서 위 SOTA를 내고, 합성 전용인 KUKA·Baxter에서 동일 파이프라인이 검출·FK·포즈까지 end-to-end로 동작함을 보이며 로봇별 병목(예: 손목 관절의 관측성 천장)을 분석한다.
 
-> EN: **Contributions.** (1) **State of the art under predicted-joint + auto-bbox**: mean ADD-AUC 0.804 on DREAM-real, surpassing RoboPEPP (0.780) and RoboTAG (0.740), while using fully automatic boxes (RoboPEPP's headline uses GT boxes). (2) A **test-time, training-free render-and-compare depth corrector**: we do not *invent* render-and-compare (RoboPose'21, CtRNet'23 are prior art) but **recast it without training** as a zero-shot-SAM + frozen-DINOv3 depth corrector for the predicted-joint / auto-bbox regime, applied per camera. (3) **Occlusion robustness**: light occlusion augmentation plus camera-specific self-training exceeds RoboPEPP across all evaluated occlusion levels (0–40%). (4) **Generalization study (appendix/follow-up)**: extending the same pipeline to KUKA iiwa7 and Baxter, we show detection/FK/pose all generalize, and analyze per-robot bottlenecks (e.g., a wrist-observability ceiling).
+> EN: **Contributions.** (1) **State of the art under predicted-joint + auto-bbox**: mean ADD-AUC 0.804 on DREAM-real, surpassing RoboPEPP (0.780) and RoboTAG (0.740), while using fully automatic boxes (RoboPEPP's headline uses GT boxes). (2) A **test-time, training-free render-and-compare depth corrector**: we do not *invent* render-and-compare (RoboPose'21, CtRNet'23 are prior art) but **recast it without training** as a zero-shot-SAM + frozen-DINOv3 depth corrector for the predicted-joint / auto-bbox regime, applied per camera. (3) **Occlusion robustness**: light occlusion augmentation plus camera-specific self-training exceeds RoboPEPP across all evaluated occlusion levels (0–40%). (4) **All three DREAM robots**: DREAM is a Panda/KUKA/Baxter benchmark; we report the above SOTA on Panda (which has real data) and show the same pipeline runs end-to-end on the synthetic-only KUKA and Baxter splits, analyzing per-robot bottlenecks (e.g., a wrist-joint observability ceiling).
 
 ---
 
@@ -99,9 +99,9 @@
 
 ### 4.1 설정 (Setup)
 
-DREAM 실측 벤치마크의 4개 카메라 스플릿(RealSense, Kinect360, Azure, ORB)에서 평가한다. 지표는 표준 **ADD-AUC@100mm**(0–100mm 임계에서 ADD 정확도 곡선의 면적)이다. 우리 프로토콜은 **관절각 예측(predicted-joint) + 완전 자동 바운딩 박스**(bbox-from-solved) + sim-to-real 학습으로, GT 바운딩 박스를 쓰는 관례보다 엄격하다. 자가학습을 쓰는 카메라(RealSense/Kinect/ORB)는 시퀀스 앞 70%로 적응하고 뒤 30% 영역에서만 평가하여 정보 누수를 차단한다(anti-leak held-out, 카메라당 1000프레임 조밀 샘플). 백본은 DINOv3 ViT-B/16으로 전 과정 동결한다.
+DREAM은 Panda·KUKA iiwa7·Baxter 세 로봇을 포함하는 벤치마크지만, **공개 실측 테스트 이미지는 Panda에만 존재**하고 KUKA·Baxter는 합성(domain-randomized) 전용이다. 따라서 헤드라인 실측 평가는 Panda의 4개 카메라 스플릿(RealSense, Kinect360, Azure, ORB)에서 수행하고, KUKA·Baxter는 §4.7에서 합성 스플릿으로 별도 보고한다. 지표는 표준 **ADD-AUC@100mm**(0–100mm 임계에서 ADD 정확도 곡선의 면적)이다. 우리 프로토콜은 **관절각 예측(predicted-joint) + 완전 자동 바운딩 박스**(bbox-from-solved) + sim-to-real 학습으로, GT 바운딩 박스를 쓰는 관례보다 엄격하다. 자가학습을 쓰는 카메라(RealSense/Kinect/ORB)는 시퀀스 앞 70%로 적응하고 뒤 30% 영역에서만 평가하여 정보 누수를 차단한다(anti-leak held-out, 카메라당 1000프레임 조밀 샘플). 백본은 DINOv3 ViT-B/16으로 전 과정 동결한다.
 
-> EN: We evaluate on the four camera splits of the DREAM real benchmark (RealSense, Kinect360, Azure, ORB). The metric is the standard **ADD-AUC@100mm** (area under the ADD accuracy-vs-threshold curve over 0–100 mm). Our protocol is **predicted-joint + fully automatic bounding boxes** (bbox-from-solved) with sim-to-real training, stricter than the common GT-box practice. Cameras that use self-training (RealSense/Kinect/ORB) adapt on the first 70% of the sequence and are evaluated only on the last-30% region to prevent leakage (anti-leak held-out; 1000 densely-sampled frames per camera). The backbone is a DINOv3 ViT-B/16, frozen throughout.
+> EN: DREAM is a three-robot benchmark (Panda, KUKA iiwa7, Baxter), but **public real test images exist only for Panda**; KUKA and Baxter are synthetic (domain-randomized) only. We therefore run the headline real evaluation on Panda's four camera splits (RealSense, Kinect360, Azure, ORB) and report KUKA/Baxter separately on synthetic splits in §4.7. The metric is the standard **ADD-AUC@100mm**. Our protocol is **predicted-joint + fully automatic bounding boxes** (bbox-from-solved) with sim-to-real training, stricter than the common GT-box practice. Self-training cameras (RealSense/Kinect/ORB) adapt on the first 70% of the sequence and are evaluated on the last-30% region to prevent leakage (anti-leak held-out; 1000 densely-sampled frames per camera). The backbone is a DINOv3 ViT-B/16, frozen throughout.
 
 ### 4.2 주요 결과 (Main results)
 
@@ -195,8 +195,32 @@ RoboPEPP의 가림 프로토콜(로봇 bbox 면적의 0–40%를 사각 occluder
 
 > EN: **Re-lock stability.** For paper-grade confidence we re-measured at 1000 (vs 800) frames: the mean is essentially unchanged (0.8037→**0.8039**, Δ+0.0002) with per-camera drift ≤0.006, and **all four cameras beat RoboPEPP** (ORB flips −0.002→+0.003). Results are robust to sample size.
 
-## 5. Multi-Robot Generalization (일반화) — TODO
-<!-- KUKA/Baxter 검출·data-fit FK·direct-pose 포즈, 관측성 천장 분석. 근거: experiments/2026-07-10_multirobot. -->
-> EN TODO: KUKA/Baxter detection, data-fit FK, direct-pose pose, wrist-observability analysis. Source: experiments/2026-07-10_multirobot.
+### 4.7 DREAM의 다른 로봇: KUKA iiwa7 · Baxter (합성)
 
-## 6. Conclusion (결론) — TODO
+DREAM의 나머지 두 로봇은 실측 데이터가 없으므로 합성(DR) 스플릿에서 평가한다. 검출기는 Panda 검출기에서 전이학습하여 2D 키포인트 AUC **0.735**(KUKA)·**0.817**(Baxter)를 얻는다. 운동학 FK는 표준 URDF 대신 **DREAM 합성 데이터에 직접 피팅**하여(관절각↔키포인트 3D) 링크 원점을 RMS 0.003mm로 재현한다. 포즈는 head 각도 + 회전 헤드의 R,t를 직접 쓰는 direct-pose로 ADD-AUC **0.34**(KUKA)·**0.25**(Baxter)를 기록한다(표 5).
+
+> EN: The other two DREAM robots have no real data, so we evaluate on synthetic (DR) splits. Detectors transfer-learned from the Panda detector reach 2D-keypoint AUC **0.735** (KUKA) / **0.817** (Baxter). Instead of a standard URDF, we **fit the kinematic FK directly to DREAM's synthetic data** (joint angles ↔ 3D keypoints), reproducing link origins at 0.003 mm RMS. Pose via a direct-pose scheme (head angles + rotation-head R,t) gives ADD-AUC **0.34** (KUKA) / **0.25** (Baxter) (Table 5).
+
+**표 5. DREAM 로봇별 파이프라인 요약.**
+
+| 로봇 | 데이터 | 검출기 2D AUC | 포즈 ADD-AUC | 병목 |
+|---|---|---|---|---|
+| Panda | **실측** | — | **0.804** | — (SOTA) |
+| KUKA iiwa7 | 합성 | 0.735 | 0.34 | 회전 헤드 병진 오차(56mm) |
+| Baxter 좌완 | 합성 | 0.817 | 0.25 | 손목 관절 **관측성 천장** |
+
+> EN: **Table 5. Pipeline summary across DREAM robots.** Panda (real) is the headline SOTA; KUKA/Baxter (synthetic) validate the pipeline end-to-end.
+
+**⚠️ 비교 주의.** KUKA/Baxter의 합성 0.34/0.25는 Panda 실측 0.804와 **다른 데이터(합성)·다른 조건(render-compare 미적용)**이므로 직접 비교 대상이 아니다. 이 결과의 의의는 절대 수치가 아니라 (i) 동일 파이프라인이 세 로봇 모두에서 동작하고, (ii) 남은 병목을 정량 규명했다는 점이다.
+
+> EN: **Comparison caveat.** The synthetic 0.34/0.25 for KUKA/Baxter are **different data (synthetic) and different conditions (no render-compare)** than Panda's real 0.804 and are not directly comparable. Their value is not the absolute numbers but (i) that the same pipeline runs on all three robots and (ii) the quantitative bottleneck analysis below.
+
+**관측성 천장 분석.** Baxter 손목의 지배적 오차는 검출 실패가 아니라 **관측성**에서 온다: 손목 관절의 자기축 회전은 자기 키포인트 원점을 움직이지 않아, 완벽한(GT) 키포인트를 헤드에 주입해도 손목 각도가 거의 개선되지 않는다(손목 MAE 28.1°→27.6°). 즉 2D 키포인트 기하만으로는 손목 방향이 원리적으로 미결정이며, 이를 풀려면 기하가 아니라 그리퍼/손목의 **appearance**를 읽어야 한다(엔드이펙터 특징 패치). 이는 로봇 팔 포즈에서 원위 관절이 갖는 근본적 관측성 한계를 드러낸다.
+
+> EN: **Observability-ceiling analysis.** Baxter's dominant wrist error comes from **observability**, not detection failure: a wrist joint's self-axis rotation does not move its own keypoint origin, so injecting perfect (GT) keypoints into the head barely changes the wrist angle (wrist MAE 28.1°→27.6°). The wrist orientation is thus fundamentally under-determined by 2D keypoint geometry and must instead be read from the **appearance** of the gripper/wrist (an end-effector feature patch). This exposes a fundamental observability limit of distal joints in robot-arm pose estimation.
+
+---
+
+## 5. Conclusion (결론) — TODO
+<!-- 요약: predicted-joint+auto-bbox SOTA, 무료 기하 레버, 3-로봇, 관측성 한계. 향후: kuka mesh 확보 시 RC, 손목 appearance. -->
+> EN TODO: summary (predicted-joint+auto-bbox SOTA via foundation features + free geometric levers + zero-shot render-compare; three DREAM robots; observability limits). Future: RC for KUKA with correct meshes, appearance-based wrist for Baxter.
