@@ -97,3 +97,4 @@ htmlcov/
 pip-log.txt
 celerybeat-schedule
 celerybeat.pid
+_assets_src/

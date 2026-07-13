@@ -17,6 +17,6 @@
 
 | occ-aug → self-train 스택 | 07-05 | ✅ 전 4카메라 가림 강건 + mean 0.804 (손실 0) | [2026-07-05_occaug_selftrain_stack.md](2026-07-05_occaug_selftrain_stack.md) |
 
-| 멀티로봇 DREAM 검출기 (KUKA / Baxter) | 07-09~10 | ✅ KUKA synth AUC 0.735 / Baxter 0.817 (L2 tail=link혼동, 솔버 복구 예상) | [2026-07-10_multirobot_dream_detectors.md](2026-07-10_multirobot_dream_detectors.md) |
+| 멀티로봇 DREAM 포즈 (KUKA / Baxter) | 07-09~13 | ✅ 검출기 0.735/0.817, 포즈 ADD 0.34/0.25(synth, direct-pose). 천장: KUKA rot-t, Baxter wrist(관측성). RC 양쪽 막힘. wrist appearance(mlp_patch) 재학습 중 | [2026-07-10_multirobot_dream_detectors.md](2026-07-10_multirobot_dream_detectors.md) |
 
 관련 문서: [SOTA 서베이](../references/sota_survey.md) · [다음 시도 로드맵](../references/next_directions.md) · 반증 맵은 로드맵 §3
