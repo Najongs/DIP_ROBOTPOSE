@@ -98,3 +98,9 @@ pip-log.txt
 celerybeat-schedule
 celerybeat.pid
 _assets_src/
+3_pose_models/DINObotPose3/Eval/ablation_logs/*.log
+3_pose_models/DINObotPose3/Eval/ablation_logs/*.tsv
+3_pose_models/DINObotPose3/Eval/ablation_logs/*.lock
+3_pose_models/DINObotPose3/Eval/rc_dumps_abl/
+3_pose_models/DINObotPose3/Eval/occl_logs/
+3_pose_models/DINObotPose3/Eval/mr_logs/

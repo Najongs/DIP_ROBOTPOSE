@@ -1,0 +1,2 @@
+KUKA direct-pose (5997): ADD-AUC 0.3568 mean 75.1mm median 61.3mm
+Baxter direct-pose (5982): ADD-AUC 0.2535 mean 86.6mm median 76.3mm
