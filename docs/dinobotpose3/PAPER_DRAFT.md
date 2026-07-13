@@ -95,9 +95,105 @@
 
 ---
 
-## 4. Experiments (실험) — TODO
-<!-- 성적표(재잠금 1000프레임), 가림 곡선, ablation(RC/cov-PnP/DARK/occ-stack), 프로토콜 표. 근거: FINAL_MODEL.md, figures/. -->
-> EN TODO: scorecard (1000-frame re-lock), occlusion curve, ablations (RC / cov-PnP / DARK / occ-stack), protocol table. Sources: FINAL_MODEL.md, figures/.
+## 4. Experiments (실험)
+
+### 4.1 설정 (Setup)
+
+DREAM 실측 벤치마크의 4개 카메라 스플릿(RealSense, Kinect360, Azure, ORB)에서 평가한다. 지표는 표준 **ADD-AUC@100mm**(0–100mm 임계에서 ADD 정확도 곡선의 면적)이다. 우리 프로토콜은 **관절각 예측(predicted-joint) + 완전 자동 바운딩 박스**(bbox-from-solved) + sim-to-real 학습으로, GT 바운딩 박스를 쓰는 관례보다 엄격하다. 자가학습을 쓰는 카메라(RealSense/Kinect/ORB)는 시퀀스 앞 70%로 적응하고 뒤 30% 영역에서만 평가하여 정보 누수를 차단한다(anti-leak held-out, 카메라당 1000프레임 조밀 샘플). 백본은 DINOv3 ViT-B/16으로 전 과정 동결한다.
+
+> EN: We evaluate on the four camera splits of the DREAM real benchmark (RealSense, Kinect360, Azure, ORB). The metric is the standard **ADD-AUC@100mm** (area under the ADD accuracy-vs-threshold curve over 0–100 mm). Our protocol is **predicted-joint + fully automatic bounding boxes** (bbox-from-solved) with sim-to-real training, stricter than the common GT-box practice. Cameras that use self-training (RealSense/Kinect/ORB) adapt on the first 70% of the sequence and are evaluated only on the last-30% region to prevent leakage (anti-leak held-out; 1000 densely-sampled frames per camera). The backbone is a DINOv3 ViT-B/16, frozen throughout.
+
+### 4.2 주요 결과 (Main results)
+
+DINObotPose3는 predicted-joint 체제에서 평균 ADD-AUC **0.804**로 최고 성능을 달성하며, **4개 카메라 전부** 강한 기준선 RoboPEPP를 상회한다(표 1). RoboPEPP의 헤드라인이 GT-bbox인 반면 우리는 완전 자동 bbox임을 다시 강조한다.
+
+> EN: DINObotPose3 attains the best mean ADD-AUC of **0.804** in the predicted-joint regime and surpasses the strong RoboPEPP baseline on **all four cameras** (Table 1) — while, again, using fully automatic boxes against RoboPEPP's GT-box headline.
+
+**표 1. DREAM 실측 카메라별 ADD-AUC@100mm (predicted-joint).** 1000-프레임 재잠금.
+
+| 카메라 | **Ours** | RoboPEPP (GT-bbox) | RoboTAG | 격차(vs PEPP) |
+|---|---|---|---|---|
+| RealSense | **0.815** | 0.805 | 0.783 | +0.010 |
+| Kinect360 | **0.828** | 0.785 | 0.757 | +0.043 |
+| Azure | **0.795** | 0.753 | 0.831 | +0.042 |
+| ORB | **0.778** | 0.775 | 0.588 | +0.003 |
+| **Mean** | **0.804** | 0.780 | 0.740 | **+0.024** |
+
+> EN: **Table 1. Per-camera ADD-AUC@100mm on DREAM-real (predicted-joint), 1000-frame re-lock.** Ours beats RoboPEPP on every camera (mean +0.024); RoboTAG wins only on Azure but collapses on ORB (0.588) under automatic detection.
+
+**프로토콜을 통제한 전체 비교(표 2)** 는 우리 0.804가 predicted-joint 체제의 최고임을 보인다. known-joint 계열(CtRNet 86.4, CtRNet-X 86.2)은 관절각을 엔코더로 받는 **더 쉬운 문제**이므로 별도 리그로 분리한다.
+
+> EN: **A protocol-controlled comparison (Table 2)** shows 0.804 is best in the predicted-joint regime. The known-joint family (CtRNet 86.4, CtRNet-X 86.2) receives encoder joint angles — an **easier problem** — and is separated into its own league.
+
+**표 2. Predicted-joint DREAM-real 평균 ADD-AUC (프로토콜 통제).**
+
+| 방법 | Mean | 관절각 | bbox | 깊이 모호성 해법 |
+|---|---|---|---|---|
+| DREAM (R101-H) | 57.8 | known | — | keypoint+PnP |
+| RoboPose | 73.2 | predicted | init 의존 | 반복 render&compare |
+| RoboTAG | 74.0 | predicted | 자동 | end-to-end 회귀 |
+| HoRoPose | 77.2 | predicted | — | 학습된 root-DepthNet |
+| RoboPEPP | 78.0 | predicted | **GT** | masking-pretrain |
+| **Ours** | **80.4** | predicted | **자동** | **테스트-타임 SAM-실루엣 RC** |
+| *(별도 리그)* CtRNet / CtRNet-X | 86.4 / 86.2 | **known** | — | 학습-타임 실루엣 자기지도 |
+
+> EN: **Table 2. Predicted-joint DREAM-real mean ADD-AUC (protocol-controlled).** Known-joint CtRNet(-X) is a separate league (encoder angles). Ours is the best predicted-joint method under the hardest (automatic-bbox) setting.
+
+### 4.3 가림 강건성 (Occlusion robustness)
+
+RoboPEPP의 가림 프로토콜(로봇 bbox 면적의 0–40%를 사각 occluder로 페이스트)로 평가하면, DINObotPose3는 **모든 가림 수준에서** RoboPEPP를 상회한다(표 3). 이 우위의 원천은 (a) 우리에게만 있는 렌더-비교 깊이 보정, (b) 처음부터 가림에 노출된 약한 가림-증강 헤드다.
+
+> EN: Under RoboPEPP's occlusion protocol (paste rectangular occluders over 0–40% of the robot's bbox area), DINObotPose3 exceeds RoboPEPP at **every** occlusion level (Table 3). The advantage stems from (a) the render-compare depth corrector unique to us and (b) a light occlusion-augmentation head exposed to occlusion from the start.
+
+**표 3. 가림 수준별 ADD-AUC.**
+
+| 가림 % | 0 | 10 | 20 | 30 | 40 |
+|---|---|---|---|---|---|
+| **Ours (light+RC)** | **0.812** | **0.765** | **0.678** | **0.575** | **0.429** |
+| RoboPEPP | 0.795 | 0.730 | 0.600 | 0.470 | 0.351 |
+
+> EN: **Table 3. ADD-AUC vs occlusion level.** Ours dominates across 0–40%; the gap widens at heavier occlusion (+0.078 at 40%).
+
+### 4.4 절제 실험 (Ablations)
+
+**누적 마일스톤(표 4).** 강한 기준선 RoboPEPP(0.780)에서 시작해, 테스트-타임 렌더-비교가 mean을 0.796으로, 무료 DARK 디코딩이 0.799로, 가림-증강→자가학습 스택이 0.804로 끌어올린다. **성능 향상의 대부분이 학습 불필요 레버**(RC·DARK)에서 나온다.
+
+> EN: **Cumulative milestones (Table 4).** From the strong RoboPEPP baseline (0.780), test-time render-and-compare lifts the mean to 0.796, free DARK decoding to 0.799, and the occlusion-aug→self-train stack to 0.804. **Most of the gain comes from training-free levers** (RC, DARK).
+
+**표 4. 누적 절제 (mean ADD-AUC).**
+
+| 구성 | Mean | Δ |
+|---|---|---|
+| RoboPEPP (기준선) | 0.780 | — |
+| + 테스트-타임 render-and-compare | 0.796 | +0.016 |
+| + DARK 서브픽셀 디코딩 (무료) | 0.799 | +0.003 |
+| + occ-aug → self-train 스택 | **0.804** | +0.005 |
+
+> EN: **Table 4. Cumulative ablation (mean ADD-AUC).** Render-and-compare and DARK are training-free; the occlusion stack trades a hair of clean accuracy for occlusion robustness.
+
+**렌더-비교의 카메라별 기여.** RC는 깊이 신호가 약한 **원거리 카메라의 엔진**이다 — RealSense +0.070, Kinect +0.060, ORB +0.040. 반면 근거리 Azure는 깊이 신호가 이미 강해 RC를 끄는 것이 최적이다(카메라별 on/off). 이는 RC가 "포즈 전체 추정"이 아니라 **깊이/스케일 보정기**로 작동함을 정량적으로 확인한다.
+
+> EN: **Per-camera render-compare contribution.** RC is the engine for **far cameras** where depth is weak — RealSense +0.070, Kinect +0.060, ORB +0.040 — whereas for the near Azure camera it is best turned off (per-camera on/off). This quantitatively confirms RC acts as a **depth/scale corrector**, not a full-pose estimator.
+
+**무료 레버.** cov-PnP는 20% 가림에서 +0.011로 do-no-harm을 유지하며, DARK는 특히 원거리 ORB의 격차를 −0.010→−0.004로 좁힌다.
+
+> EN: **Free levers.** cov-PnP adds +0.011 at 20% occlusion with do-no-harm elsewhere, and DARK narrows the far-camera ORB gap from −0.010 to −0.004.
+
+**가림 강건성의 출처.** 40% 가림에서 깨끗하게만 학습한 헤드(0.376)보다 약한 가림-증강 헤드(0.420)가 강건하며, 배포 스택은 그 강건성을 대부분 유지(0.396)하면서 실측 정확도를 회복한다. 즉 **가림 강건성은 처음부터 증강 학습해야 배어든다.**
+
+> EN: **Source of occlusion robustness.** At 40% occlusion, the light occlusion-augmentation head (0.420) is more robust than a clean-only head (0.376), and the deployed stack retains most of it (0.396) while recovering real-image accuracy — i.e., **robustness must be trained in from the start via augmentation.**
+
+### 4.5 프로토콜 분석 (Protocol analysis)
+
+**자동 bbox는 진짜 어렵다.** ORB 카메라는 시점이 다양해 자동 검출이 붕괴한다 — 동일한 자동-bbox 조건에서 RoboPEPP의 ORB는 GT-bbox 0.775에서 **0.344로 급락**한다. 우리 bbox-from-solved는 이 붕괴를 피해 0.778을 유지한다. 즉 우리 비교는 기준선에 불리한(더 엄격한) 조건에서 이루어진다.
+
+> EN: **Automatic bounding boxes are genuinely hard.** The ORB camera's diverse viewpoints break automatic detection — under the same automatic-bbox condition, RoboPEPP's ORB **drops from 0.775 (GT-box) to 0.344**. Our bbox-from-solved avoids this collapse and holds 0.778, so our comparison is run under a setting that disadvantages (is stricter for) the baselines.
+
+### 4.6 재잠금 안정성 (Re-lock stability)
+
+논문급 신뢰성을 위해 표본을 800에서 1000프레임으로 늘려 재측정했다. 평균은 0.8037→**0.8039**로 사실상 불변(Δ+0.0002)이고 개별 카메라 변동도 ≤0.006이며, **4/4 카메라 모두 RoboPEPP를 상회**한다(ORB가 −0.002→+0.003으로 전환). 결과는 표본 수에 강건하다.
+
+> EN: **Re-lock stability.** For paper-grade confidence we re-measured at 1000 (vs 800) frames: the mean is essentially unchanged (0.8037→**0.8039**, Δ+0.0002) with per-camera drift ≤0.006, and **all four cameras beat RoboPEPP** (ORB flips −0.002→+0.003). Results are robust to sample size.
 
 ## 5. Multi-Robot Generalization (일반화) — TODO
 <!-- KUKA/Baxter 검출·data-fit FK·direct-pose 포즈, 관측성 천장 분석. 근거: experiments/2026-07-10_multirobot. -->
