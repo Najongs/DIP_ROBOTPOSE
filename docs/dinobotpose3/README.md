@@ -10,6 +10,7 @@ DREAM 벤치마크 단안 로봇 포즈 SOTA (배포 mean **0.804** vs RoboPEPP 
 | 폴더 | 내용 |
 |---|---|
 | [FINAL_MODEL.md](FINAL_MODEL.md) | **최종 배포 모델** — 카메라별 체크포인트/파이프라인/재현/head 계보 |
+| [PAPER_DRAFT.md](PAPER_DRAFT.md) | 논문화 초안 — abstract, claim framing, 이후 섹션 확장용 |
 | [00_overview.md](00_overview.md) | 세션 진행 종합 (성적·결정·현황) |
 | [architecture/](architecture/model.md) | 모델 구조 — 백본/헤드/솔버/RC 파이프라인 |
 | [data/](data/dataset.md) | 데이터 구조 — DREAM/Panda([dataset](data/dataset.md)) + 멀티로봇 FR5/FR3/Meca500([multi_robot](data/multi_robot.md)) |
