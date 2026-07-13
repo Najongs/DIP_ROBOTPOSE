@@ -80,12 +80,14 @@ def main():
                          'ambiguity + link-confusion); rot-head direct t (~t-err) beats re-solving.')
     ap.add_argument('--cov-pnp', action='store_true')
     ap.add_argument('--conf-gate', type=float, default=0.05)
+    ap.add_argument('--head-type', default='mlp', choices=['mlp', 'mlp_patch', 'transformer'],
+                    help='must match the angle-head training (mlp_patch = end-effector appearance patch)')
     args = ap.parse_args()
 
     device = torch.device('cuda'); assert torch.cuda.is_available(); IS = args.image_size
     _patch_solver_for_baxter()
 
-    m = AnglePredictor(args.model_name, IS, fix_joint7_zero=True, head_type='mlp',
+    m = AnglePredictor(args.model_name, IS, fix_joint7_zero=True, head_type=args.head_type,
                        with_rotation=bool(args.rot_head), with_translation=bool(args.rot_head)).to(device).eval()
     sd = torch.load(args.detector, map_location=device); sd = {k.replace('module.', ''): v for k, v in sd.items()}
     m.load_state_dict({k: v for k, v in sd.items() if k in m.state_dict() and v.shape == m.state_dict()[k].shape}, strict=False)
