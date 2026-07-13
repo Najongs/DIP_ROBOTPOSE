@@ -20,6 +20,10 @@ python docs/dinobotpose3/figures/make_figs.py
 | `fig6_milestones` | 세션 진행 마일스톤 mean(RoboPEPP 0.780→render-compare 0.796→+DARK 0.799→+stack 0.804), 전부 학습 불필요(self-train 제외) | [00_overview.md](../00_overview.md) 채택 레버, dark_decode 실험 |
 | `fig7_occ_mechanism` | 가림 강건성의 출처 — clean head vs occ-aug light vs 배포 스택, 40%에서 light 0.420 vs base 0.376(+0.044). 처음부터 증강 학습해야 배어듦 | [experiments/2026-07-05](../experiments/2026-07-05_occaug_selftrain_stack.md), occlusion_aug_heads |
 
+**멀티로봇 (§4.7, `make_figs_multirobot.py`):**
+| `fig8_multirobot` | DREAM 3-로봇 포즈 — Panda(real, 0.804) \| KUKA/Baxter(synth, 0.34/0.25) real\|synth 구분·"비교 불가" 명시. 같은 파이프라인 3로봇 | [PAPER_DRAFT §4.7](../PAPER_DRAFT.md), experiments/2026-07-10 |
+| `fig9_wrist_observability` | Baxter 관절별 MAE — 검출 2D vs GT-2D 주입. 손목(w0/w1)은 GT 키포인트로도 안 내려감 = **관측성 천장**(검출 실패 아님) | 위 실험 doc, wrist 진단 |
+
 ## 정성 확인 (qualitative overlay) — `qualitative/`
 
 실제 DREAM 프레임 위에 파이프라인 추정 포즈를 겹쳐 **눈으로** 확인. GREEN=GT 스켈레톤, RED=예측 FK 재투영(모델 실제 포즈), YELLOW=검출 원시 2D, CYAN=가림체 뒤라 conf-gate된(운동학이 추론한) 키포인트. PNG는 gitignore(재생성 가능) — 스크립트는 추적됨.

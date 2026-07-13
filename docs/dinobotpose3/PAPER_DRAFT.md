@@ -90,8 +90,21 @@
 
 ### 3.4 가림 강건성 (Occlusion robustness)
 
-<!-- TODO(KR): light occ-aug head + 카메라별 self-train(합성 anti-forget 유지) 상세, 가림 곡선 프로토콜(RoboPEPP Fig.6). -->
-> EN TODO: detail the light occlusion-augmentation head plus camera-specific self-training with synthetic anti-forgetting, and the occlusion-curve protocol (RoboPEPP Fig. 6).
+부분 가시(가림)는 배포 시 흔하지만 합성 학습 데이터에는 거의 없다. 우리는 이를 두 단계로 처리한다.
+
+> EN: Partial visibility (occlusion) is common at deployment but nearly absent from synthetic training data. We address it in two stages.
+
+**약한 가림 증강 헤드.** 관절각·회전 헤드를 학습할 때, 로봇 위에 노이즈 텍스처 사각 occluder를 페이스트하는 가림 증강을 켠다. 핵심은 **약하게(gentle)** 쓰는 것이다 — 페이스트 비율을 ≤0.3으로 제한하고 키포인트 드롭은 쓰지 않는다. 처음부터 가림에 노출된 헤드는 가림 하에서 더 강건해지며(40% 가림에서 깨끗 헤드 0.376 대 약한 증강 헤드 0.420), 강한 증강은 오히려 깨끗한 정확도를 해쳐 역효과다.
+
+> EN: **Light occlusion-augmentation head.** When training the joint-angle and rotation heads, we enable occlusion augmentation that pastes noise-textured rectangular occluders onto the robot. The key is to keep it **gentle** — paste ratio ≤0.3 and no keypoint drop. A head exposed to occlusion from the start is more robust under occlusion (0.376 clean-only vs 0.420 light-augmented at 40%), whereas strong augmentation backfires by hurting clean accuracy.
+
+**합성 망각 방지를 유지한 카메라별 자가학습.** 각 실측 카메라에 대해 검출기 의사라벨로 자가학습하여 도메인 갭을 좁힌다. 다만 순수 자가학습은 가림 강건성을 씻어내므로, 자가학습 동안 **가림 증강을 계속 유지**한다(합성 anti-forgetting). 이 스택(약한 가림 헤드 → 카메라별 자가학습 + 가림 증강 유지)은 실측 적응과 가림 강건성을 **동시에** 확보한다: 예컨대 Kinect는 자가학습으로 실측 정확도가 오르면서(+0.017) 40% 가림 강건성(0.393)이 깨끗 헤드(0.376)와 RoboPEPP(0.351)를 모두 상회한다. 카메라별로 최적 구성을 선택한다 — Kinect/ORB는 스택, RealSense/Azure는 약한 가림 헤드 직접 사용.
+
+> EN: **Camera-specific self-training with synthetic anti-forgetting.** For each real camera we self-train on detector pseudo-labels to close the domain gap. Because pure self-training washes out occlusion robustness, we **keep occlusion augmentation on during self-training** (synthetic anti-forgetting). This stack (light occlusion head → per-camera self-training with occlusion augmentation retained) secures real adaptation and occlusion robustness **simultaneously**: e.g., Kinect gains real accuracy from self-training (+0.017) while its 40% occlusion robustness (0.393) still beats both the clean-only head (0.376) and RoboPEPP (0.351). We pick the best configuration per camera — stack for Kinect/ORB, light occlusion head directly for RealSense/Azure.
+
+**평가 프로토콜.** 가림 강건성은 RoboPEPP의 프로토콜(로봇 bbox 면적의 0–40%를 사각 occluder로 페이스트)로 별도 측정하며, 직접 비교를 위해 동일 규약을 따른다(§4.3).
+
+> EN: **Evaluation protocol.** We measure occlusion robustness separately with RoboPEPP's protocol (paste rectangular occluders over 0–40% of the robot's bbox area), following the same convention for direct comparison (§4.3).
 
 ---
 
@@ -197,7 +210,7 @@ RoboPEPP의 가림 프로토콜(로봇 bbox 면적의 0–40%를 사각 occluder
 
 ### 4.7 DREAM의 다른 로봇: KUKA iiwa7 · Baxter (합성)
 
-DREAM의 나머지 두 로봇은 실측 데이터가 없으므로 합성(DR) 스플릿에서 평가한다. 검출기는 Panda 검출기에서 전이학습하여 2D 키포인트 AUC **0.735**(KUKA)·**0.817**(Baxter)를 얻는다. 운동학 FK는 표준 URDF 대신 **DREAM 합성 데이터에 직접 피팅**하여(관절각↔키포인트 3D) 링크 원점을 RMS 0.003mm로 재현한다. 포즈는 head 각도 + 회전 헤드의 R,t를 직접 쓰는 direct-pose로 ADD-AUC **0.34**(KUKA)·**0.25**(Baxter)를 기록한다(표 5).
+DREAM의 나머지 두 로봇은 실측 데이터가 없으므로 합성(DR) 스플릿에서 평가한다. 검출기는 Panda 검출기에서 전이학습하여 2D 키포인트 AUC **0.735**(KUKA)·**0.817**(Baxter)를 얻는다. 운동학 FK는 표준 URDF 대신 **DREAM 합성 데이터에 직접 피팅**하여(관절각↔키포인트 3D) 링크 원점을 RMS 0.003mm로 재현한다. 포즈는 head 각도 + 회전 헤드의 R,t를 직접 쓰는 direct-pose로 ADD-AUC **0.34**(KUKA)·**0.25**(Baxter)를 기록한다(표 5, 그림 8).
 
 > EN: The other two DREAM robots have no real data, so we evaluate on synthetic (DR) splits. Detectors transfer-learned from the Panda detector reach 2D-keypoint AUC **0.735** (KUKA) / **0.817** (Baxter). Instead of a standard URDF, we **fit the kinematic FK directly to DREAM's synthetic data** (joint angles ↔ 3D keypoints), reproducing link origins at 0.003 mm RMS. Pose via a direct-pose scheme (head angles + rotation-head R,t) gives ADD-AUC **0.34** (KUKA) / **0.25** (Baxter) (Table 5).
 
@@ -215,7 +228,7 @@ DREAM의 나머지 두 로봇은 실측 데이터가 없으므로 합성(DR) 스
 
 > EN: **Comparison caveat.** The synthetic 0.34/0.25 for KUKA/Baxter are **different data (synthetic) and different conditions (no render-compare)** than Panda's real 0.804 and are not directly comparable. Their value is not the absolute numbers but (i) that the same pipeline runs on all three robots and (ii) the quantitative bottleneck analysis below.
 
-**관측성 천장 분석.** Baxter 손목의 지배적 오차는 검출 실패가 아니라 **관측성**에서 온다: 손목 관절의 자기축 회전은 자기 키포인트 원점을 움직이지 않아, 완벽한(GT) 키포인트를 헤드에 주입해도 손목 각도가 거의 개선되지 않는다(손목 MAE 28.1°→27.6°). 즉 2D 키포인트 기하만으로는 손목 방향이 원리적으로 미결정이며, 이를 풀려면 기하가 아니라 그리퍼/손목의 **appearance**를 읽어야 한다(엔드이펙터 특징 패치). 이는 로봇 팔 포즈에서 원위 관절이 갖는 근본적 관측성 한계를 드러낸다.
+**관측성 천장 분석(그림 9).** Baxter 손목의 지배적 오차는 검출 실패가 아니라 **관측성**에서 온다: 손목 관절의 자기축 회전은 자기 키포인트 원점을 움직이지 않아, 완벽한(GT) 키포인트를 헤드에 주입해도 손목 각도가 거의 개선되지 않는다(손목 MAE 28.1°→27.6°). 즉 2D 키포인트 기하만으로는 손목 방향이 원리적으로 미결정이며, 이를 풀려면 기하가 아니라 그리퍼/손목의 **appearance**를 읽어야 한다(엔드이펙터 특징 패치). 이는 로봇 팔 포즈에서 원위 관절이 갖는 근본적 관측성 한계를 드러낸다.
 
 > EN: **Observability-ceiling analysis.** Baxter's dominant wrist error comes from **observability**, not detection failure: a wrist joint's self-axis rotation does not move its own keypoint origin, so injecting perfect (GT) keypoints into the head barely changes the wrist angle (wrist MAE 28.1°→27.6°). The wrist orientation is thus fundamentally under-determined by 2D keypoint geometry and must instead be read from the **appearance** of the gripper/wrist (an end-effector feature patch). This exposes a fundamental observability limit of distal joints in robot-arm pose estimation.
 
