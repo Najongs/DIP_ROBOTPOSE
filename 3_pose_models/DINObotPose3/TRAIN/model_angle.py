@@ -282,7 +282,7 @@ class AnglePredictor(nn.Module):
         self.backbone.eval()
         self.keypoint_head.eval()
 
-    def forward(self, image, camera_K, kp_jitter=0.0, kp_drop=0.0):
+    def forward(self, image, camera_K, kp_jitter=0.0, kp_drop=0.0, kp2d_override=None):
         with torch.no_grad():
             tokens = self.backbone(image)                 # (B,Np,C)
             heatmaps = self.keypoint_head(tokens)         # (B,7,H,W)
@@ -293,6 +293,8 @@ class AnglePredictor(nn.Module):
             else:
                 kp2d = soft_argmax_2d(heatmaps)           # (B,7,2) @ heatmap res
             conf = heatmaps.flatten(2).max(dim=2)[0]      # (B,7)
+            if kp2d_override is not None:                 # diagnostic: inject GT/external 2D (heatmap res)
+                kp2d = kp2d_override.to(kp2d.dtype)
         if kp_drop > 0.0:
             # OCCLUSION augmentation: randomly "occlude" keypoints (low conf + displaced position) to
             # induce the under-determination that makes p(angles|image) multimodal. Forces the MCL
