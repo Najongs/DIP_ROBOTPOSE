@@ -260,7 +260,7 @@ class AnglePredictor(nn.Module):
         feat_dim = self.backbone.model.config.hidden_size
         self.keypoint_head = ViTKeypointHead(
             input_dim=feat_dim, heatmap_size=(self.heatmap_size, self.heatmap_size))
-        self.kp_patch = 3 if head_type == 'mlp_patch' else 0  # k×k end-effector appearance patch
+        self.kp_patch = int(os.environ.get('KP_PATCH_K', '3')) if head_type == 'mlp_patch' else 0  # k×k appearance patch
         self.n_hyp = n_hyp if head_type == 'mlp_mcl' else 1
         if head_type == 'transformer':
             self.angle_head = AngleHeadTransformer(feat_dim=feat_dim)
