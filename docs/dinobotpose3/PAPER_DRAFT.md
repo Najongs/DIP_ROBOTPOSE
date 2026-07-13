@@ -221,6 +221,20 @@ DREAM의 나머지 두 로봇은 실측 데이터가 없으므로 합성(DR) 스
 
 ---
 
-## 5. Conclusion (결론) — TODO
-<!-- 요약: predicted-joint+auto-bbox SOTA, 무료 기하 레버, 3-로봇, 관측성 한계. 향후: kuka mesh 확보 시 RC, 손목 appearance. -->
-> EN TODO: summary (predicted-joint+auto-bbox SOTA via foundation features + free geometric levers + zero-shot render-compare; three DREAM robots; observability limits). Future: RC for KUKA with correct meshes, appearance-based wrist for Baxter.
+## 5. Conclusion (결론)
+
+우리는 관절각을 예측하고 바운딩 박스를 완전 자동으로 잡는 가장 어려운 설정에서 단안 관절형 로봇 포즈를 추정하는 기하-유도 파이프라인 DINObotPose3를 제시했다. 핵심 설계 원칙은 **동결 파운데이션 특징을 끝까지 신뢰하고, 깊이·불확실도·가림을 학습형 회귀가 아니라 기하로 처리**하는 것이다: DARK 서브픽셀 디코딩과 공분산-인지 PnP는 학습 없이 정확도를 끌어올리고, 제로샷 SAM 마스크에 대한 미분가능 렌더-비교는 테스트-타임에 깊이/스케일만 보정한다. 그 결과 DREAM 실측에서 평균 ADD-AUC 0.804로 predicted-joint 체제의 최고 성능을 달성하며, 완전 자동 바운딩 박스를 쓰면서도 RoboPEPP·RoboTAG를 능가하고 평가한 모든 가림 수준에서 앞선다.
+
+> EN: We presented DINObotPose3, a geometry-guided pipeline for monocular articulated robot pose estimation under the hardest setting — predicted joints and fully automatic bounding boxes. Its central design principle is to **trust frozen foundation features and handle depth, uncertainty, and occlusion with geometry rather than learned regression**: DARK sub-pixel decoding and covariance-aware PnP raise accuracy at no training cost, while differentiable render-and-compare against zero-shot SAM masks corrects only depth/scale at test time. The result is a mean ADD-AUC of 0.804 on DREAM-real — best in the predicted-joint regime — surpassing RoboPEPP and RoboTAG with fully automatic boxes and leading across all evaluated occlusion levels.
+
+우리는 렌더-비교를 발명했다고 주장하지 않는다. 그 개념은 RoboPose와 CtRNet의 선행이며, 우리 기여는 그것을 **학습이 필요 없는 테스트-타임 깊이 보정기**로, 제로샷 SAM과 동결 DINOv3 키포인트 프론트엔드 위에서, predicted-joint·자동-bbox 체제에 맞게 재구성한 데 있다. 이는 학습형 깊이 회귀(HoRoPose)나 종단간 회귀(RoboTAG)만이 답이 아니며, **파운데이션 특징 + 불확실도-인지 기하 + 제로샷 렌더 비교**의 조합이 강력한 대안임을 보인다.
+
+> EN: We do not claim to have invented render-and-compare — the concept is prior art from RoboPose and CtRNet — and our contribution is recasting it as a **training-free test-time depth corrector** built on zero-shot SAM and a frozen-DINOv3 keypoint front-end for the predicted-joint / auto-bbox regime. This shows that learned depth regression (HoRoPose) and end-to-end regression (RoboTAG) are not the only answers: the combination of **foundation features, uncertainty-aware geometry, and zero-shot render comparison** is a strong alternative.
+
+DREAM의 세 로봇에 동일 파이프라인을 적용하여, 검출·데이터-피팅 운동학·포즈까지 end-to-end로 일반화됨을 확인했다. 이 과정에서 **원위 관절의 관측성 천장**이라는 근본 한계를 정량 규명했다: 손목 관절의 자기축 회전은 자기 키포인트를 움직이지 않아, 완벽한 키포인트로도 각도가 미결정이며 오직 appearance로만 풀린다. 이는 키포인트 기반 로봇 포즈 추정 전반에 적용되는 통찰이다.
+
+> EN: Applying the same pipeline to all three DREAM robots, we confirmed end-to-end generalization of detection, data-fit kinematics, and pose. In doing so we quantified a fundamental limit — an **observability ceiling for distal joints**: a wrist joint's self-axis rotation does not move its own keypoint, so its angle is under-determined even with perfect keypoints and is resolvable only from appearance — an insight that applies broadly to keypoint-based robot pose estimation.
+
+**한계와 향후 과제.** DREAM은 KUKA·Baxter의 공개 실측 데이터가 없어 이 두 로봇의 실측 SOTA 비교는 불가능하다. 렌더-비교 깊이 보정을 KUKA로 확장하려면 벤치마크와 정합하는 로봇 메쉬가 필요하다(공개 iiwa7 메쉬는 DREAM 모델과 ~20mm 어긋나 정합 불가였고, Baxter는 정확히 일치함을 확인). Baxter 손목의 관측성 천장은 엔드이펙터 appearance를 명시적으로 읽는 헤드로 접근할 수 있다. 마지막으로, 우리 렌더-비교는 안정성을 위해 카메라별 on/off와 앵커링에 의존하므로, 자유 실루엣 최적화의 깊이 모호성을 원리적으로 억제하는 정식화가 남은 과제다.
+
+> EN: **Limitations and future work.** DREAM provides no public real data for KUKA or Baxter, precluding a real-data SOTA comparison for those robots. Extending render-compare depth correction to KUKA requires a robot mesh matching the benchmark (public iiwa7 meshes differed from the DREAM model by ~20 mm and could not be aligned, whereas Baxter matched exactly). Baxter's wrist observability ceiling can be attacked with a head that explicitly reads end-effector appearance. Finally, our render-compare relies on per-camera on/off and anchoring for stability; a formulation that principally suppresses the depth ambiguity of free silhouette optimization remains future work.
