@@ -170,26 +170,28 @@ DINObotPose3는 predicted-joint 체제에서 평균 ADD-AUC **0.804**로 최고 
 
 ### 4.3 가림 강건성 (Occlusion robustness)
 
-RoboPEPP의 가림 프로토콜(로봇 bbox 면적의 0–40%를 사각 occluder로 페이스트)로 평가하면, DINObotPose3는 **모든 가림 수준에서** RoboPEPP를 상회한다(표 4, 그림 2). 이 우위의 원천은 (a) 우리에게만 있는 렌더-비교 깊이 보정, (b) 처음부터 가림에 노출된 약한 가림-증강 헤드다.
+RoboPEPP의 가림 프로토콜(로봇 bbox 면적의 0–40%를 사각 occluder로 페이스트)로 평가하면, DINObotPose3는 **모든 가림 수준에서** 기존 방법들 — RoboPEPP·HoRoPose(HPE)·RoboPose — 을 상회한다(표 5, 그림 2). 이 우위의 원천은 (a) 우리에게만 있는 렌더-비교 깊이 보정, (b) 처음부터 가림에 노출된 약한 가림-증강 헤드다.
 
-> EN: Under RoboPEPP's occlusion protocol (paste rectangular occluders over 0–40% of the robot's bbox area), DINObotPose3 exceeds RoboPEPP at **every** occlusion level (Table 4, Fig. 2). The advantage stems from (a) the render-compare depth corrector unique to us and (b) a light occlusion-augmentation head exposed to occlusion from the start.
+> EN: Under RoboPEPP's occlusion protocol (paste rectangular occluders over 0–40% of the robot's bbox area), DINObotPose3 exceeds prior methods — RoboPEPP, HoRoPose (HPE), and RoboPose — at **every** occlusion level (Table 5, Fig. 2). The advantage stems from (a) the render-compare depth corrector unique to us and (b) a light occlusion-augmentation head exposed to occlusion from the start.
 
-**표 4. 가림 수준별 ADD-AUC.**
+**표 5. 가림 수준별 ADD-AUC** (RoboPEPP Fig.6 프로토콜, synth_photo). 경쟁 수치는 RoboPEPP 논문 Fig.6에서 인용.
 
-| 가림 % | 0 | 10 | 20 | 30 | 40 |
+| 방법 | 0% | 10% | 20% | 30% | 40% |
 |---|---|---|---|---|---|
 | **Ours (light+RC)** | **0.812** | **0.765** | **0.679** | **0.573** | **0.430** |
 | RoboPEPP | 0.795 | 0.730 | 0.600 | 0.470 | 0.351 |
+| HoRoPose (HPE) | 0.570 | 0.505 | 0.405 | 0.320 | 0.282 |
+| RoboPose | 0.540 | 0.420 | 0.280 | 0.210 | 0.145 |
 
-> EN: **Table 4. ADD-AUC vs occlusion level.** Ours dominates across 0–40%; the gap widens at heavier occlusion (+0.079 at 40%).
+> EN: **Table 5. ADD-AUC vs occlusion level** (RoboPEPP Fig. 6 protocol, synth_photo; competitor numbers cited from RoboPEPP Fig. 6). Ours dominates across 0–40%: the gap over RoboPEPP widens with occlusion (+0.079 at 40%), and both HoRoPose (HPE) and the iterative RoboPose fall far below (0.282 / 0.145 at 40%).
 
 ### 4.4 절제 실험 (Ablations)
 
-**Leave-one-out(표 5).** 배포 스택에서 각 레버를 하나씩 제거하고 **동일한 1000-프레임 held-out 집합**에서 재평가하여, 각 기법의 순 기여(ΔMean)를 동일 조건에서 정량화한다(이전 누적/경쟁자-기준 방식과 달리 우리 모델 기준의 순수 절제). 렌더-비교가 압도적 최대 레버(+0.043)이고, 회전 헤드(+0.016)와 가림-증강/자가학습 스택(+0.010)이 뒤따르며, 무료 디코딩·솔버 레버(DARK/cov-PnP/conf-gate)는 클린에서 작지만 do-no-harm이다(가림에서 진가, §4.3). 완전 자동 bbox는 GT-bbox 대비 −0.002에 불과해 사실상 무비용의 더 엄격한 프로토콜이다.
+**Leave-one-out(표 6).** 배포 스택에서 각 레버를 하나씩 제거하고 **동일한 1000-프레임 held-out 집합**에서 재평가하여, 각 기법의 순 기여(ΔMean)를 동일 조건에서 정량화한다(이전 누적/경쟁자-기준 방식과 달리 우리 모델 기준의 순수 절제). 렌더-비교가 압도적 최대 레버(+0.043)이고, 회전 헤드(+0.016)와 가림-증강/자가학습 스택(+0.010)이 뒤따르며, 무료 디코딩·솔버 레버(DARK/cov-PnP/conf-gate)는 클린에서 작지만 do-no-harm이다(가림에서 진가, §4.3). 완전 자동 bbox는 GT-bbox 대비 −0.002에 불과해 사실상 무비용의 더 엄격한 프로토콜이다.
 
-> EN: **Leave-one-out (Table 5).** We remove each lever from the deployed stack and re-evaluate on the **same 1000-frame held-out set**, quantifying each technique's net contribution (ΔMean) under identical conditions — a pure ablation off our own model, unlike the earlier cumulative/competitor-anchored view. Render-and-compare is by far the largest lever (+0.043), followed by the rotation head (+0.016) and the occlusion-aug/self-training stack (+0.010); the free decoding/solver levers (DARK/cov-PnP/conf-gate) are small on clean but do-no-harm (their value is under occlusion, §4.3). Fully automatic boxes cost only −0.002 vs GT boxes — a near-free, stricter protocol.
+> EN: **Leave-one-out (Table 6).** We remove each lever from the deployed stack and re-evaluate on the **same 1000-frame held-out set**, quantifying each technique's net contribution (ΔMean) under identical conditions — a pure ablation off our own model, unlike the earlier cumulative/competitor-anchored view. Render-and-compare is by far the largest lever (+0.043), followed by the rotation head (+0.016) and the occlusion-aug/self-training stack (+0.010); the free decoding/solver levers (DARK/cov-PnP/conf-gate) are small on clean but do-no-harm (their value is under occlusion, §4.3). Fully automatic boxes cost only −0.002 vs GT boxes — a near-free, stricter protocol.
 
-**표 5. Leave-one-out 절제 (locked 1000, ADD-AUC@100mm).** 각 행은 배포 Full에서 한 레버 제거.
+**표 6. Leave-one-out 절제 (locked 1000, ADD-AUC@100mm).** 각 행은 배포 Full에서 한 레버 제거.
 
 | 제거 | rs | kinect | orb | azure | Mean | **ΔMean** |
 |---|---|---|---|---|---|---|
@@ -202,17 +204,17 @@ RoboPEPP의 가림 프로토콜(로봇 bbox 면적의 0–40%를 사각 occluder
 | − conf-gate | 0.816 | 0.826 | 0.781 | 0.790 | 0.803 | −0.001 |
 | auto-bbox → GT-bbox | 0.813 | 0.820 | 0.784 | 0.808 | 0.806 | +0.002 |
 
-> EN: **Table 5. Leave-one-out ablation (locked 1000, ADD-AUC@100mm);** each row removes one lever from the deployed Full model. †azure ships RC off, so −RC leaves azure unchanged.
+> EN: **Table 6. Leave-one-out ablation (locked 1000, ADD-AUC@100mm);** each row removes one lever from the deployed Full model. †azure ships RC off, so −RC leaves azure unchanged.
 
 **렌더-비교의 카메라별 기여(그림 4).** RC는 깊이 신호가 약한 **원거리 카메라의 엔진**이다 — RealSense +0.070, Kinect +0.062, ORB +0.040(위 표의 −RC 행에서 카메라별 직접 측정). 근거리 Azure는 깊이가 이미 강해 RC를 끄는 것이 최적(카메라별 on/off). 이는 RC가 "포즈 전체 추정"이 아니라 **깊이/스케일 보정기**로 작동함을 확증한다.
 
 > EN: **Per-camera render-compare contribution (Fig. 4).** RC is the engine for **far cameras** where depth is weak — RealSense +0.070, Kinect +0.062, ORB +0.040 (read directly from the −RC row per camera) — whereas for the near Azure camera it is best off. This confirms RC acts as a **depth/scale corrector**, not a full-pose estimator.
 
-**가림에서 occ-aug의 기여(표 6).** occ-aug/self-train은 클린에서 +0.010이지만 가림이 심해질수록 기여가 커진다 — 40% 가림에서 **+0.038**(light head vs clean head, 나머지 스택 동일). 강건성은 처음부터 증강 학습해야 배어듦을 보인다.
+**가림에서 occ-aug의 기여(표 7).** occ-aug/self-train은 클린에서 +0.010이지만 가림이 심해질수록 기여가 커진다 — 40% 가림에서 **+0.038**(light head vs clean head, 나머지 스택 동일). 강건성은 처음부터 증강 학습해야 배어듦을 보인다.
 
-> EN: **occ-aug contribution under occlusion (Table 6).** occ-aug/self-training gives +0.010 on clean but its contribution grows with occlusion — **+0.038 at 40%** (light vs clean head, rest of stack fixed), showing robustness must be trained in from the start.
+> EN: **occ-aug contribution under occlusion (Table 7).** occ-aug/self-training gives +0.010 on clean but its contribution grows with occlusion — **+0.038 at 40%** (light vs clean head, rest of stack fixed), showing robustness must be trained in from the start.
 
-**표 6. occ-aug on/off의 가림별 ADD-AUC** (synth_photo, 나머지 스택 동일).
+**표 7. occ-aug on/off의 가림별 ADD-AUC** (synth_photo, 나머지 스택 동일).
 
 | 가림 % | 0 | 10 | 20 | 30 | 40 |
 |---|---|---|---|---|---|
@@ -220,7 +222,7 @@ RoboPEPP의 가림 프로토콜(로봇 bbox 면적의 0–40%를 사각 occluder
 | − occ-aug (clean head) | 0.804 | 0.752 | 0.671 | 0.562 | 0.392 |
 | Δ (occ-aug 기여) | +0.008 | +0.013 | +0.007 | +0.011 | **+0.038** |
 
-> EN: **Table 6. occ-aug on/off ADD-AUC vs occlusion** (synth_photo, rest of stack fixed).
+> EN: **Table 7. occ-aug on/off ADD-AUC vs occlusion** (synth_photo, rest of stack fixed).
 
 **무료 레버.** cov-PnP는 20% 가림에서 +0.011로 do-no-harm을 유지하며, DARK는 특히 원거리 ORB의 격차를 −0.010→−0.004로 좁힌다.
 
@@ -230,11 +232,11 @@ RoboPEPP의 가림 프로토콜(로봇 bbox 면적의 0–40%를 사각 occluder
 
 > EN: **Source of occlusion robustness (Fig. 6).** At 40% occlusion, the light occlusion-augmentation head (0.420) is more robust than a clean-only head (0.376), and the deployed stack retains most of it (0.396) while recovering real-image accuracy — i.e., **robustness must be trained in from the start via augmentation.**
 
-**누적 build-up(표 7, 그림 5).** leave-one-out과 상보적으로, 헐벗은 base(클린 헤드·PnP만)에서 레버를 하나씩 **더하며** RealSense held-out 1000에서 단조 개선을 측정한다(세션 단위 mean 진행은 그림 5). base 0.666에서 배포치 0.815까지 **총 +0.149**이며, 가장 큰 세 단계는 rot-head 초기화(+0.036), occ-aug/자가학습 헤드(+0.040), 렌더-비교(+0.070)다. DARK(+0.007)와 cov-PnP·conf-gate는 클린에서 ±0.005 이내로 사실상 평평하다 — 이들의 값은 클린 정확도가 아니라 **가림 강건성**(§4.3)에 있다는 앞선 결론과 정확히 일치한다.
+**누적 build-up(표 8, 그림 5).** leave-one-out과 상보적으로, 헐벗은 base(클린 헤드·PnP만)에서 레버를 하나씩 **더하며** RealSense held-out 1000에서 단조 개선을 측정한다(세션 단위 mean 진행은 그림 5). base 0.666에서 배포치 0.815까지 **총 +0.149**이며, 가장 큰 세 단계는 rot-head 초기화(+0.036), occ-aug/자가학습 헤드(+0.040), 렌더-비교(+0.070)다. DARK(+0.007)와 cov-PnP·conf-gate는 클린에서 ±0.005 이내로 사실상 평평하다 — 이들의 값은 클린 정확도가 아니라 **가림 강건성**(§4.3)에 있다는 앞선 결론과 정확히 일치한다.
 
-> EN: **Cumulative build-up (Table 7, Fig. 5).** Complementary to leave-one-out, we *add* levers one at a time onto a bare base (clean head, PnP only) and measure the monotone gain on the RealSense held-out 1000 (session-level mean progression in Fig. 5). From base 0.666 to the deployed 0.815 is **+0.149 total**, with the three largest steps being rot-head initialization (+0.036), the occ-aug/self-training head (+0.040), and render-and-compare (+0.070). DARK (+0.007) and cov-PnP/conf-gate are essentially flat on clean (within ±0.005) — exactly matching the earlier finding that their value lies in **occlusion robustness** (§4.3), not clean accuracy.
+> EN: **Cumulative build-up (Table 8, Fig. 5).** Complementary to leave-one-out, we *add* levers one at a time onto a bare base (clean head, PnP only) and measure the monotone gain on the RealSense held-out 1000 (session-level mean progression in Fig. 5). From base 0.666 to the deployed 0.815 is **+0.149 total**, with the three largest steps being rot-head initialization (+0.036), the occ-aug/self-training head (+0.040), and render-and-compare (+0.070). DARK (+0.007) and cov-PnP/conf-gate are essentially flat on clean (within ±0.005) — exactly matching the earlier finding that their value lies in **occlusion robustness** (§4.3), not clean accuracy.
 
-**표 7. 누적 build-up (RealSense held-out 1000, ADD-AUC@100mm).** 각 행은 위 행에 레버 하나를 추가.
+**표 8. 누적 build-up (RealSense held-out 1000, ADD-AUC@100mm).** 각 행은 위 행에 레버 하나를 추가.
 
 | 스택 | ADD-AUC | Δ |
 |---|---|---|
@@ -245,7 +247,7 @@ RoboPEPP의 가림 프로토콜(로봇 bbox 면적의 0–40%를 사각 occluder
 | + occ-aug / 자가학습 헤드 | 0.745 | +0.040 |
 | **+ render-and-compare (배포)** | **0.815** | **+0.070** |
 
-> EN: **Table 7. Cumulative build-up (RealSense held-out 1000, ADD-AUC@100mm);** each row adds one lever to the row above. cov-PnP dips −0.004 on clean (its value is under occlusion), the rest accumulate monotonically to the deployed 0.815.
+> EN: **Table 8. Cumulative build-up (RealSense held-out 1000, ADD-AUC@100mm);** each row adds one lever to the row above. cov-PnP dips −0.004 on clean (its value is under occlusion), the rest accumulate monotonically to the deployed 0.815.
 
 **conf-gate 민감도.** conf-gate 임계값을 {0, 0.05(배포), 0.10, 0.20}으로 스윕하면 클린 RealSense에서 ADD-AUC가 각각 0.747·0.745·0.746·0.749로 **±0.002 이내로 평평**하다 — 배포 하이퍼파라미터가 임의 선택이 아니라 넓은 안정 구간 안에 있음을 보인다(가림 필터로서의 진가는 §4.3).
 
@@ -287,11 +289,11 @@ DREAM의 나머지 두 로봇은 실측 데이터가 없으므로 합성(DR) 스
 
 ### 4.8 런타임 (Runtime)
 
-비교 논문들이 표준으로 보고하는 추론 속도를 RTX 3090에서 측정한다(표 8). 동결 DINOv3 백본 forward는 빠르나(19ms, 60 img/s), 비용은 **테스트-타임 최적화**에 있다 — 운동학 솔버(250 iter, 352 ms/frame)와 렌더-비교(SAM + 미분 렌더, ~1.3 s/frame). base 파이프라인은 ~2.4 fps, RC 포함 end-to-end는 ~0.6 fps다. 정확도 우선 설계로 실시간은 아니며, RC는 카메라별 선택(Azure는 base-only ~2.4 fps)이고 솔버 iter 수로 정확도-속도 절충이 가능하다(부록).
+비교 논문들이 표준으로 보고하는 추론 속도를 RTX 3090에서 측정한다(표 9). 동결 DINOv3 백본 forward는 빠르나(19ms, 60 img/s), 비용은 **테스트-타임 최적화**에 있다 — 운동학 솔버(250 iter, 352 ms/frame)와 렌더-비교(SAM + 미분 렌더, ~1.3 s/frame). base 파이프라인은 ~2.4 fps, RC 포함 end-to-end는 ~0.6 fps다. 정확도 우선 설계로 실시간은 아니며, RC는 카메라별 선택(Azure는 base-only ~2.4 fps)이고 솔버 iter 수로 정확도-속도 절충이 가능하다(부록).
 
-> EN: **Runtime (Table 8), measured on an RTX 3090.** The frozen DINOv3 backbone forward is fast (19 ms, 60 img/s), but the cost lies in **test-time optimization** — the kinematic solver (250 iters, 352 ms/frame) and render-and-compare (SAM + differentiable rendering, ~1.3 s/frame). The base pipeline runs at ~2.4 fps and end-to-end with RC at ~0.6 fps. The method is accuracy-focused rather than real-time; RC is applied per camera (Azure is base-only, ~2.4 fps) and the solver iteration count trades accuracy for speed.
+> EN: **Runtime (Table 9), measured on an RTX 3090.** The frozen DINOv3 backbone forward is fast (19 ms, 60 img/s), but the cost lies in **test-time optimization** — the kinematic solver (250 iters, 352 ms/frame) and render-and-compare (SAM + differentiable rendering, ~1.3 s/frame). The base pipeline runs at ~2.4 fps and end-to-end with RC at ~0.6 fps. The method is accuracy-focused rather than real-time; RC is applied per camera (Azure is base-only, ~2.4 fps) and the solver iteration count trades accuracy for speed.
 
-**표 8. 단계별 지연 (RTX 3090).**
+**표 9. 단계별 지연 (RTX 3090).**
 
 | 단계 | 지연 | 처리량 |
 |---|---|---|
@@ -302,19 +304,37 @@ DREAM의 나머지 두 로봇은 실측 데이터가 없으므로 합성(DR) 스
 | **base end-to-end** | ~420 ms | **~2.4 fps** |
 | **+ render-and-compare** | ~1700 ms | **~0.6 fps** |
 
-> EN: **Table 8. Per-stage latency (RTX 3090).**
+> EN: **Table 9. Per-stage latency (RTX 3090).**
 
 **RC iteration 수 = 정확도-속도 knob.** RC 반복 수를 스윕하면 RealSense 기준 ADD-AUC가 0(0.745, RC 없음)→25(0.788)→50(0.802)→150(**0.815**)로 **~150 iter에 배포치(250, 0.8155)에 수렴**한다(ORB도 150에서 0.778=배포치). 즉 250→150으로 RC 렌더 비용을 ~40% 줄이면서 정확도 손실이 없다. 또한 RC 신호는 **전적으로 실루엣 IoU 항**에서 나온다 — 실루엣 항 제거 시 base(0.745)로 회귀하고, 재투영 앵커 항은 +0.002만 기여한다.
 
 > EN: **RC iteration count is the accuracy–speed knob.** Sweeping RC iterations, RealSense ADD-AUC goes 0(0.745, no RC)→25(0.788)→50(0.802)→150(**0.815**), **converging to the deployed 250-iter value (0.8155) by ~150 iters** (ORB likewise 0.778 at 150). So 250→150 cuts ~40% of the RC render cost with no accuracy loss. The RC signal comes **entirely from the silhouette-IoU term** — removing it reverts to base (0.745); the reprojection-anchor term adds only +0.002.
 
+**기존 방법과의 런타임 위치(표 10).** 비교 방법들은 두 설계 패러다임으로 갈린다. (i) **단일 feed-forward** 계열 — HoRoPose(HPE)·RoboPEPP·RoboTAG·CtRNet — 은 한 번의 순전파로 포즈를 회귀해 실시간(수십 fps)이지만, 그 대가로 GT-bbox(RoboPEPP)나 known-joint(CtRNet) 같은 완화된 설정에 의존하거나 정확도가 낮다. (ii) **반복 테스트-타임 최적화** 계열 — RoboPose와 우리 — 는 렌더-비교로 정확도를 끌어올리는 대신 실시간이 아니다. 우리는 이 최적화 축에 서되, RoboPose와 달리 **학습된 refiner가 필요 없고**, RC-iteration knob(250→150, 무손실)으로 최적화 비용을 조절할 수 있어 optimization 계열 중 가장 가벼운 편이다. 절대 지연은 우리 값만 RTX 3090 실측이며, 경쟁 방법의 수치는 각 논문 보고치 체제(feed-forward=실시간 / RoboPose=반복·비실시간)로 표기한다.
+
+> EN: **Runtime positioning vs prior work (Table 10).** Competing methods split into two design paradigms: (i) **single feed-forward** — HoRoPose (HPE), RoboPEPP, RoboTAG, CtRNet — regress the pose in one pass and run in real time (tens of fps), but pay for it with relaxed settings (GT boxes for RoboPEPP, known joints for CtRNet) or lower accuracy; and (ii) **iterative test-time optimization** — RoboPose and ours — which trade real-time speed for accuracy via render-and-compare. We sit on the optimization axis but, unlike RoboPose, need **no learned refiner** and expose an RC-iteration knob (250→150, lossless) that makes us the lightest of the optimization family. Absolute latencies are RTX-3090-measured for ours only; competitor entries are given as the runtime regime reported by each paper (feed-forward = real-time / RoboPose = iterative, non-real-time).
+
+**표 10. 설계 패러다임별 런타임·설정 비교.** (우리 값은 RTX 3090 실측; 경쟁 방법은 논문 보고 체제)
+
+| 방법 | 패러다임 | 런타임 체제 | 관절 | bbox |
+|---|---|---|---|---|
+| HoRoPose (HPE) | 단일 feed-forward (holistic 회귀) | 실시간 (논문 보고) | predicted | — |
+| CtRNet | feed-forward + 학습-타임 실루엣 자기지도 | 실시간 (논문 보고) | **known** | — |
+| RoboPEPP | masked-encoder feed-forward | 실시간급 (논문 보고) | predicted | **GT** |
+| RoboTAG | end-to-end 회귀 | 실시간급 (논문 보고) | predicted | 자동 |
+| RoboPose | **반복** render-and-compare | 비실시간 (다중 iter) | predicted | init 의존 |
+| **Ours (base)** | feed-forward + 운동학 솔버 | **~0.42 s/frame (2.4 fps)** 실측 | predicted | **자동** |
+| **Ours (+RC)** | + 테스트-타임 최적화 | **~1.7 s/frame (0.6 fps)** 실측 | predicted | **자동** |
+
+> EN: **Table 10. Runtime and setting by design paradigm** (ours RTX-3090-measured; competitors as the regime reported by each paper). Feed-forward methods are real-time but rely on relaxed settings or known joints; RoboPose and ours are optimization-based (accuracy-focused, non-real-time), with ours the lightest via the RC-iteration knob and no learned refiner.
+
 ### 4.9 시도했으나 반증된 대안 (What did not work)
 
-강한 부정 증거를 리뷰어에게 투명하게 제시한다(표 9). 특히 **백본 적응은 3가지 방식 모두 ADD를 악화**시켜(솔버가 요구하는 sub-pixel 키포인트 정밀도 파괴), 동결 백본 결정을 정당화한다. RC 계열에서도 feature-metric·edge-NCC·multi-start 변형이 실루엣 RC를 못 이겼고, 학습형 상태 prior(population/DPoser식)와 translation prior는 오히려 해로웠다.
+강한 부정 증거를 리뷰어에게 투명하게 제시한다(표 11). 특히 **백본 적응은 3가지 방식 모두 ADD를 악화**시켜(솔버가 요구하는 sub-pixel 키포인트 정밀도 파괴), 동결 백본 결정을 정당화한다. RC 계열에서도 feature-metric·edge-NCC·multi-start 변형이 실루엣 RC를 못 이겼고, 학습형 상태 prior(population/DPoser식)와 translation prior는 오히려 해로웠다.
 
-> EN: **What did not work (Table 9).** We transparently report strong negative evidence. In particular, **backbone adaptation failed in all three variants** (destroying the sub-pixel keypoint precision the solver needs), justifying the frozen backbone. Among RC variants, feature-metric / edge-NCC / multi-start did not beat plain silhouette RC, and learned state priors (population/DPoser-style) and a translation prior were actively harmful.
+> EN: **What did not work (Table 11).** We transparently report strong negative evidence. In particular, **backbone adaptation failed in all three variants** (destroying the sub-pixel keypoint precision the solver needs), justifying the frozen backbone. Among RC variants, feature-metric / edge-NCC / multi-start did not beat plain silhouette RC, and learned state priors (population/DPoser-style) and a translation prior were actively harmful.
 
-**표 9. 반증된 대안과 그 결과.**
+**표 11. 반증된 대안과 그 결과.**
 
 | 대안 | 결과 | 판정 |
 |---|---|---|
@@ -332,7 +352,7 @@ DREAM의 나머지 두 로봇은 실측 데이터가 없으므로 합성(DR) 스
 | RoboTAG reproj-consistency 이식 | azure −0.014 | ❌ |
 | 768-crop 고해상도 | −0.14 회귀 | ❌ |
 
-> EN: **Table 9. Refuted alternatives and their results.** Backbone adaptation (3 ways), feature-metric/edge-NCC/multi-start RC, learned/translation priors, union-bbox, MCL, ported RoboTAG consistency, and 768-crop all regressed or diverged.
+> EN: **Table 11. Refuted alternatives and their results.** Backbone adaptation (3 ways), feature-metric/edge-NCC/multi-start RC, learned/translation priors, union-bbox, MCL, ported RoboTAG consistency, and 768-crop all regressed or diverged.
 
 ---
 

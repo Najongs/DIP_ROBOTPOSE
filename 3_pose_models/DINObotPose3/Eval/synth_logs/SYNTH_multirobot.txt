@@ -1,0 +1,12 @@
+DREAM synthetic test ADD-AUC@100mm
+Panda: occ_bench r0, synth-native clean crop head (angle_crop_20260605_174740), 1000 frames
+KUKA/Baxter: direct-pose (head angles + rot-head R,t), no RC, 5000 frames
+
+  Panda       synth-DR    : base 0.6713   +RC (pending)
+  Panda       synth-photo : base 0.7082   +RC (pending)
+  KUKA iiwa7  synth-DR    : 0.3573   (direct-pose, no RC)
+  KUKA iiwa7  synth-photo : 0.3190
+  Baxter left synth-DR    : 0.2521        [no photo test set exists in DREAM]
+
+Note: competitor synthetic (DR/photo) AUC not in repo reference docs -> to be cited from
+DREAM/RoboPEPP/HoRoPose papers (same panda_synth_test_{dr,photo} set, ADD-AUC@100mm).
