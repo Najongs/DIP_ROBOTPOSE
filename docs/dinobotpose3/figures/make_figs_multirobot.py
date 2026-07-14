@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Extra publication figures for the multi-robot (§4.7) part of the paper:
-  fig8_multirobot     — DREAM pose across the 3 robots (real Panda vs synthetic KUKA/Baxter)
-  fig9_wrist_observ   — Baxter per-joint MAE, detected-2D vs GT-2D injection (observability ceiling)
+  fig7_multirobot     — DREAM pose across the 3 robots (real Panda vs synthetic KUKA/Baxter)
+  fig8_wrist_observ   — Baxter per-joint MAE, detected-2D vs GT-2D injection (observability ceiling)
 Matches make_figs.py style."""
 import os
 import numpy as np
@@ -28,8 +28,8 @@ def save(fig, name):
     print(f"wrote {name}.png / .pdf")
 
 
-# ---------------------------------------------------------------- fig8: 3-robot pose
-def fig8():
+# ---------------------------------------------------------------- fig7: 3-robot pose
+def fig7():
     robots = ["Panda", "KUKA iiwa7", "Baxter"]
     pose = [0.804, 0.357, 0.253]                 # ADD-AUC@100mm
     det  = [None, 0.735, 0.817]                # detector 2D keypoint AUC (synth); Panda n/a here
@@ -59,11 +59,11 @@ def fig8():
         ax.spines[s].set_visible(False)
     ax.set_title("DREAM pose across robots — same pipeline, 3 robots\n"
                  "(DREAM has real test data only for Panda)", fontsize=11.5)
-    save(fig, "fig8_multirobot"); plt.close(fig)
+    save(fig, "fig7_multirobot"); plt.close(fig)
 
 
-# ---------------------------------------------------------------- fig9: wrist observability
-def fig9():
+# ---------------------------------------------------------------- fig8: wrist observability
+def fig8():
     joints = ["s0", "s1", "e0", "e1", "w0", "w1"]
     det = [6.65, 4.53, 10.41, 6.99, 28.11, 22.84]     # detected 2D
     gt  = [6.70, 4.33, 10.35, 6.51, 27.59, 22.19]     # GT 2D injected
@@ -86,9 +86,9 @@ def fig9():
     ax.legend(frameon=False, fontsize=10, loc="upper left")
     ax.set_title("Baxter joint MAE — perfect (GT) keypoints barely change the wrist\n"
                  "→ wrist is an observability ceiling, not a detection failure", fontsize=11.5)
-    save(fig, "fig9_wrist_observability"); plt.close(fig)
+    save(fig, "fig8_wrist_observability"); plt.close(fig)
 
 
 if __name__ == "__main__":
-    fig8(); fig9()
+    fig7(); fig8()
     print("MULTIROBOT FIGURES DONE ->", OUT)

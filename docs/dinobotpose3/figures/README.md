@@ -12,17 +12,21 @@ python docs/dinobotpose3/figures/make_figs.py
 | `fig1_scorecard` | 카메라별 ADD-AUC 막대(Ours/RoboPEPP/RoboTAG) + MEAN, orb auto-bbox 붕괴(RoboPEPP 0.344) 주석 | [FINAL_MODEL.md](../FINAL_MODEL.md) 재잠금 테이블 |
 | `fig2_occlusion` | 가림 강건성 곡선 0~40% (RoboPEPP Fig.6 프로토콜), 전 구간 초과 | [experiments/2026-07-05](../experiments/2026-07-05_occaug_selftrain_stack.md), SUMMARY.md |
 | `fig3_relock` | 800→1000 재잠금 안정성(Δmean +0.0002), RoboPEPP mean 기준선 | [experiments/2026-07-05](../experiments/2026-07-05_occaug_selftrain_stack.md) §재잠금 |
-| `fig4_table` | 결과 표 렌더 이미지 (발표 슬라이드용) | 위와 동일 |
+| `slide_table` | 결과 표 렌더 이미지 (발표 슬라이드용 — **논문 그림 번호 아님**) | 위와 동일 |
 | `table_dream.tex` | LaTeX 표 (논문 본문용, booktabs) | 위와 동일 |
 
 **어트리뷰션 (왜 좋아졌나):**
-| `fig5_lever_decomp` | 카메라별 레버 분해 — base(솔버+cov-PnP+DARK+head) + RC 세그먼트. **RC가 원거리 엔진**(+0.070/0.060/0.040), azure는 RC off. **재잠금에서 직접 측정** | 1000-프레임 재잠금 dump vs +RC (직접 측정) |
-| `fig6_milestones` | 세션 진행 마일스톤 mean(RoboPEPP 0.780→render-compare 0.796→+DARK 0.799→+stack 0.804), 전부 학습 불필요(self-train 제외) | [00_overview.md](../00_overview.md) 채택 레버, dark_decode 실험 |
-| `fig7_occ_mechanism` | 가림 강건성의 출처 — clean head vs occ-aug light vs 배포 스택, 40%에서 light 0.420 vs base 0.376(+0.044). 처음부터 증강 학습해야 배어듦 | [experiments/2026-07-05](../experiments/2026-07-05_occaug_selftrain_stack.md), occlusion_aug_heads |
+| `fig4_lever_decomp` | 카메라별 레버 분해 — base(솔버+cov-PnP+DARK+head) + RC 세그먼트. **RC가 원거리 엔진**(+0.070/0.060/0.040), azure는 RC off. **재잠금에서 직접 측정** | 1000-프레임 재잠금 dump vs +RC (직접 측정) |
+| `fig5_milestones` | 세션 진행 마일스톤 mean(RoboPEPP 0.780→render-compare 0.796→+DARK 0.799→+stack 0.804), 전부 학습 불필요(self-train 제외) | [00_overview.md](../00_overview.md) 채택 레버, dark_decode 실험 |
+| `fig6_occ_mechanism` | 가림 강건성의 출처 — clean head vs occ-aug light vs 배포 스택, 40%에서 light 0.420 vs base 0.376(+0.044). 처음부터 증강 학습해야 배어듦 | [experiments/2026-07-05](../experiments/2026-07-05_occaug_selftrain_stack.md), occlusion_aug_heads |
 
 **멀티로봇 (§4.7, `make_figs_multirobot.py`):**
-| `fig8_multirobot` | DREAM 3-로봇 포즈 — Panda(real, 0.804) \| KUKA/Baxter(synth, 0.34/0.25) real\|synth 구분·"비교 불가" 명시. 같은 파이프라인 3로봇 | [PAPER_DRAFT §4.7](../PAPER_DRAFT.md), experiments/2026-07-10 |
-| `fig9_wrist_observability` | Baxter 관절별 MAE — 검출 2D vs GT-2D 주입. 손목(w0/w1)은 GT 키포인트로도 안 내려감 = **관측성 천장**(검출 실패 아님) | 위 실험 doc, wrist 진단 |
+| `fig7_multirobot` | DREAM 3-로봇 포즈 — Panda(real, 0.804) \| KUKA/Baxter(synth, 0.34/0.25) real\|synth 구분·"비교 불가" 명시. 같은 파이프라인 3로봇 | [PAPER_DRAFT §4.7](../PAPER_DRAFT.md), experiments/2026-07-10 |
+| `fig8_wrist_observability` | Baxter 관절별 MAE — 검출 2D vs GT-2D 주입. 손목(w0/w1)은 GT 키포인트로도 안 내려감 = **관측성 천장**(검출 실패 아님) | 위 실험 doc, wrist 진단 |
+
+**정성 (§4.4, `viz_mesh.py` → 커밋된 PNG):**
+| `fig9_mesh_overlay` | 예측 Panda 메쉬 실루엣(nvdiffrast, 오렌지)을 RealSense 실측 6프레임에 오버레이 — 몸체가 사진에 밀착(ADD 11~66mm) | `Eval/viz_mesh.py`, RealSense held-out |
+| `fig10_occ_ladder` | 동일 프레임 0~40% 가림 사다리 — ≤20%까지 정렬 유지, 심한 가림에서만 실패(정직한 실패 사례) | `Eval/viz_mesh.py --ladder` |
 
 ## 정성 확인 (qualitative overlay) — `qualitative/`
 

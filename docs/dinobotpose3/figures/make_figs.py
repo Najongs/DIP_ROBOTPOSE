@@ -181,7 +181,7 @@ def fig_table():
     ax.set_title("DREAM 4-real-split ADD-AUC@100mm — 1000-frame re-lock (2026-07-06)\n"
                  "predicted angles + fully-automatic bbox;  * only cell where a baseline beats ours",
                  fontsize=10, pad=6)
-    save(fig, "fig4_table")
+    save(fig, "slide_table")
 
 
 # ============ LaTeX table ============
@@ -252,7 +252,7 @@ def fig_decomp():
               fontsize=9.3, ncol=1)
     ax.set_title("WHY it improves — render-and-compare is the engine on far cameras\n"
                  "(each segment measured at the 1000-frame re-lock)", fontsize=10.5, pad=8)
-    save(fig, "fig5_lever_decomp")
+    save(fig, "fig4_lever_decomp")
 
 
 # ============ FIG 6: WHY — session milestone progression (documented means) ============
@@ -286,7 +286,7 @@ def fig_milestones():
             transform=ax.transData, fontsize=8.2, color="#666", style="italic")
     ax.set_title("Session progression — each adopted lever lifts the DREAM mean",
                  fontsize=10.5, pad=8)
-    save(fig, "fig6_milestones")
+    save(fig, "fig5_milestones")
 
 
 # ============ FIG 7: WHY occlusion-robust — head training is the source ============
@@ -325,7 +325,7 @@ def fig_occ_mechanism():
     ax.set_title("WHY occlusion-robust — baked into the head by occ-aug training\n"
                  "(short self-train on an adapted head does NOT instill it)",
                  fontsize=10.3, pad=8)
-    save(fig, "fig7_occ_mechanism")
+    save(fig, "fig6_occ_mechanism")
 
 
 fig_scorecard()
