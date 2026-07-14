@@ -131,9 +131,14 @@ DINObotPose3는 predicted-joint 체제에서 평균 ADD-AUC **0.804**로 최고 
 | HoRoPose\* (HPE\*) | auto | 0.491 | — | 0.667 | 0.516 | — |
 | RoboTAG | auto | 0.783 | 0.757 | 0.831 | 0.588 | 0.740 |
 | RoboPEPP | auto | 0.805 | 0.785 | 0.753 | 0.775 | 0.780 |
-| **Ours** | auto | **0.815** | **0.828** | **0.795** | **0.778** | **0.804** |
+| **Ours (predicted)** | auto | **0.815** | **0.828** | **0.795** | **0.778** | **0.804** |
+| _Ours (known-joint θ, 상한)_ | _auto_ | _0.867_ | _0.878_ | _0.788_ | _0.831_ | _0.841_ |
 
-> EN: **Table 1. Per-camera ADD-AUC@100mm on DREAM-real (all predicted-joint methods), 1000-frame re-lock;** competitor numbers cited from each paper / RoboPEPP Table 2. Ours leads the mean (0.804) and beats every **auto-bbox** competitor on every camera. RoboTAG wins only on Azure but collapses on ORB (0.588); HoRoPose reaches 0.772 only with **GT boxes** — under the same off-the-shelf detector (HPE\*) it collapses (ORB 0.516, RealSense 0.491). Among auto-bbox methods only RoboPEPP is competitive, and we beat it on all four cameras (+0.024 mean).
+> EN: **Table 1. Per-camera ADD-AUC@100mm on DREAM-real (all predicted-joint methods), 1000-frame re-lock;** competitor numbers cited from each paper / RoboPEPP Table 2. Ours leads the mean (0.804) and beats every **auto-bbox** competitor on every camera. RoboTAG wins only on Azure but collapses on ORB (0.588); HoRoPose reaches 0.772 only with **GT boxes** — under the same off-the-shelf detector (HPE\*) it collapses (ORB 0.516, RealSense 0.491). Among auto-bbox methods only RoboPEPP is competitive, and we beat it on all four cameras (+0.024 mean). The last (italic) row is our **known-joint upper bound** (GT joint angles injected, solving only camera R,t) — see below.
+
+**Known-joint 상한(위 표 마지막 행).** 관절각을 GT로 주입하고 카메라 R,t만 풀면 평균이 **0.804→0.841(+0.037)**로 오른다. 이득은 **원거리 카메라에 집중**된다(RealSense +0.052·Kinect +0.050·ORB +0.053) — 즉 원거리에서 남은 격차의 대부분은 **예측 관절각의 오차**다. 반면 근거리 **Azure는 GT-θ로도 불변**(0.788 vs 0.795)이라 병목이 각도가 아니라 **깊이/포즈**임을 재확인한다. (렌더-비교는 예측-θ용 깊이 보정기라, 이미 정확한 GT-θ RealSense에서는 오히려 과보정하여 base 0.867→RC 0.825로 내려간다 — 상한은 배포와 동일하게 카메라별 최적 RC on/off를 취했다.)
+
+> EN: **Known-joint upper bound (last row).** Injecting GT joint angles and solving only camera R,t lifts the mean **0.804→0.841 (+0.037)**. The gain concentrates on **far cameras** (RealSense +0.052, Kinect +0.050, ORB +0.053) — i.e., most of the remaining far-camera gap is **predicted-angle error** — whereas near-camera **Azure is unchanged even with GT angles** (0.788 vs 0.795), re-confirming its bottleneck is **depth/pose, not angles**. (Render-compare, a predicted-θ depth corrector, over-corrects the already-accurate GT-θ RealSense pose, 0.867→0.825; the ceiling uses per-camera best RC on/off, as in deployment.)
 
 **프로토콜을 통제한 전체 비교(표 2)** 는 우리 0.804가 predicted-joint 체제의 최고임을 보인다. known-joint 계열(CtRNet 86.4, CtRNet-X 86.2)은 관절각을 엔코더로 받는 **더 쉬운 문제**이므로 별도 리그로 분리한다.
 

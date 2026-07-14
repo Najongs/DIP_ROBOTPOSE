@@ -1,0 +1,15 @@
+KNOWN-JOINT CEILING (--oracle-angle: GT joint angles, freeze theta, solve only R,t)
+locked 1000-frame held-out, deployed per-camera heads.
+                  base(noRC)   +RC       best     predicted(deployed)  gain(best-pred)
+realsense         0.8673       0.8252    0.8673   0.815                +0.052
+kinect            0.8673       0.8775    0.8775   0.828                +0.050
+orb               0.8279       0.8306    0.8306   0.778                +0.053
+azure(RC off)     0.7881       —         0.7881   0.795                -0.007
+MEAN (best)                              0.841    0.804                +0.037
+
+Findings:
+- Known-joint lifts far cameras hugely (rs/kinect/orb +0.05) -> predicted joint angles are the
+  headroom on far cameras. Azure ~unchanged (0.788 vs 0.795) -> its bottleneck is depth/pose, NOT angles.
+- RC (a predicted-theta depth corrector) HURTS known-theta realsense (0.867->0.825): with exact angles
+  the base pose is already accurate, RC's free silhouette optimization over-corrects. -> ceiling uses
+  per-camera best (same methodology as deployed per-camera RC on/off).
