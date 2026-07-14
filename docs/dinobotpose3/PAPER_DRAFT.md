@@ -234,6 +234,31 @@ RoboPEPP의 가림 프로토콜(로봇 bbox 면적의 0–40%를 사각 occluder
 
 > EN: **Source of occlusion robustness.** At 40% occlusion, the light occlusion-augmentation head (0.420) is more robust than a clean-only head (0.376), and the deployed stack retains most of it (0.396) while recovering real-image accuracy — i.e., **robustness must be trained in from the start via augmentation.**
 
+**누적 build-up(표 7).** leave-one-out과 상보적으로, 헐벗은 base(클린 헤드·PnP만)에서 레버를 하나씩 **더하며** RealSense held-out 1000에서 단조 개선을 측정한다. base 0.666에서 배포치 0.815까지 **총 +0.149**이며, 가장 큰 세 단계는 rot-head 초기화(+0.036), occ-aug/자가학습 헤드(+0.040), 렌더-비교(+0.070)다. DARK(+0.007)와 cov-PnP·conf-gate는 클린에서 ±0.005 이내로 사실상 평평하다 — 이들의 값은 클린 정확도가 아니라 **가림 강건성**(§4.3)에 있다는 앞선 결론과 정확히 일치한다.
+
+> EN: **Cumulative build-up (Table 7).** Complementary to leave-one-out, we *add* levers one at a time onto a bare base (clean head, PnP only) and measure the monotone gain on the RealSense held-out 1000. From base 0.666 to the deployed 0.815 is **+0.149 total**, with the three largest steps being rot-head initialization (+0.036), the occ-aug/self-training head (+0.040), and render-and-compare (+0.070). DARK (+0.007) and cov-PnP/conf-gate are essentially flat on clean (within ±0.005) — exactly matching the earlier finding that their value lies in **occlusion robustness** (§4.3), not clean accuracy.
+
+**표 7. 누적 build-up (RealSense held-out 1000, ADD-AUC@100mm).** 각 행은 위 행에 레버 하나를 추가.
+
+| 스택 | ADD-AUC | Δ |
+|---|---|---|
+| base (클린 헤드, PnP만, RC off) | 0.666 | — |
+| + DARK 서브픽셀 디코딩 | 0.673 | +0.007 |
+| + cov-PnP | 0.669 | −0.004 |
+| + rot-head 초기화 | 0.705 | +0.036 |
+| + occ-aug / 자가학습 헤드 | 0.745 | +0.040 |
+| **+ render-and-compare (배포)** | **0.815** | **+0.070** |
+
+> EN: **Table 7. Cumulative build-up (RealSense held-out 1000, ADD-AUC@100mm);** each row adds one lever to the row above. cov-PnP dips −0.004 on clean (its value is under occlusion), the rest accumulate monotonically to the deployed 0.815.
+
+**conf-gate 민감도.** conf-gate 임계값을 {0, 0.05(배포), 0.10, 0.20}으로 스윕하면 클린 RealSense에서 ADD-AUC가 각각 0.747·0.745·0.746·0.749로 **±0.002 이내로 평평**하다 — 배포 하이퍼파라미터가 임의 선택이 아니라 넓은 안정 구간 안에 있음을 보인다(가림 필터로서의 진가는 §4.3).
+
+> EN: **conf-gate sensitivity.** Sweeping the confidence-gate threshold {0, 0.05 (deployed), 0.10, 0.20} moves clean-RealSense ADD-AUC only across 0.747·0.745·0.746·0.749 — **flat within ±0.002**, showing the deployed hyper-parameter sits in a wide stable basin rather than a tuned peak (its real value as an occlusion filter is in §4.3).
+
+**정성 결과.** 그림 10은 예측된 Panda 메시 실루엣(nvdiffrast)을 RealSense 실측 위에 오버레이한 것으로, 여러 관절 배치에서 몸체가 사진과 밀착함을 보인다(프레임별 ADD 11–66mm). 그림 11은 동일 프레임을 0–40% 가림 사다리로 렌더링해, 중간 가림(≤20%)까지 정렬이 유지되고 심한 가림에서만 실패가 나타남을 정성적으로 확인한다.
+
+> EN: **Qualitative results.** Fig. 10 overlays the predicted Panda mesh silhouette (nvdiffrast) on real RealSense frames, showing the body hugging the photo across diverse joint configurations (per-frame ADD 11–66 mm). Fig. 11 renders one frame across a 0–40% occlusion ladder, qualitatively confirming that alignment holds through moderate occlusion (≤20%) and only fails under heavy occlusion.
+
 ### 4.5 프로토콜 분석 (Protocol analysis)
 
 **자동 bbox는 진짜 어렵다.** ORB 카메라는 시점이 다양해 자동 검출이 붕괴한다 — 동일한 자동-bbox 조건에서 RoboPEPP의 ORB는 GT-bbox 0.775에서 **0.344로 급락**한다. 우리 bbox-from-solved는 이 붕괴를 피해 0.778을 유지한다. 즉 우리 비교는 기준선에 불리한(더 엄격한) 조건에서 이루어진다.
@@ -266,11 +291,11 @@ DREAM의 나머지 두 로봇은 실측 데이터가 없으므로 합성(DR) 스
 
 ### 4.8 런타임 (Runtime)
 
-비교 논문들이 표준으로 보고하는 추론 속도를 RTX 3090에서 측정한다(표 7). 동결 DINOv3 백본 forward는 빠르나(19ms, 60 img/s), 비용은 **테스트-타임 최적화**에 있다 — 운동학 솔버(250 iter, 352 ms/frame)와 렌더-비교(SAM + 미분 렌더, ~1.3 s/frame). base 파이프라인은 ~2.4 fps, RC 포함 end-to-end는 ~0.6 fps다. 정확도 우선 설계로 실시간은 아니며, RC는 카메라별 선택(Azure는 base-only ~2.4 fps)이고 솔버 iter 수로 정확도-속도 절충이 가능하다(부록).
+비교 논문들이 표준으로 보고하는 추론 속도를 RTX 3090에서 측정한다(표 8). 동결 DINOv3 백본 forward는 빠르나(19ms, 60 img/s), 비용은 **테스트-타임 최적화**에 있다 — 운동학 솔버(250 iter, 352 ms/frame)와 렌더-비교(SAM + 미분 렌더, ~1.3 s/frame). base 파이프라인은 ~2.4 fps, RC 포함 end-to-end는 ~0.6 fps다. 정확도 우선 설계로 실시간은 아니며, RC는 카메라별 선택(Azure는 base-only ~2.4 fps)이고 솔버 iter 수로 정확도-속도 절충이 가능하다(부록).
 
-> EN: **Runtime (Table 7), measured on an RTX 3090.** The frozen DINOv3 backbone forward is fast (19 ms, 60 img/s), but the cost lies in **test-time optimization** — the kinematic solver (250 iters, 352 ms/frame) and render-and-compare (SAM + differentiable rendering, ~1.3 s/frame). The base pipeline runs at ~2.4 fps and end-to-end with RC at ~0.6 fps. The method is accuracy-focused rather than real-time; RC is applied per camera (Azure is base-only, ~2.4 fps) and the solver iteration count trades accuracy for speed.
+> EN: **Runtime (Table 8), measured on an RTX 3090.** The frozen DINOv3 backbone forward is fast (19 ms, 60 img/s), but the cost lies in **test-time optimization** — the kinematic solver (250 iters, 352 ms/frame) and render-and-compare (SAM + differentiable rendering, ~1.3 s/frame). The base pipeline runs at ~2.4 fps and end-to-end with RC at ~0.6 fps. The method is accuracy-focused rather than real-time; RC is applied per camera (Azure is base-only, ~2.4 fps) and the solver iteration count trades accuracy for speed.
 
-**표 7. 단계별 지연 (RTX 3090).**
+**표 8. 단계별 지연 (RTX 3090).**
 
 | 단계 | 지연 | 처리량 |
 |---|---|---|
@@ -281,7 +306,7 @@ DREAM의 나머지 두 로봇은 실측 데이터가 없으므로 합성(DR) 스
 | **base end-to-end** | ~420 ms | **~2.4 fps** |
 | **+ render-and-compare** | ~1700 ms | **~0.6 fps** |
 
-> EN: **Table 7. Per-stage latency (RTX 3090).**
+> EN: **Table 8. Per-stage latency (RTX 3090).**
 
 **RC iteration 수 = 정확도-속도 knob.** RC 반복 수를 스윕하면 RealSense 기준 ADD-AUC가 0(0.745, RC 없음)→25(0.788)→50(0.802)→150(**0.815**)로 **~150 iter에 배포치(250, 0.8155)에 수렴**한다(ORB도 150에서 0.778=배포치). 즉 250→150으로 RC 렌더 비용을 ~40% 줄이면서 정확도 손실이 없다. 또한 RC 신호는 **전적으로 실루엣 IoU 항**에서 나온다 — 실루엣 항 제거 시 base(0.745)로 회귀하고, 재투영 앵커 항은 +0.002만 기여한다.
 
@@ -289,11 +314,11 @@ DREAM의 나머지 두 로봇은 실측 데이터가 없으므로 합성(DR) 스
 
 ### 4.9 시도했으나 반증된 대안 (What did not work)
 
-강한 부정 증거를 리뷰어에게 투명하게 제시한다(표 8). 특히 **백본 적응은 3가지 방식 모두 ADD를 악화**시켜(솔버가 요구하는 sub-pixel 키포인트 정밀도 파괴), 동결 백본 결정을 정당화한다. RC 계열에서도 feature-metric·edge-NCC·multi-start 변형이 실루엣 RC를 못 이겼고, 학습형 상태 prior(population/DPoser식)와 translation prior는 오히려 해로웠다.
+강한 부정 증거를 리뷰어에게 투명하게 제시한다(표 9). 특히 **백본 적응은 3가지 방식 모두 ADD를 악화**시켜(솔버가 요구하는 sub-pixel 키포인트 정밀도 파괴), 동결 백본 결정을 정당화한다. RC 계열에서도 feature-metric·edge-NCC·multi-start 변형이 실루엣 RC를 못 이겼고, 학습형 상태 prior(population/DPoser식)와 translation prior는 오히려 해로웠다.
 
-> EN: **What did not work (Table 8).** We transparently report strong negative evidence. In particular, **backbone adaptation failed in all three variants** (destroying the sub-pixel keypoint precision the solver needs), justifying the frozen backbone. Among RC variants, feature-metric / edge-NCC / multi-start did not beat plain silhouette RC, and learned state priors (population/DPoser-style) and a translation prior were actively harmful.
+> EN: **What did not work (Table 9).** We transparently report strong negative evidence. In particular, **backbone adaptation failed in all three variants** (destroying the sub-pixel keypoint precision the solver needs), justifying the frozen backbone. Among RC variants, feature-metric / edge-NCC / multi-start did not beat plain silhouette RC, and learned state priors (population/DPoser-style) and a translation prior were actively harmful.
 
-**표 8. 반증된 대안과 그 결과.**
+**표 9. 반증된 대안과 그 결과.**
 
 | 대안 | 결과 | 판정 |
 |---|---|---|
@@ -311,7 +336,7 @@ DREAM의 나머지 두 로봇은 실측 데이터가 없으므로 합성(DR) 스
 | RoboTAG reproj-consistency 이식 | azure −0.014 | ❌ |
 | 768-crop 고해상도 | −0.14 회귀 | ❌ |
 
-> EN: **Table 8. Refuted alternatives and their results.** Backbone adaptation (3 ways), feature-metric/edge-NCC/multi-start RC, learned/translation priors, union-bbox, MCL, ported RoboTAG consistency, and 768-crop all regressed or diverged.
+> EN: **Table 9. Refuted alternatives and their results.** Backbone adaptation (3 ways), feature-metric/edge-NCC/multi-start RC, learned/translation priors, union-bbox, MCL, ported RoboTAG consistency, and 768-crop all regressed or diverged.
 
 ---
 

@@ -1,0 +1,15 @@
+C cumulative build-up (RealSense held-out 1000, base-only except +RC):
+  base(clean head,PnP)   0.6659
+  +DARK                  0.6727  (+0.007)
+  +cov-PnP               0.6690  (-0.004, clean-noise; value under occ)
+  +rot-head              0.7054  (+0.036)
+  +occ-aug/self-train    0.7452  (+0.040)  [= deployed base-only]
+  +render-compare        0.8155  (+0.070)  [= deployed A1 locked; c4 config+RC]
+  total base->deployed:  +0.149
+
+G2 conf-gate sensitivity (RealSense base-only clean):
+  gate 0.00  0.7470
+  gate 0.05  0.7452  (deployed)
+  gate 0.10  0.7459
+  gate 0.20  0.7489
+  -> flat within +-0.002 (insensitive on clean; value under occlusion)
