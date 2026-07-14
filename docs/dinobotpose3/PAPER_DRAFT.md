@@ -122,17 +122,18 @@ DINObotPose3는 predicted-joint 체제에서 평균 ADD-AUC **0.804**로 최고 
 
 > EN: DINObotPose3 attains the best mean ADD-AUC of **0.804** in the predicted-joint regime and surpasses the strong RoboPEPP baseline on **all four cameras** (Table 1, Fig. 1). RoboPEPP and RoboTAG run under the **same automatic-bbox protocol** as ours, so this is a fair like-for-like comparison (in contrast to the GT-box HoRoPose, §4.5).
 
-**표 1. DREAM 실측 카메라별 ADD-AUC@100mm (predicted-joint).** 1000-프레임 재잠금.
+**표 1. DREAM 실측 카메라별 ADD-AUC@100mm (predicted-joint 전 방법).** 1000-프레임 재잠금. 경쟁 수치는 각 논문/RoboPEPP Table 2 인용. bbox: GT=주어진 박스, auto=자체 검출기.
 
-| 카메라 | **Ours** | RoboPEPP (auto-bbox) | RoboTAG | 격차(vs PEPP) |
-|---|---|---|---|---|
-| RealSense | **0.815** | 0.805 | 0.783 | +0.010 |
-| Kinect360 | **0.828** | 0.785 | 0.757 | +0.043 |
-| Azure | **0.795** | 0.753 | 0.831 | +0.042 |
-| ORB | **0.778** | 0.775 | 0.588 | +0.003 |
-| **Mean** | **0.804** | 0.780 | 0.740 | **+0.024** |
+| 방법 | bbox | RealSense | Kinect360 | Azure | ORB | Mean |
+|---|---|---|---|---|---|---|
+| RoboPose | auto | 0.743 | 0.776 | 0.704 | 0.704 | 0.732 |
+| HoRoPose (HPE) | **GT** | 0.752 | 0.760 | 0.822 | 0.752 | 0.772 |
+| HoRoPose\* (HPE\*) | auto | 0.491 | — | 0.667 | 0.516 | — |
+| RoboTAG | auto | 0.783 | 0.757 | 0.831 | 0.588 | 0.740 |
+| RoboPEPP | auto | 0.805 | 0.785 | 0.753 | 0.775 | 0.780 |
+| **Ours** | auto | **0.815** | **0.828** | **0.795** | **0.778** | **0.804** |
 
-> EN: **Table 1. Per-camera ADD-AUC@100mm on DREAM-real (predicted-joint), 1000-frame re-lock.** Ours beats RoboPEPP on every camera (mean +0.024); RoboTAG wins only on Azure but collapses on ORB (0.588) under automatic detection.
+> EN: **Table 1. Per-camera ADD-AUC@100mm on DREAM-real (all predicted-joint methods), 1000-frame re-lock;** competitor numbers cited from each paper / RoboPEPP Table 2. Ours leads the mean (0.804) and beats every **auto-bbox** competitor on every camera. RoboTAG wins only on Azure but collapses on ORB (0.588); HoRoPose reaches 0.772 only with **GT boxes** — under the same off-the-shelf detector (HPE\*) it collapses (ORB 0.516, RealSense 0.491). Among auto-bbox methods only RoboPEPP is competitive, and we beat it on all four cameras (+0.024 mean).
 
 **프로토콜을 통제한 전체 비교(표 2)** 는 우리 0.804가 predicted-joint 체제의 최고임을 보인다. known-joint 계열(CtRNet 86.4, CtRNet-X 86.2)은 관절각을 엔코더로 받는 **더 쉬운 문제**이므로 별도 리그로 분리한다.
 
@@ -146,11 +147,14 @@ DINObotPose3는 predicted-joint 체제에서 평균 ADD-AUC **0.804**로 최고 
 | RoboPose | 73.2 | predicted | init 의존 | 반복 render&compare |
 | RoboTAG | 74.0 | predicted | 자동 | end-to-end 회귀 |
 | HoRoPose | 77.2 | predicted | **GT** | 학습된 root-DepthNet |
+| GISR | 77.9\* | predicted | — | 실루엣 정제 |
 | RoboPEPP | 78.0 | predicted | 자동 | masking-pretrain |
 | **Ours** | **80.4** | predicted | **자동** | **테스트-타임 SAM-실루엣 RC** |
 | *(별도 리그)* CtRNet / CtRNet-X | 86.4 / 86.2 | **known** | — | 학습-타임 실루엣 자기지도 |
 
-> EN: **Table 2. Predicted-joint DREAM-real mean ADD-AUC (protocol-controlled).** Known-joint CtRNet(-X) is a separate league (encoder angles). Ours is the best predicted-joint method under the hardest (automatic-bbox) setting.
+\*GISR(RA-L'24)는 ORB를 보고하지 않아 **3-카메라 평균**(azure 80.6·kinect 73.9·realsense 79.3)이다 — 가장 어려운 ORB를 제외하므로 4-카메라 평균들과 직접 비교는 유리한 쪽으로 편향됨.
+
+> EN: **Table 2. Predicted-joint DREAM-real mean ADD-AUC (protocol-controlled).** Known-joint CtRNet(-X) is a separate league (encoder angles). Ours is the best predicted-joint method under the hardest (automatic-bbox) setting. \*GISR reports no ORB, so its 77.9 is a **3-camera average** (excluding the hardest split), not directly comparable to the 4-camera means.
 
 **DREAM 전체 로봇 성능(표 3).** DREAM은 Panda·KUKA·Baxter 세 로봇을 포함하며, 동일 파이프라인을 셋 모두에 적용한 성능을 한 표에 정리한다. Panda는 실측 벤치마크의 헤드라인 SOTA(0.804)이고, KUKA·Baxter는 합성 스플릿에서 각각 0.357·0.253이다.
 

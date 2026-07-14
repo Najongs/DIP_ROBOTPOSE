@@ -128,6 +128,9 @@ def main():
                          'use 0.7 1.0 to match selftrain contiguous last-30%% split)')
     ap.add_argument('--iters', type=int, default=200)
     ap.add_argument('--conf-gate', type=float, default=0.05)
+    ap.add_argument('--oracle-angle', action='store_true',
+                    help='known-joint ceiling: use GT joint angles (theta) and solve only camera R,t '
+                         '(theta frozen). Measures the cost of joint-angle prediction vs a known-joint upper bound.')
     ap.add_argument('--margin', type=float, default=1.5)
     ap.add_argument('--bbox-conf', type=float, default=0.1, help='conf threshold for bbox keypoints')
     ap.add_argument('--bbox-refine-iters', type=int, default=0,
@@ -266,6 +269,10 @@ def main():
         if args.cov_pnp:
             from solve_pose_kinematic import heatmap_cov_inv
             cov_inv = heatmap_cov_inv(o2['heatmaps_2d'], kp2d)
+        if args.oracle_angle:
+            # known-joint upper bound: replace predicted theta with GT, freeze it, solve only R,t
+            init_ang = init_ang.clone()
+            init_ang[:, :6] = gt
         if args.ms_local > 0:
             _sig = math.radians(args.ms_sigma)
             _gen = torch.Generator(device=device).manual_seed(0)
@@ -288,7 +295,8 @@ def main():
             refined, kp_cam, reproj2 = solve_batch(kp2d, conf, Kc, fix_joint7=True, iters=args.iters,
                                              lr=2e-2, img_size=IS, device=device, prior_w=0.0,
                                              theta_init=init_ang, conf_gate=args.conf_gate, R_init=R_init,
-                                             cov_inv=cov_inv, prior_adaptive=args.prior_adaptive)
+                                             cov_inv=cov_inv, prior_adaptive=args.prior_adaptive,
+                                             freeze_theta=args.oracle_angle)
         raw_err += wrapped_abs_deg(init_ang[:, :6], gt).sum(0).cpu()
         ref_err += wrapped_abs_deg(refined[:, :6], gt).sum(0).cpu()
         valid = (gt3d.abs().sum(-1) > 0)

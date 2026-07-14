@@ -219,7 +219,7 @@ def solve_batch(kp_2d, conf, K, fix_joint7=True, iters=250, lr=5e-2,
                 img_size=512, device='cuda', prior_w=2e-3, theta_init=None,
                 conf_gate=0.0, anchor_init_w=0.0, min_kp=6, pnp_rel=0.0, pnp_drop=3,
                 R_init=None, t_init=None, gt_tz=None, depth_w=0.0, return_pose=False,
-                cov_inv=None, prior_adaptive=0.0):
+                cov_inv=None, prior_adaptive=0.0, freeze_theta=False):
     """
     kp_2d: (B,N,2) tensor, conf: (B,N) tensor, K: (B,3,3) tensor.
     theta_init: optional (B,7) tensor — learned-prediction init (refinement mode).
@@ -272,11 +272,12 @@ def solve_batch(kp_2d, conf, K, fix_joint7=True, iters=250, lr=5e-2,
     reproj_init = (uv_init - kp_2d).norm(dim=-1).mean(dim=1)  # (B,)
 
     # --- learnable params ---
-    p = theta_to_p(theta0, lo, hi).clone().detach().requires_grad_(True)
+    p = theta_to_p(theta0, lo, hi).clone().detach().requires_grad_(not freeze_theta)
     d6 = matrix_to_rot6d(R0).clone().detach().requires_grad_(True)
     t = t0.clone().detach().requires_grad_(True)
 
-    opt = torch.optim.Adam([p, d6, t], lr=lr)
+    # known-joint mode: hold theta at theta0 (=GT), optimize only camera pose (R,t)
+    opt = torch.optim.Adam(([d6, t] if freeze_theta else [p, d6, t]), lr=lr)
     # base confidence weights, normalized per-frame
     base_w = conf.clamp(min=1e-3)
     if conf_gate > 0.0:
@@ -296,7 +297,7 @@ def solve_batch(kp_2d, conf, K, fix_joint7=True, iters=250, lr=5e-2,
 
     for it in range(iters):
         opt.zero_grad()
-        theta = p_to_theta(p, lo, hi)
+        theta = theta0 if freeze_theta else p_to_theta(p, lo, hi)
         if fix_joint7:
             theta = torch.cat([theta[:, :6], torch.zeros(B, 1, device=device)], dim=1)
         fk = panda_forward_kinematics(theta)            # (B,N,3)
