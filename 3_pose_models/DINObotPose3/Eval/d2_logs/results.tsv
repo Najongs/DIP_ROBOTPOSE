@@ -1,0 +1,4 @@
+render-h 224	ADD-AUC=0.7786	wall=1328s
+render-h 320	ADD-AUC=0.8046	wall=1333s
+render-h 448	ADD-AUC=0.8154	wall=1330s
+render-h 512	ADD-AUC=0.8168	wall=1336s
