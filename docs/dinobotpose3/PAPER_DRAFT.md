@@ -375,6 +375,21 @@ DREAM의 나머지 두 로봇은 실측 데이터가 없으므로 합성(DR) 스
 
 > EN: **Table 11. Refuted alternatives and their results.** Backbone adaptation (3 ways), feature-metric/edge-NCC/multi-start RC, learned/translation priors, union-bbox, MCL, ported RoboTAG consistency, and 768-crop all regressed or diverged.
 
+### 4.10 백본 선택: DINOv3 vs SigLIP2 (동일 크기) (Backbone choice)
+
+우리 파이프라인이 특정 백본에 의존하는지 확인하기 위해, **동일 크기(ViT-B/16, ~86M)**의 두 파운데이션 백본 DINOv3와 SigLIP2를 2D 키포인트 검출 수준에서 비교한다(표 12, real-Azure 검출 AUC). **언프리즈(fine-tune) 시 둘은 동등**하다(둘 다 ~0.81) — 즉 성능은 특정 백본이 아니라 파운데이션 특징 일반에서 온다. 그러나 **동결(frozen) 시 DINOv3가 명확히 우위**(0.80 vs 0.72)다. 우리 배포 스택은 솔버의 서브픽셀 정밀도를 보존하기 위해 백본을 **동결**하므로(백본 적응은 §4.9에서 3중 반증), 이 동결-체제 우위가 DINOv3 선택을 정당화한다. (pose-level 카스케이드 비교는 부록에 추가 예정 — 동결 SigLIP2가 이미 검출에서 열세라 pose도 하회할 것으로 예상.)
+
+> EN: **Backbone choice: DINOv3 vs SigLIP2 (matched size).** To check that our pipeline is not tied to a specific backbone, we compare DINOv3 and SigLIP2 at **matched size (ViT-B/16, ~86M)** at the 2D-keypoint level (Table 12, real-Azure detection AUC). **Unfrozen (fine-tuned) they are equal** (both ~0.81) — performance comes from foundation features in general, not a specific backbone. But **frozen, DINOv3 is clearly better** (0.80 vs 0.72). Since our deployed stack **freezes** the backbone to preserve the solver's sub-pixel precision (adaptation is triply refuted, §4.9), this frozen-regime advantage justifies the DINOv3 choice. (A pose-level cascade comparison is deferred to the appendix — frozen SigLIP2 already trails on detection, so its pose is expected to trail too.)
+
+**표 12. DINOv3 vs SigLIP2 (ViT-B/16) 2D 키포인트 검출 AUC** (real-Azure, plateau).
+
+| 백본 | frozen | unfrozen (last-4 ft) |
+|---|---|---|
+| **DINOv3** | **~0.80** | 0.815 |
+| SigLIP2 | 0.72 | 0.814 |
+
+> EN: **Table 12. DINOv3 vs SigLIP2 (ViT-B/16) 2D-keypoint detection AUC** (real-Azure, plateau). Equal when unfrozen; DINOv3 wins frozen (the regime we deploy).
+
 ---
 
 ## 5. Conclusion (결론)
