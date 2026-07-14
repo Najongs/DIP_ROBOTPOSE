@@ -1032,3 +1032,18 @@ User asked "what other comparison groups are needed?" → prioritized + executed
   pose ADD → fill §4.10 pose-level. Expected: frozen siglip trails (detector already 0.72<0.80). (b) **D2 RC
   render-resolution sweep** {224,320,448,512} on realsense (Eval/run_d2_reso.sh, d2_logs/) → add resolution
   knob to §4.8 RC-design. Waiters: siglip=bi51dni92, D2=b0aok3k37.
+
+## 2026-07-15 (cont.) — ✅ D2 render-res sweep integrated · 🔄 siglip pose-cascade armed
+- **D2 RC render-resolution sweep DONE** (RealSense, Eval/d2_logs/results.tsv): render-h
+  224→0.7786 / 320→0.8046 / 448→**0.8154** / 512→0.8168; wall-time flat ~1330s all four
+  (nvdiffrast rasterization not GPU-bound in range). Knee at 448, 512 only +0.001 → confirms
+  deployed rs/kinect@448 as accuracy-cost optimum. **Real speed knob = RC iteration count, not
+  resolution.** Written into §4.8 after the RC-iteration paragraph (commit 15358fb).
+- **siglip crop-detector** finished 8/20 epochs by check time, val AUC 0.7824→0.8297 still climbing
+  (~+0.005/ep). Let run to 20 for fairest comparison. best_heatmap.pth updates on best AUC.
+- 🔄 CONTINUE POST-COMPACTION: waiter **baa56ncty** fires when detector logs 20 epochs (or torchrun
+  exits). THEN launch `TRAIN/run_siglip_pose_cascade.sh` (committed) — trains siglip crop-angle(50ep)
+  + crop-rot(30ep) on FROZEN siglip backbone+crop-detector, sequential on freest GPU. Outputs paths
+  written to scratchpad siglip_{angle,rot}_out.txt; done-marker siglip_cascade_done.txt. THEN eval
+  4-cam pose ADD (selfbbox_eval with siglip detector+heads) → fill §4.10/Table 12 pose-level row →
+  commit. Expected: frozen siglip trails DINOv3 at pose level too (detector already 0.72<0.80 frozen).
