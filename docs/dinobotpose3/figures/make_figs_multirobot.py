@@ -31,7 +31,7 @@ def save(fig, name):
 # ---------------------------------------------------------------- fig8: 3-robot pose
 def fig8():
     robots = ["Panda", "KUKA iiwa7", "Baxter"]
-    pose = [0.804, 0.34, 0.25]                 # ADD-AUC@100mm
+    pose = [0.804, 0.357, 0.253]                 # ADD-AUC@100mm
     det  = [None, 0.735, 0.817]                # detector 2D keypoint AUC (synth); Panda n/a here
     cols = [C_REAL, C_SYN, C_SYN]
     fig, ax = plt.subplots(figsize=(7.2, 4.4))
