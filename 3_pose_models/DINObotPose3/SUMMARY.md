@@ -26,7 +26,7 @@ self-train + synth occ-aug on an already-adapted head does NOT instill it (reals
 occ-aug→self-train stack (2026-07-05): light occlusion-aug head → per-camera self-train with occlusion-aug
 on the synth anti-forget batch — recovers real adaptation WHILE retaining occlusion robustness. kinect +0.017,
 orb +0.001, both now occlusion-robust (40% 0.39 > RoboPEPP 0.351); realsense keeps its already-optimal head.
-Protocol: predicted angles + fully-automatic bbox (stricter than RoboPEPP's GT-bbox headline); rs/kinect/orb
+Protocol: predicted angles + fully-automatic bbox — SAME auto-bbox protocol as RoboPEPP/RoboTAG (fair like-for-like; RoboPEPP Table2 Known-BBox=No, ORB 77.5 robust), stricter only than GT-bbox HoRoPose (which collapses to ORB 9.8 under an auto detector). [corrected 2026-07-14; earlier "RoboPEPP GT-bbox" was wrong]; rs/kinect/orb
 anti-leak held-out 1000/cam (re-locked 2026-07-06). DARK decode (`--dark-decode`, `Eval/decode_util.py`) lifts pose 2D precision
 universally (+0.0035–0.017 per cam, free) — closed the orb gap −0.010→−0.004. RC = depth/scale corrector →
 per-camera on/off (helps far cams; azure RC OFF). Details EXPERIMENTS.md 2026-07-04; survey
@@ -53,6 +53,13 @@ Same-condition ablations on the locked 1000-frame held-out set, per-camera deplo
 - **Cross-robot (direct-pose, synthetic-only, no RC)**: KUKA iiwa7 **0.357**, Baxter **0.253**; data-fit FK
   (0.003 mm RMS, Baxter needs 40-start). Not comparable to Panda real (DREAM has real test only for Panda).
 - Figs 1–11 (fig10 mesh overlay, fig11 occlusion ladder). Logs Eval/ablation_logs/*; EXPERIMENTS.md 07-14.
+- **Synthetic comparison (Table 4) + bbox CORRECTION (07-14)**: our synth ADD-AUC — Panda DR/photo (+RC)
+  **0.742/0.769**, KUKA **0.357/0.319**, Baxter DR **0.252** — TRAILS synth-specialized RoboPEPP (83/84)/
+  RoboPose on synth (their training-distribution home turf) but BEATS **HoRoPose\* (auto-bbox) 41/41** by
+  ~33 pts under matched predicted+auto protocol. 🔴 **RoboPEPP is auto-bbox, NOT GT** (Table2 Known-BBox=No;
+  real cols = our Table 1). Corrected paper+refs: RoboPEPP/RoboTAG = same auto protocol (fair win 0.804 vs
+  0.780); GT-bbox = HoRoPose (collapses to ORB 0.098 under auto detector). Runtime T10 (feed-forward vs
+  optimization). Synth logs Eval/synth_logs/SYNTH_comparison.txt.
 
 ## Pipeline (deployable, oracle-free)
 ```

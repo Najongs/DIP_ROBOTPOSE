@@ -988,3 +988,22 @@ Locked 1000-frame held-out, per-camera deployed heads. All numbers same-frame/sa
 PAPER_DRAFT §4 now: headline (Table 3, 3-robot) + occlusion curve + leave-one-out (T5) + build-up (T7) +
 occ-aug (T6) + runtime (T8) + RC design + conf-gate sensitivity + refuted (T9) + figs 1–11. Scripts:
 Eval/{ablation_run,ablation_campaign,buildup_g2,runtime_bench}.py/.sh; logs Eval/ablation_logs/*.
+
+## 2026-07-14 — 🌐 SYNTHETIC comparison + HoRoPose/RoboPose + runtime table + 🔴 bbox-framing CORRECTION
+Added §4.2 synth table (T4), §4.3 occlusion competitors (HPE/RoboPose in T5), §4.8 runtime table (T10).
+- **Synthetic ADD-AUC** (ours; occ_bench r0 clean crop head +RC for Panda; direct-pose no-RC for KUKA/Baxter):
+  Panda DR base 0.671→+RC **0.742**, photo base 0.708→+RC **0.769**; KUKA dr **0.357**/photo **0.319**;
+  Baxter dr **0.252** (no photo test set exists). Data datasets/synthetic/{kuka,baxter}_synth_test_*,
+  datasets/ICRA_multiview/DREAM_syn/panda_synth_test_*.
+- **Competitors** (RoboPEPP CVPR'25 Table 2, user-provided): Panda-DR/Photo — RoboPEPP 83.0/84.1, RoboPose
+  82.9/79.7, HPE(GT-bbox) 82.7/82.0, **HPE\*(auto) 41.4/40.7**, DREAM-H 82.9/81.1. KUKA-DR/Photo RoboPEPP
+  76.2/76.1. Baxter-DR RoboPEPP 34.4, HPE 58.8. → On synth we TRAIL synth-specialized RoboPEPP/RoboPose,
+  but BEAT HoRoPose\* (matched predicted+auto-bbox) by ~33 pts. Honest framing: we're real-focused SOTA.
+- **🔴 bbox-framing correction**: RoboPEPP Table 2 = "Known BBox = No" (own off-the-shelf detector = AUTO);
+  its real cols AK75.3/XK78.5/RS80.5/ORB77.5 EXACTLY equal our Table 1 numbers. So our long-standing
+  "RoboPEPP GT-bbox headline / auto ORB→34" claim was WRONG (the 34.4 was RoboPEPP's Baxter-DR, misread).
+  Corrected throughout: RoboPEPP/RoboTAG are the SAME auto-bbox protocol as us (0.804 vs 0.780 = fair
+  like-for-like win); the GT-bbox method is HoRoPose, which collapses under an off-the-shelf detector
+  (HPE* ORB 0.098). Fixed §4.1/§4.2/§4.5/intro + Table 1/2/10 labels + references/{sota_survey,related_work}.md.
+Runtime T10: feed-forward real-time (HPE/RoboPEPP/RoboTAG/CtRNet) vs iterative optimization (RoboPose/ours);
+ours lightest optimization (no learned refiner, RC-iter knob). Synth logs Eval/synth_logs/SYNTH_comparison.txt.

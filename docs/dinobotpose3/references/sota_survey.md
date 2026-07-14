@@ -10,7 +10,7 @@
 
 ### ⚠️ 프로토콜 3축 — 이게 맞지 않으면 수치 비교 무효
 1. **관절각 known vs predicted**: DREAM/CtRNet/SGTAPose/GISR/MonoSE(3)=known(쉬움), RoboPose(unknown)/HoRoPose/RoboPEPP/RoboTAG/우리=predicted(어려움)
-2. **bbox GT vs 자동**: panda-orb는 카메라 배치가 다양해 자동 검출이 붕괴 — **RoboPEPP orb 77.5는 GT-bbox, 자동 bbox면 ~34**. **우리 bbox-from-solved는 완전 자동** → 우리 비교가 더 엄격한(불리한) 조건.
+2. **bbox GT vs 자동**: panda-orb는 카메라 배치가 다양해 자동 검출이 붕괴 — **GT-bbox 방법은 HoRoPose(ORB 75.2)**이고, 동일 auto 검출기(HPE*)면 ORB 9.8로 붕괴. **RoboPEPP는 자동-bbox이면서 ORB 77.5로 견고**(Table2 Known-BBox=No). RoboPose도 auto면 ORB 32.7. **우리 bbox-from-solved(0.778)와 RoboPEPP(0.775)는 동일 auto 프로토콜** → RoboPEPP/RoboTAG 대비 공정한 동일-조건, HoRoPose(GT) 대비만 우리가 더 엄격.
 3. **학습 데이터**: 순수 sim-to-real vs real self-train vs real 라벨 학습
 
 | 방법 | 연도 | 계열 | azure | kinect360 | realsense | orb | mean | 관절각 | 비고 |
@@ -20,9 +20,9 @@
 | SGTAPose | CVPR'23 | temporal | 67.8 | 2.1 | 87.6 | 72.3 | 57.5 | known | kinect 붕괴 |
 | CtRNet | CVPR'23 | self-sup kp+seg(실루엣 R&C=학습손실) | 89.9 | 79.5 | 90.8 | 85.3 | 86.4 | **known** | real self-train — 비교 불가(쉬운 축 2개) |
 | CtRNet-X | ICRA'25 | +CLIP 가시부품→키포인트 선택 | — | — | — | — | 86.2 | **known** | 부분가시 처리; CtRNet 85.96→86.23. **known-angle이라 우리 predicted와 비교 불가** ([related_work](related_work.md)) |
-| HoRoPose | ECCV'24 | RootNet식 depth | 82.2 | 76.0 | 75.2 | 75.2 | 77.2 | predicted | root-depth로 orb 강건 |
+| HoRoPose | ECCV'24 | RootNet식 depth | 82.2 | 76.0 | 75.2 | 75.2 | 77.2 | predicted | **GT-bbox**(Table2 Known-BBox=Yes); auto 검출기(HPE*)면 ORB 9.8·synth 41로 붕괴 |
 | GISR | RA-L'24 | 실루엣 정제 | 80.6 | 73.9 | 79.3 | — | — | predicted | orb는 seg 파인튜닝 |
-| **RoboPEPP** | CVPR'25 | masking-pretrain+PnP | **75.3** | **78.5** | **80.5** | **77.5** | **77.9** | predicted | **GT-bbox 헤드라인** (auto orb≈34); 가림 최강(40% 가림 AUC 35.1) |
+| **RoboPEPP** | CVPR'25 | masking-pretrain+PnP | **75.3** | **78.5** | **80.5** | **77.5** | **77.9** | predicted | **자동-bbox(자체 검출기, Table2 Known-BBox=No)** — ORB 77.5로 견고(붕괴X); 가림 최강(40% 가림 AUC 35.1). ※기존 "auto orb≈34"는 Baxter-DR 34.4 오인 |
 | RoboTAG | '25-11 | topological align graph | 83.1 | 75.7 | 78.3 | 58.8 | **74.0** | predicted | **auto-bbox(우리와 동일)**; orb 58.8=auto 붕괴. 검증완료 arXiv:2511.07717 v2 |
 | ~~PoseDiff~~ | '25-09 | diffusion E2E | ~~96.4~~ | ~~94.8~~ | ~~96.6~~ | ~~96.5~~ | ~~96.1~~ | — | 🔴 **2025-10-30 저자 철회** — 철회 사유 원문: "The experimental setup and metrics lacks rigor, affecting the fairness of the comparisons". real 80/20 in-domain 학습이었음. **수치 전면 무시** |
 | **Ours** | '26-07-04 | kp+solver+RC+**DARK** | **79.2** | **81.3** | **82.1** | **77.1** | **79.9** | predicted | **완전 자동 bbox**; +DARK decode+cov-PnP(무료); rs/kinect/orb anti-leak held-out |
