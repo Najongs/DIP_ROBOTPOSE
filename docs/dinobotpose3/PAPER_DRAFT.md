@@ -118,9 +118,9 @@ DREAM은 Panda·KUKA iiwa7·Baxter 세 로봇을 포함하는 벤치마크지만
 
 ### 4.2 주요 결과 (Main results)
 
-DINObotPose3는 predicted-joint 체제에서 평균 ADD-AUC **0.804**로 최고 성능을 달성하며, **4개 카메라 전부** 강한 기준선 RoboPEPP를 상회한다(표 1). RoboPEPP의 헤드라인이 GT-bbox인 반면 우리는 완전 자동 bbox임을 다시 강조한다.
+DINObotPose3는 predicted-joint 체제에서 평균 ADD-AUC **0.804**로 최고 성능을 달성하며, **4개 카메라 전부** 강한 기준선 RoboPEPP를 상회한다(표 1, 그림 1). RoboPEPP의 헤드라인이 GT-bbox인 반면 우리는 완전 자동 bbox임을 다시 강조한다.
 
-> EN: DINObotPose3 attains the best mean ADD-AUC of **0.804** in the predicted-joint regime and surpasses the strong RoboPEPP baseline on **all four cameras** (Table 1) — while, again, using fully automatic boxes against RoboPEPP's GT-box headline.
+> EN: DINObotPose3 attains the best mean ADD-AUC of **0.804** in the predicted-joint regime and surpasses the strong RoboPEPP baseline on **all four cameras** (Table 1, Fig. 1) — while, again, using fully automatic boxes against RoboPEPP's GT-box headline.
 
 **표 1. DREAM 실측 카메라별 ADD-AUC@100mm (predicted-joint).** 1000-프레임 재잠금.
 
@@ -170,18 +170,18 @@ DINObotPose3는 predicted-joint 체제에서 평균 ADD-AUC **0.804**로 최고 
 
 ### 4.3 가림 강건성 (Occlusion robustness)
 
-RoboPEPP의 가림 프로토콜(로봇 bbox 면적의 0–40%를 사각 occluder로 페이스트)로 평가하면, DINObotPose3는 **모든 가림 수준에서** RoboPEPP를 상회한다(표 4). 이 우위의 원천은 (a) 우리에게만 있는 렌더-비교 깊이 보정, (b) 처음부터 가림에 노출된 약한 가림-증강 헤드다.
+RoboPEPP의 가림 프로토콜(로봇 bbox 면적의 0–40%를 사각 occluder로 페이스트)로 평가하면, DINObotPose3는 **모든 가림 수준에서** RoboPEPP를 상회한다(표 4, 그림 2). 이 우위의 원천은 (a) 우리에게만 있는 렌더-비교 깊이 보정, (b) 처음부터 가림에 노출된 약한 가림-증강 헤드다.
 
-> EN: Under RoboPEPP's occlusion protocol (paste rectangular occluders over 0–40% of the robot's bbox area), DINObotPose3 exceeds RoboPEPP at **every** occlusion level (Table 4). The advantage stems from (a) the render-compare depth corrector unique to us and (b) a light occlusion-augmentation head exposed to occlusion from the start.
+> EN: Under RoboPEPP's occlusion protocol (paste rectangular occluders over 0–40% of the robot's bbox area), DINObotPose3 exceeds RoboPEPP at **every** occlusion level (Table 4, Fig. 2). The advantage stems from (a) the render-compare depth corrector unique to us and (b) a light occlusion-augmentation head exposed to occlusion from the start.
 
 **표 4. 가림 수준별 ADD-AUC.**
 
 | 가림 % | 0 | 10 | 20 | 30 | 40 |
 |---|---|---|---|---|---|
-| **Ours (light+RC)** | **0.812** | **0.765** | **0.678** | **0.575** | **0.429** |
+| **Ours (light+RC)** | **0.812** | **0.765** | **0.679** | **0.573** | **0.430** |
 | RoboPEPP | 0.795 | 0.730 | 0.600 | 0.470 | 0.351 |
 
-> EN: **Table 4. ADD-AUC vs occlusion level.** Ours dominates across 0–40%; the gap widens at heavier occlusion (+0.078 at 40%).
+> EN: **Table 4. ADD-AUC vs occlusion level.** Ours dominates across 0–40%; the gap widens at heavier occlusion (+0.079 at 40%).
 
 ### 4.4 절제 실험 (Ablations)
 
@@ -204,9 +204,9 @@ RoboPEPP의 가림 프로토콜(로봇 bbox 면적의 0–40%를 사각 occluder
 
 > EN: **Table 5. Leave-one-out ablation (locked 1000, ADD-AUC@100mm);** each row removes one lever from the deployed Full model. †azure ships RC off, so −RC leaves azure unchanged.
 
-**렌더-비교의 카메라별 기여.** RC는 깊이 신호가 약한 **원거리 카메라의 엔진**이다 — RealSense +0.070, Kinect +0.062, ORB +0.040(위 표의 −RC 행에서 카메라별 직접 측정). 근거리 Azure는 깊이가 이미 강해 RC를 끄는 것이 최적(카메라별 on/off). 이는 RC가 "포즈 전체 추정"이 아니라 **깊이/스케일 보정기**로 작동함을 확증한다.
+**렌더-비교의 카메라별 기여(그림 5).** RC는 깊이 신호가 약한 **원거리 카메라의 엔진**이다 — RealSense +0.070, Kinect +0.062, ORB +0.040(위 표의 −RC 행에서 카메라별 직접 측정). 근거리 Azure는 깊이가 이미 강해 RC를 끄는 것이 최적(카메라별 on/off). 이는 RC가 "포즈 전체 추정"이 아니라 **깊이/스케일 보정기**로 작동함을 확증한다.
 
-> EN: **Per-camera render-compare contribution.** RC is the engine for **far cameras** where depth is weak — RealSense +0.070, Kinect +0.062, ORB +0.040 (read directly from the −RC row per camera) — whereas for the near Azure camera it is best off. This confirms RC acts as a **depth/scale corrector**, not a full-pose estimator.
+> EN: **Per-camera render-compare contribution (Fig. 5).** RC is the engine for **far cameras** where depth is weak — RealSense +0.070, Kinect +0.062, ORB +0.040 (read directly from the −RC row per camera) — whereas for the near Azure camera it is best off. This confirms RC acts as a **depth/scale corrector**, not a full-pose estimator.
 
 **가림에서 occ-aug의 기여(표 6).** occ-aug/self-train은 클린에서 +0.010이지만 가림이 심해질수록 기여가 커진다 — 40% 가림에서 **+0.038**(light head vs clean head, 나머지 스택 동일). 강건성은 처음부터 증강 학습해야 배어듦을 보인다.
 
@@ -222,21 +222,17 @@ RoboPEPP의 가림 프로토콜(로봇 bbox 면적의 0–40%를 사각 occluder
 
 > EN: **Table 6. occ-aug on/off ADD-AUC vs occlusion** (synth_photo, rest of stack fixed).
 
-**렌더-비교의 카메라별 기여.** RC는 깊이 신호가 약한 **원거리 카메라의 엔진**이다 — RealSense +0.070, Kinect +0.060, ORB +0.040. 반면 근거리 Azure는 깊이 신호가 이미 강해 RC를 끄는 것이 최적이다(카메라별 on/off). 이는 RC가 "포즈 전체 추정"이 아니라 **깊이/스케일 보정기**로 작동함을 정량적으로 확인한다.
-
-> EN: **Per-camera render-compare contribution.** RC is the engine for **far cameras** where depth is weak — RealSense +0.070, Kinect +0.060, ORB +0.040 — whereas for the near Azure camera it is best turned off (per-camera on/off). This quantitatively confirms RC acts as a **depth/scale corrector**, not a full-pose estimator.
-
 **무료 레버.** cov-PnP는 20% 가림에서 +0.011로 do-no-harm을 유지하며, DARK는 특히 원거리 ORB의 격차를 −0.010→−0.004로 좁힌다.
 
 > EN: **Free levers.** cov-PnP adds +0.011 at 20% occlusion with do-no-harm elsewhere, and DARK narrows the far-camera ORB gap from −0.010 to −0.004.
 
-**가림 강건성의 출처.** 40% 가림에서 깨끗하게만 학습한 헤드(0.376)보다 약한 가림-증강 헤드(0.420)가 강건하며, 배포 스택은 그 강건성을 대부분 유지(0.396)하면서 실측 정확도를 회복한다. 즉 **가림 강건성은 처음부터 증강 학습해야 배어든다.**
+**가림 강건성의 출처(그림 7).** 40% 가림에서 깨끗하게만 학습한 헤드(0.376)보다 약한 가림-증강 헤드(0.420)가 강건하며, 배포 스택은 그 강건성을 대부분 유지(0.396)하면서 실측 정확도를 회복한다. 즉 **가림 강건성은 처음부터 증강 학습해야 배어든다.**
 
-> EN: **Source of occlusion robustness.** At 40% occlusion, the light occlusion-augmentation head (0.420) is more robust than a clean-only head (0.376), and the deployed stack retains most of it (0.396) while recovering real-image accuracy — i.e., **robustness must be trained in from the start via augmentation.**
+> EN: **Source of occlusion robustness (Fig. 7).** At 40% occlusion, the light occlusion-augmentation head (0.420) is more robust than a clean-only head (0.376), and the deployed stack retains most of it (0.396) while recovering real-image accuracy — i.e., **robustness must be trained in from the start via augmentation.**
 
-**누적 build-up(표 7).** leave-one-out과 상보적으로, 헐벗은 base(클린 헤드·PnP만)에서 레버를 하나씩 **더하며** RealSense held-out 1000에서 단조 개선을 측정한다. base 0.666에서 배포치 0.815까지 **총 +0.149**이며, 가장 큰 세 단계는 rot-head 초기화(+0.036), occ-aug/자가학습 헤드(+0.040), 렌더-비교(+0.070)다. DARK(+0.007)와 cov-PnP·conf-gate는 클린에서 ±0.005 이내로 사실상 평평하다 — 이들의 값은 클린 정확도가 아니라 **가림 강건성**(§4.3)에 있다는 앞선 결론과 정확히 일치한다.
+**누적 build-up(표 7, 그림 6).** leave-one-out과 상보적으로, 헐벗은 base(클린 헤드·PnP만)에서 레버를 하나씩 **더하며** RealSense held-out 1000에서 단조 개선을 측정한다(세션 단위 mean 진행은 그림 6). base 0.666에서 배포치 0.815까지 **총 +0.149**이며, 가장 큰 세 단계는 rot-head 초기화(+0.036), occ-aug/자가학습 헤드(+0.040), 렌더-비교(+0.070)다. DARK(+0.007)와 cov-PnP·conf-gate는 클린에서 ±0.005 이내로 사실상 평평하다 — 이들의 값은 클린 정확도가 아니라 **가림 강건성**(§4.3)에 있다는 앞선 결론과 정확히 일치한다.
 
-> EN: **Cumulative build-up (Table 7).** Complementary to leave-one-out, we *add* levers one at a time onto a bare base (clean head, PnP only) and measure the monotone gain on the RealSense held-out 1000. From base 0.666 to the deployed 0.815 is **+0.149 total**, with the three largest steps being rot-head initialization (+0.036), the occ-aug/self-training head (+0.040), and render-and-compare (+0.070). DARK (+0.007) and cov-PnP/conf-gate are essentially flat on clean (within ±0.005) — exactly matching the earlier finding that their value lies in **occlusion robustness** (§4.3), not clean accuracy.
+> EN: **Cumulative build-up (Table 7, Fig. 6).** Complementary to leave-one-out, we *add* levers one at a time onto a bare base (clean head, PnP only) and measure the monotone gain on the RealSense held-out 1000 (session-level mean progression in Fig. 6). From base 0.666 to the deployed 0.815 is **+0.149 total**, with the three largest steps being rot-head initialization (+0.036), the occ-aug/self-training head (+0.040), and render-and-compare (+0.070). DARK (+0.007) and cov-PnP/conf-gate are essentially flat on clean (within ±0.005) — exactly matching the earlier finding that their value lies in **occlusion robustness** (§4.3), not clean accuracy.
 
 **표 7. 누적 build-up (RealSense held-out 1000, ADD-AUC@100mm).** 각 행은 위 행에 레버 하나를 추가.
 
@@ -267,15 +263,15 @@ RoboPEPP의 가림 프로토콜(로봇 bbox 면적의 0–40%를 사각 occluder
 
 ### 4.6 재잠금 안정성 (Re-lock stability)
 
-논문급 신뢰성을 위해 표본을 800에서 1000프레임으로 늘려 재측정했다. 평균은 0.8037→**0.8039**로 사실상 불변(Δ+0.0002)이고 개별 카메라 변동도 ≤0.006이며, **4/4 카메라 모두 RoboPEPP를 상회**한다(ORB가 −0.002→+0.003으로 전환). 결과는 표본 수에 강건하다.
+논문급 신뢰성을 위해 표본을 800에서 1000프레임으로 늘려 재측정했다(그림 3). 평균은 0.8037→**0.8039**로 사실상 불변(Δ+0.0002)이고 개별 카메라 변동도 ≤0.006이며, **4/4 카메라 모두 RoboPEPP를 상회**한다(ORB가 −0.002→+0.003으로 전환). 결과는 표본 수에 강건하다.
 
-> EN: **Re-lock stability.** For paper-grade confidence we re-measured at 1000 (vs 800) frames: the mean is essentially unchanged (0.8037→**0.8039**, Δ+0.0002) with per-camera drift ≤0.006, and **all four cameras beat RoboPEPP** (ORB flips −0.002→+0.003). Results are robust to sample size.
+> EN: **Re-lock stability (Fig. 3).** For paper-grade confidence we re-measured at 1000 (vs 800) frames: the mean is essentially unchanged (0.8037→**0.8039**, Δ+0.0002) with per-camera drift ≤0.006, and **all four cameras beat RoboPEPP** (ORB flips −0.002→+0.003). Results are robust to sample size.
 
 ### 4.7 KUKA·Baxter 상세: data-fit FK와 관측성 병목
 
 DREAM의 나머지 두 로봇은 실측 데이터가 없으므로 합성(DR) 스플릿에서 평가한다. 검출기는 Panda 검출기에서 전이학습하여 2D 키포인트 AUC **0.735**(KUKA)·**0.817**(Baxter)를 얻는다. 운동학 FK는 표준 URDF 대신 **DREAM 합성 데이터에 직접 피팅**하여(관절각↔키포인트 3D) 링크 원점을 RMS 0.003mm로 재현한다. 포즈는 head 각도 + 회전 헤드의 R,t를 직접 쓰는 direct-pose로 ADD-AUC **0.357**(KUKA)·**0.253**(Baxter)를 기록한다(§4.2 표 3, 그림 8).
 
-> EN: The other two DREAM robots have no real data, so we evaluate on synthetic (DR) splits. Detectors transfer-learned from the Panda detector reach 2D-keypoint AUC **0.735** (KUKA) / **0.817** (Baxter). Instead of a standard URDF, we **fit the kinematic FK directly to DREAM's synthetic data** (joint angles ↔ 3D keypoints), reproducing link origins at 0.003 mm RMS. Pose via a direct-pose scheme (head angles + rotation-head R,t) gives ADD-AUC **0.357** (KUKA) / **0.253** (Baxter) (Table 3, §4.2).
+> EN: The other two DREAM robots have no real data, so we evaluate on synthetic (DR) splits. Detectors transfer-learned from the Panda detector reach 2D-keypoint AUC **0.735** (KUKA) / **0.817** (Baxter). Instead of a standard URDF, we **fit the kinematic FK directly to DREAM's synthetic data** (joint angles ↔ 3D keypoints), reproducing link origins at 0.003 mm RMS. Pose via a direct-pose scheme (head angles + rotation-head R,t) gives ADD-AUC **0.357** (KUKA) / **0.253** (Baxter) (Table 3, §4.2; Fig. 8).
 
 (3-로봇 통합 성능표는 §4.2 표 3 참조. / _EN: see the unified 3-robot Table 3 in §4.2._)
 
