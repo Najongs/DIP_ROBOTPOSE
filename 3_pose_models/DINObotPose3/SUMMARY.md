@@ -39,6 +39,21 @@ per-camera on/off (helps far cams; azure RC OFF). Details EXPERIMENTS.md 2026-07
 occl-robust silhouette downweighting (depth bias) and population-mean adaptive prior (fights the true
 config; learned state prior skipped — synth joints independent). Bench: `Eval/occlusion_bench.sh`.
 
+## 📊 2026-07-14 — COMPREHENSIVE ABLATION CAMPAIGN (confirmed, PAPER_DRAFT §4)
+Same-condition ablations on the locked 1000-frame held-out set, per-camera deployed heads.
+- **A1 gate PASSED**: mean 0.804 reproduced exactly (rs .8155/kinect .8275/azure .7945/orb .7784).
+- **Per-lever contribution (leave-one-out ΔMean)**: **render-compare +0.043** (dominant; rs+0.070/
+  kinect+0.062/orb+0.040) > rot-head +0.016 > occ-aug/self-train +0.010 > DARK +0.003 > cov-PnP/conf-gate
+  +0.001. Auto-bbox costs only −0.002 vs GT (near-free, stricter). **Free decode/solver levers (DARK/cov/
+  gate) are do-no-harm on clean — their value is under occlusion** (occ-aug +0.038 at 40%).
+- **Cumulative build-up (RealSense)**: base 0.666 → deployed 0.815 = **+0.149**; big rungs rot/occ-aug/RC.
+- **RC design**: converges by ~150 iters (=deployed 250) → 250→150 cuts ~40% RC cost, no loss. RC signal is
+  **entirely the silhouette-IoU term** (no-sil → base); reproj-anchor +0.002.
+- **Runtime (RTX 3090)**: backbone 19 ms, solver(250it) 352 ms, RC ~1.3 s → base ~2.4 fps, +RC ~0.6 fps.
+- **Cross-robot (direct-pose, synthetic-only, no RC)**: KUKA iiwa7 **0.357**, Baxter **0.253**; data-fit FK
+  (0.003 mm RMS, Baxter needs 40-start). Not comparable to Panda real (DREAM has real test only for Panda).
+- Figs 1–11 (fig10 mesh overlay, fig11 occlusion ladder). Logs Eval/ablation_logs/*; EXPERIMENTS.md 07-14.
+
 ## Pipeline (deployable, oracle-free)
 ```
 image → [self-bbox: full-frame DINOv3 detector + kinematic solve → project FK 7 kp → crop bbox]
@@ -83,6 +98,9 @@ do-no-harm on every adapted camera; realsense deployed 0.745 == the locked @1000
 7. **Rotation-head pseudo-label self-train** (2026-06-29, `selftrain_pseudo_rot.py`) — adapt the ROT head (not just angle) toward the solver's refined R\* on real; deployable self-bbox +0.011 rs / +0.007 orb / +0.007 kinect over the angle-only-selftrain head. The diagnosed R/gauge bottleneck, the only deployable realization of the gauge headroom (depth headroom stays single-view-unreachable).
 
 ## What was REFUTED (negative results, decisively)
+- **mlp_patch appearance angle head (Panda + Baxter wrist)**: k=3/k=5 patch head never beat plain mlp over 9 epochs → wrist under-determination is an **observability ceiling** (self-axis rotation doesn't move its own keypoint), not a detection/architecture failure. No crop-matched patch head exists → H2 arch comparison deferred as confounded.
+- **Baxter render-and-compare**: silhouette-depth + wrist-shape ambiguity degrades pose (77→204 mm) — RC helps Panda far-cams only.
+- **conf-gate as a tuned peak**: sweep {0,.05,.10,.20}=0.747/0.745/0.746/0.749, flat ±0.002 — deployed 0.05 is a wide basin, not sensitive.
 - **union-bbox** (solved∪detected): −0.002 — self-bbox already encloses kp; the −0.04 vs GT-crop is oracle-zoom, not bbox defect.
 - **iterative crop-selftrain r2**: realsense plateau (+0.000) — head lever saturated.
 - **depth / t_z translation prior**: sim2real 587mm — rejected (solver's PnP t is better).

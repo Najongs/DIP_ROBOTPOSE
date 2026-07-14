@@ -945,3 +945,46 @@ orb −0.010→−0.004 (near-MATCH). ADOPT --dark-decode + --cov-pnp in the dep
 768-crop, feature-metric RC, edge-NCC, occl-robust silhouette, population prior all refuted this session.
 Occlusion-aug heads (T1/T2) still training — robustness/accuracy tradeoff (+0.014/0.018 occluded, −0.009
 clean @Ep1), positioned as a separate robustness config. Docs: docs/experiments/*.
+
+## 2026-07-05 — 🔒🔒🔒 DEPLOYED light-stack + per-camera self-train → mean 0.804 (RoboPEPP 0.780)
+occ-aug LIGHT head + camera-specific self-training (synthetic anti-forgetting) landed as the deployed
+config. Per-camera: realsense 0.8155 / kinect 0.8275 / azure 0.7945 / orb 0.7784 → **mean 0.804**, all
+4 cameras > RoboPEPP (ORB flips +0.003). RC on for rs/kinect/orb (@448/448/512), OFF for near Azure.
+Re-lock 800→1000 stable (0.8037→0.8039, drift ≤0.006). Checkpoints: outputs_selftrain/{cam}_lightstack_
+20260705_00354{6,52,9}; azure angle_occaug_light_20260704 + rot_crop_occaug_20260704.
+
+## 2026-07-09/10 — KUKA iiwa7 + Baxter-left DREAM detectors (synthetic)
+5-GPU detector training. KUKA iiwa7 2D-keypoint AUC 0.735 (long-tail = link-identity confusion, not
+quality). Baxter-left detector AUC 0.817. Checkpoints kuka_dream_detector_20260709_183119,
+baxter_left_dream_detector_20260710_152926.
+
+## 2026-07-12/13 — KUKA/Baxter angle+rot heads · data-fit FK · direct-pose ADD
+Data-fit FK: fit URDF joint transforms to DREAM data via scipy least_squares (iiwa7 single-start;
+Baxter needed 40-start multi-start to escape local minima → 0.003 mm RMS). **direct-pose** mode (trust
+head angles + rot-head R,t directly, bypass 2D → avoids link-confusion): KUKA ADD-AUC@100 **0.357**,
+Baxter **0.253** (synthetic-only, no RC). Baxter RC REFUTED (silhouette-depth + wrist-shape ambiguity,
+77→204 mm). **Wrist observability ceiling**: GT-2D injection barely changes w0/w1 MAE (28→28°) → wrist
+self-axis rotation doesn't move its own keypoint; mlp_patch appearance head REFUTED (k=3/k=5 never beat
+plain mlp over 9 epochs). Heads: kuka_angle/rot_20260712, baxter_angle/rot_20260713.
+
+## 2026-07-14 — 📊 COMPREHENSIVE ABLATION CAMPAIGN → PAPER_DRAFT §4 (P0+P1)
+Locked 1000-frame held-out, per-camera deployed heads. All numbers same-frame/same-condition.
+- **A1 gate PASSED**: mean 0.804 exactly reproduced (rs 0.8155/kinect 0.8275/azure 0.7945/orb 0.7784).
+- **B leave-one-out** (ΔMean = per-lever contribution): RC **+0.043** (biggest; rs+0.070/kinect+0.062/
+  orb+0.040), rot-head +0.016, occ-aug/self-train +0.010, DARK +0.003, cov-PnP +0.001, conf-gate +0.001,
+  auto-bbox −0.002 vs GT (near-free, stricter protocol).
+- **C cumulative build-up** (RealSense held-out): base 0.666 → +DARK 0.673 → +cov 0.669 → +rot 0.705 →
+  +occ-aug/self 0.745 → +RC 0.815 = **+0.149 total**; big rungs rot/occ-aug/RC, free levers flat on clean.
+- **E occlusion 0–40%**: light+RC 0.812/0.765/0.679/0.573/0.430; occ-aug contribution grows to **+0.038
+  at 40%** (vs clean head) → robustness must be trained in.
+- **D RC design**: iteration sweep converges by ~150 iters (rs 0.815/orb 0.778 = deployed 250) → 250→150
+  cuts ~40% RC cost, no loss. RC signal ENTIRELY silhouette-IoU (no-sil → base 0.745); reproj-anchor +0.002.
+- **G2 conf-gate sensitivity** {0,.05,.10,.20} = 0.747/0.745/0.746/0.749 → flat ±0.002 (wide stable basin).
+- **I1 runtime** (RTX 3090): backbone 19 ms, solver(250it) 352 ms, RC ~1.3 s → base ~2.4 fps, +RC ~0.6 fps.
+- **J cross-robot** (clean re-run): KUKA direct-pose 0.357, Baxter 0.253.
+- **L qualitative**: fig10 mesh-silhouette overlay (ADD 11–66 mm), fig11 occlusion ladder 0–40%.
+- **REFUTED/deferred this round**: H2 head-arch (no crop-matched mlp_patch head → confounded; mlp_patch
+  already in refuted table), G1 kp-jitter (train-only flag, not evalable).
+PAPER_DRAFT §4 now: headline (Table 3, 3-robot) + occlusion curve + leave-one-out (T5) + build-up (T7) +
+occ-aug (T6) + runtime (T8) + RC design + conf-gate sensitivity + refuted (T9) + figs 1–11. Scripts:
+Eval/{ablation_run,ablation_campaign,buildup_g2,runtime_bench}.py/.sh; logs Eval/ablation_logs/*.
