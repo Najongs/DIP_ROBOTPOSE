@@ -1,0 +1,8 @@
+RC iteration sweep (ADD-AUC vs iters):
+iters	rs	orb
+0	0.7452	0.7382
+25	0.7876	0.7561
+50	0.8017	0.7624
+150	0.8153	0.7784
+250(deployed): rs 0.8155 orb 0.7784
+RC terms (rs): no-sil 0.7452(=base) | no-repro 0.8137 | full 0.8155

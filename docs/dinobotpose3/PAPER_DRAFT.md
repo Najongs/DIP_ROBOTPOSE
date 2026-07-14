@@ -283,6 +283,10 @@ DREAM의 나머지 두 로봇은 실측 데이터가 없으므로 합성(DR) 스
 
 > EN: **Table 7. Per-stage latency (RTX 3090).**
 
+**RC iteration 수 = 정확도-속도 knob.** RC 반복 수를 스윕하면 RealSense 기준 ADD-AUC가 0(0.745, RC 없음)→25(0.788)→50(0.802)→150(**0.815**)로 **~150 iter에 배포치(250, 0.8155)에 수렴**한다(ORB도 150에서 0.778=배포치). 즉 250→150으로 RC 렌더 비용을 ~40% 줄이면서 정확도 손실이 없다. 또한 RC 신호는 **전적으로 실루엣 IoU 항**에서 나온다 — 실루엣 항 제거 시 base(0.745)로 회귀하고, 재투영 앵커 항은 +0.002만 기여한다.
+
+> EN: **RC iteration count is the accuracy–speed knob.** Sweeping RC iterations, RealSense ADD-AUC goes 0(0.745, no RC)→25(0.788)→50(0.802)→150(**0.815**), **converging to the deployed 250-iter value (0.8155) by ~150 iters** (ORB likewise 0.778 at 150). So 250→150 cuts ~40% of the RC render cost with no accuracy loss. The RC signal comes **entirely from the silhouette-IoU term** — removing it reverts to base (0.745); the reprojection-anchor term adds only +0.002.
+
 ### 4.9 시도했으나 반증된 대안 (What did not work)
 
 강한 부정 증거를 리뷰어에게 투명하게 제시한다(표 8). 특히 **백본 적응은 3가지 방식 모두 ADD를 악화**시켜(솔버가 요구하는 sub-pixel 키포인트 정밀도 파괴), 동결 백본 결정을 정당화한다. RC 계열에서도 feature-metric·edge-NCC·multi-start 변형이 실루엣 RC를 못 이겼고, 학습형 상태 prior(population/DPoser식)와 translation prior는 오히려 해로웠다.
