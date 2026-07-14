@@ -152,28 +152,44 @@ DINObotPose3는 predicted-joint 체제에서 평균 ADD-AUC **0.804**로 최고 
 
 > EN: **Table 2. Predicted-joint DREAM-real mean ADD-AUC (protocol-controlled).** Known-joint CtRNet(-X) is a separate league (encoder angles). Ours is the best predicted-joint method under the hardest (automatic-bbox) setting.
 
+**DREAM 전체 로봇 성능(표 3).** DREAM은 Panda·KUKA·Baxter 세 로봇을 포함하며, 동일 파이프라인을 셋 모두에 적용한 성능을 한 표에 정리한다. Panda는 실측 벤치마크의 헤드라인 SOTA(0.804)이고, KUKA·Baxter는 합성 스플릿에서 각각 0.357·0.253이다.
+
+> EN: **All-DREAM-robot performance (Table 3).** DREAM spans Panda, KUKA, and Baxter; we report the same pipeline on all three in one table. Panda is the real-benchmark headline SOTA (0.804); KUKA and Baxter reach 0.357 and 0.253 on synthetic splits.
+
+**표 3. DREAM 로봇별 성능 종합.** (Panda 실측 · KUKA/Baxter 합성)
+
+| 로봇 | 데이터 | 검출기 2D AUC | 포즈 ADD-AUC@100mm | 병목 |
+|---|---|---|---|---|
+| **Panda** | **실측(real)** | — | **0.804** | — (SOTA) |
+| KUKA iiwa7 | 합성(synth) | 0.735 | 0.357 | 회전 헤드 병진 오차(56mm) |
+| Baxter 좌완 | 합성(synth) | 0.817 | 0.253 | 손목 관절 **관측성 천장** |
+
+> EN: **Table 3. Performance across all DREAM robots** (Panda real; KUKA/Baxter synthetic).
+
+> ⚠️ Panda는 real ADD-AUC, KUKA/Baxter는 **합성·RC 미적용**이라 서로 **직접 비교 불가** — 통합 성능 뷰일 뿐이며, KUKA/Baxter의 FK 피팅·관측성 병목 상세는 §4.7. / _EN: Panda is real; KUKA/Baxter are synthetic without render-compare, so the three are **not directly comparable** — this is a unified overview; per-robot details are in §4.7._
+
 ### 4.3 가림 강건성 (Occlusion robustness)
 
-RoboPEPP의 가림 프로토콜(로봇 bbox 면적의 0–40%를 사각 occluder로 페이스트)로 평가하면, DINObotPose3는 **모든 가림 수준에서** RoboPEPP를 상회한다(표 3). 이 우위의 원천은 (a) 우리에게만 있는 렌더-비교 깊이 보정, (b) 처음부터 가림에 노출된 약한 가림-증강 헤드다.
+RoboPEPP의 가림 프로토콜(로봇 bbox 면적의 0–40%를 사각 occluder로 페이스트)로 평가하면, DINObotPose3는 **모든 가림 수준에서** RoboPEPP를 상회한다(표 4). 이 우위의 원천은 (a) 우리에게만 있는 렌더-비교 깊이 보정, (b) 처음부터 가림에 노출된 약한 가림-증강 헤드다.
 
-> EN: Under RoboPEPP's occlusion protocol (paste rectangular occluders over 0–40% of the robot's bbox area), DINObotPose3 exceeds RoboPEPP at **every** occlusion level (Table 3). The advantage stems from (a) the render-compare depth corrector unique to us and (b) a light occlusion-augmentation head exposed to occlusion from the start.
+> EN: Under RoboPEPP's occlusion protocol (paste rectangular occluders over 0–40% of the robot's bbox area), DINObotPose3 exceeds RoboPEPP at **every** occlusion level (Table 4). The advantage stems from (a) the render-compare depth corrector unique to us and (b) a light occlusion-augmentation head exposed to occlusion from the start.
 
-**표 3. 가림 수준별 ADD-AUC.**
+**표 4. 가림 수준별 ADD-AUC.**
 
 | 가림 % | 0 | 10 | 20 | 30 | 40 |
 |---|---|---|---|---|---|
 | **Ours (light+RC)** | **0.812** | **0.765** | **0.678** | **0.575** | **0.429** |
 | RoboPEPP | 0.795 | 0.730 | 0.600 | 0.470 | 0.351 |
 
-> EN: **Table 3. ADD-AUC vs occlusion level.** Ours dominates across 0–40%; the gap widens at heavier occlusion (+0.078 at 40%).
+> EN: **Table 4. ADD-AUC vs occlusion level.** Ours dominates across 0–40%; the gap widens at heavier occlusion (+0.078 at 40%).
 
 ### 4.4 절제 실험 (Ablations)
 
-**Leave-one-out(표 4).** 배포 스택에서 각 레버를 하나씩 제거하고 **동일한 1000-프레임 held-out 집합**에서 재평가하여, 각 기법의 순 기여(ΔMean)를 동일 조건에서 정량화한다(이전 누적/경쟁자-기준 방식과 달리 우리 모델 기준의 순수 절제). 렌더-비교가 압도적 최대 레버(+0.043)이고, 회전 헤드(+0.016)와 가림-증강/자가학습 스택(+0.010)이 뒤따르며, 무료 디코딩·솔버 레버(DARK/cov-PnP/conf-gate)는 클린에서 작지만 do-no-harm이다(가림에서 진가, §4.3). 완전 자동 bbox는 GT-bbox 대비 −0.002에 불과해 사실상 무비용의 더 엄격한 프로토콜이다.
+**Leave-one-out(표 5).** 배포 스택에서 각 레버를 하나씩 제거하고 **동일한 1000-프레임 held-out 집합**에서 재평가하여, 각 기법의 순 기여(ΔMean)를 동일 조건에서 정량화한다(이전 누적/경쟁자-기준 방식과 달리 우리 모델 기준의 순수 절제). 렌더-비교가 압도적 최대 레버(+0.043)이고, 회전 헤드(+0.016)와 가림-증강/자가학습 스택(+0.010)이 뒤따르며, 무료 디코딩·솔버 레버(DARK/cov-PnP/conf-gate)는 클린에서 작지만 do-no-harm이다(가림에서 진가, §4.3). 완전 자동 bbox는 GT-bbox 대비 −0.002에 불과해 사실상 무비용의 더 엄격한 프로토콜이다.
 
-> EN: **Leave-one-out (Table 4).** We remove each lever from the deployed stack and re-evaluate on the **same 1000-frame held-out set**, quantifying each technique's net contribution (ΔMean) under identical conditions — a pure ablation off our own model, unlike the earlier cumulative/competitor-anchored view. Render-and-compare is by far the largest lever (+0.043), followed by the rotation head (+0.016) and the occlusion-aug/self-training stack (+0.010); the free decoding/solver levers (DARK/cov-PnP/conf-gate) are small on clean but do-no-harm (their value is under occlusion, §4.3). Fully automatic boxes cost only −0.002 vs GT boxes — a near-free, stricter protocol.
+> EN: **Leave-one-out (Table 5).** We remove each lever from the deployed stack and re-evaluate on the **same 1000-frame held-out set**, quantifying each technique's net contribution (ΔMean) under identical conditions — a pure ablation off our own model, unlike the earlier cumulative/competitor-anchored view. Render-and-compare is by far the largest lever (+0.043), followed by the rotation head (+0.016) and the occlusion-aug/self-training stack (+0.010); the free decoding/solver levers (DARK/cov-PnP/conf-gate) are small on clean but do-no-harm (their value is under occlusion, §4.3). Fully automatic boxes cost only −0.002 vs GT boxes — a near-free, stricter protocol.
 
-**표 4. Leave-one-out 절제 (locked 1000, ADD-AUC@100mm).** 각 행은 배포 Full에서 한 레버 제거.
+**표 5. Leave-one-out 절제 (locked 1000, ADD-AUC@100mm).** 각 행은 배포 Full에서 한 레버 제거.
 
 | 제거 | rs | kinect | orb | azure | Mean | **ΔMean** |
 |---|---|---|---|---|---|---|
@@ -186,17 +202,17 @@ RoboPEPP의 가림 프로토콜(로봇 bbox 면적의 0–40%를 사각 occluder
 | − conf-gate | 0.816 | 0.826 | 0.781 | 0.790 | 0.803 | −0.001 |
 | auto-bbox → GT-bbox | 0.813 | 0.820 | 0.784 | 0.808 | 0.806 | +0.002 |
 
-> EN: **Table 4. Leave-one-out ablation (locked 1000, ADD-AUC@100mm);** each row removes one lever from the deployed Full model. †azure ships RC off, so −RC leaves azure unchanged.
+> EN: **Table 5. Leave-one-out ablation (locked 1000, ADD-AUC@100mm);** each row removes one lever from the deployed Full model. †azure ships RC off, so −RC leaves azure unchanged.
 
 **렌더-비교의 카메라별 기여.** RC는 깊이 신호가 약한 **원거리 카메라의 엔진**이다 — RealSense +0.070, Kinect +0.062, ORB +0.040(위 표의 −RC 행에서 카메라별 직접 측정). 근거리 Azure는 깊이가 이미 강해 RC를 끄는 것이 최적(카메라별 on/off). 이는 RC가 "포즈 전체 추정"이 아니라 **깊이/스케일 보정기**로 작동함을 확증한다.
 
 > EN: **Per-camera render-compare contribution.** RC is the engine for **far cameras** where depth is weak — RealSense +0.070, Kinect +0.062, ORB +0.040 (read directly from the −RC row per camera) — whereas for the near Azure camera it is best off. This confirms RC acts as a **depth/scale corrector**, not a full-pose estimator.
 
-**가림에서 occ-aug의 기여(표 5).** occ-aug/self-train은 클린에서 +0.010이지만 가림이 심해질수록 기여가 커진다 — 40% 가림에서 **+0.038**(light head vs clean head, 나머지 스택 동일). 강건성은 처음부터 증강 학습해야 배어듦을 보인다.
+**가림에서 occ-aug의 기여(표 6).** occ-aug/self-train은 클린에서 +0.010이지만 가림이 심해질수록 기여가 커진다 — 40% 가림에서 **+0.038**(light head vs clean head, 나머지 스택 동일). 강건성은 처음부터 증강 학습해야 배어듦을 보인다.
 
-> EN: **occ-aug contribution under occlusion (Table 5).** occ-aug/self-training gives +0.010 on clean but its contribution grows with occlusion — **+0.038 at 40%** (light vs clean head, rest of stack fixed), showing robustness must be trained in from the start.
+> EN: **occ-aug contribution under occlusion (Table 6).** occ-aug/self-training gives +0.010 on clean but its contribution grows with occlusion — **+0.038 at 40%** (light vs clean head, rest of stack fixed), showing robustness must be trained in from the start.
 
-**표 5. occ-aug on/off의 가림별 ADD-AUC** (synth_photo, 나머지 스택 동일).
+**표 6. occ-aug on/off의 가림별 ADD-AUC** (synth_photo, 나머지 스택 동일).
 
 | 가림 % | 0 | 10 | 20 | 30 | 40 |
 |---|---|---|---|---|---|
@@ -204,7 +220,7 @@ RoboPEPP의 가림 프로토콜(로봇 bbox 면적의 0–40%를 사각 occluder
 | − occ-aug (clean head) | 0.804 | 0.752 | 0.671 | 0.562 | 0.392 |
 | Δ (occ-aug 기여) | +0.008 | +0.013 | +0.007 | +0.011 | **+0.038** |
 
-> EN: **Table 5. occ-aug on/off ADD-AUC vs occlusion** (synth_photo, rest of stack fixed).
+> EN: **Table 6. occ-aug on/off ADD-AUC vs occlusion** (synth_photo, rest of stack fixed).
 
 **렌더-비교의 카메라별 기여.** RC는 깊이 신호가 약한 **원거리 카메라의 엔진**이다 — RealSense +0.070, Kinect +0.060, ORB +0.040. 반면 근거리 Azure는 깊이 신호가 이미 강해 RC를 끄는 것이 최적이다(카메라별 on/off). 이는 RC가 "포즈 전체 추정"이 아니라 **깊이/스케일 보정기**로 작동함을 정량적으로 확인한다.
 
@@ -230,21 +246,13 @@ RoboPEPP의 가림 프로토콜(로봇 bbox 면적의 0–40%를 사각 occluder
 
 > EN: **Re-lock stability.** For paper-grade confidence we re-measured at 1000 (vs 800) frames: the mean is essentially unchanged (0.8037→**0.8039**, Δ+0.0002) with per-camera drift ≤0.006, and **all four cameras beat RoboPEPP** (ORB flips −0.002→+0.003). Results are robust to sample size.
 
-### 4.7 DREAM의 다른 로봇: KUKA iiwa7 · Baxter (합성)
+### 4.7 KUKA·Baxter 상세: data-fit FK와 관측성 병목
 
-DREAM의 나머지 두 로봇은 실측 데이터가 없으므로 합성(DR) 스플릿에서 평가한다. 검출기는 Panda 검출기에서 전이학습하여 2D 키포인트 AUC **0.735**(KUKA)·**0.817**(Baxter)를 얻는다. 운동학 FK는 표준 URDF 대신 **DREAM 합성 데이터에 직접 피팅**하여(관절각↔키포인트 3D) 링크 원점을 RMS 0.003mm로 재현한다. 포즈는 head 각도 + 회전 헤드의 R,t를 직접 쓰는 direct-pose로 ADD-AUC **0.357**(KUKA)·**0.253**(Baxter)를 기록한다(표 6, 그림 8).
+DREAM의 나머지 두 로봇은 실측 데이터가 없으므로 합성(DR) 스플릿에서 평가한다. 검출기는 Panda 검출기에서 전이학습하여 2D 키포인트 AUC **0.735**(KUKA)·**0.817**(Baxter)를 얻는다. 운동학 FK는 표준 URDF 대신 **DREAM 합성 데이터에 직접 피팅**하여(관절각↔키포인트 3D) 링크 원점을 RMS 0.003mm로 재현한다. 포즈는 head 각도 + 회전 헤드의 R,t를 직접 쓰는 direct-pose로 ADD-AUC **0.357**(KUKA)·**0.253**(Baxter)를 기록한다(§4.2 표 3, 그림 8).
 
-> EN: The other two DREAM robots have no real data, so we evaluate on synthetic (DR) splits. Detectors transfer-learned from the Panda detector reach 2D-keypoint AUC **0.735** (KUKA) / **0.817** (Baxter). Instead of a standard URDF, we **fit the kinematic FK directly to DREAM's synthetic data** (joint angles ↔ 3D keypoints), reproducing link origins at 0.003 mm RMS. Pose via a direct-pose scheme (head angles + rotation-head R,t) gives ADD-AUC **0.357** (KUKA) / **0.253** (Baxter) (Table 6).
+> EN: The other two DREAM robots have no real data, so we evaluate on synthetic (DR) splits. Detectors transfer-learned from the Panda detector reach 2D-keypoint AUC **0.735** (KUKA) / **0.817** (Baxter). Instead of a standard URDF, we **fit the kinematic FK directly to DREAM's synthetic data** (joint angles ↔ 3D keypoints), reproducing link origins at 0.003 mm RMS. Pose via a direct-pose scheme (head angles + rotation-head R,t) gives ADD-AUC **0.357** (KUKA) / **0.253** (Baxter) (Table 3, §4.2).
 
-**표 6. DREAM 로봇별 파이프라인 요약.**
-
-| 로봇 | 데이터 | 검출기 2D AUC | 포즈 ADD-AUC | 병목 |
-|---|---|---|---|---|
-| Panda | **실측** | — | **0.804** | — (SOTA) |
-| KUKA iiwa7 | 합성 | 0.735 | 0.357 | 회전 헤드 병진 오차(56mm) |
-| Baxter 좌완 | 합성 | 0.817 | 0.253 | 손목 관절 **관측성 천장** |
-
-> EN: **Table 5. Pipeline summary across DREAM robots.** Panda (real) is the headline SOTA; KUKA/Baxter (synthetic) validate the pipeline end-to-end.
+(3-로봇 통합 성능표는 §4.2 표 3 참조. / _EN: see the unified 3-robot Table 3 in §4.2._)
 
 **⚠️ 비교 주의.** KUKA/Baxter의 합성 0.34/0.25는 Panda 실측 0.804와 **다른 데이터(합성)·다른 조건(render-compare 미적용)**이므로 직접 비교 대상이 아니다. 이 결과의 의의는 절대 수치가 아니라 (i) 동일 파이프라인이 세 로봇 모두에서 동작하고, (ii) 남은 병목을 정량 규명했다는 점이다.
 
