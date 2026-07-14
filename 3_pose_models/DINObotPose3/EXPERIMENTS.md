@@ -1047,3 +1047,20 @@ User asked "what other comparison groups are needed?" → prioritized + executed
   written to scratchpad siglip_{angle,rot}_out.txt; done-marker siglip_cascade_done.txt. THEN eval
   4-cam pose ADD (selfbbox_eval with siglip detector+heads) → fill §4.10/Table 12 pose-level row →
   commit. Expected: frozen siglip trails DINOv3 at pose level too (detector already 0.72<0.80 frozen).
+
+## 2026-07-15 (cont.2) — siglip detector DONE (20ep AUC 0.859) → pose heads training (parallel)
+- siglip crop-detector completed 20 epochs, synth-DR val AUC 0.7824→**0.8592** (unfrozen 4-block,
+  matches DINOv3 crop-detector recipe). GPUs freed.
+- Launched siglip pose heads. 🐛 fixed `model_angle.py` crash: `AnglePredictor` used
+  `backbone.model.config.hidden_size` which AttributeErrors on SiglipConfig (nests under
+  vision_config) — added `getattr(cfg,'vision_config',cfg)` fallback (mirrors train_heatmap.py).
+  Covers both angle+rot (rot reuses AnglePredictor).
+- Running PARALLEL (angle & rot independent) via `TRAIN/run_siglip_pose_parallel.sh`: crop-angle
+  (50ep, GPU1) + crop-rot (30ep, GPU2), frozen siglip backbone+crop-detector, ~1.7 it/s ~30min/ep
+  → wall ~25h. best-on-val ckpts saved continuously. Out paths in scratchpad siglip_{angle,rot}_out.txt.
+- 🔄 CONTINUE POST-COMPACTION: waiter **b6u9ide18** fires when both best ckpts exist AND converged
+  (angle ≥25 ep + rot done, or both done-markers). THEN eval 4-cam pose ADD with siglip
+  detector+heads (selfbbox_eval: --stage1-detector/--crop-detector siglip crop-det, --model-name
+  google/siglip2-base-patch16-512, angle/rot ckpts = siglip best) → fill §4.10/Table 12 pose-level
+  row (DINOv3 vs SigLIP2 pose ADD) → commit. Expected: siglip trails (detector real-Azure 0.72<0.80
+  frozen; unfrozen ~equal at detection, pose TBD).
