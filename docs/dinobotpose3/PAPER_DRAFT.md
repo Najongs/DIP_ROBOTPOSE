@@ -275,6 +275,32 @@ DREAM의 나머지 두 로봇은 실측 데이터가 없으므로 합성(DR) 스
 
 > EN: **Table 7. Per-stage latency (RTX 3090).**
 
+### 4.9 시도했으나 반증된 대안 (What did not work)
+
+강한 부정 증거를 리뷰어에게 투명하게 제시한다(표 8). 특히 **백본 적응은 3가지 방식 모두 ADD를 악화**시켜(솔버가 요구하는 sub-pixel 키포인트 정밀도 파괴), 동결 백본 결정을 정당화한다. RC 계열에서도 feature-metric·edge-NCC·multi-start 변형이 실루엣 RC를 못 이겼고, 학습형 상태 prior(population/DPoser식)와 translation prior는 오히려 해로웠다.
+
+> EN: **What did not work (Table 8).** We transparently report strong negative evidence. In particular, **backbone adaptation failed in all three variants** (destroying the sub-pixel keypoint precision the solver needs), justifying the frozen backbone. Among RC variants, feature-metric / edge-NCC / multi-start did not beat plain silhouette RC, and learned state priors (population/DPoser-style) and a translation prior were actively harmful.
+
+**표 8. 반증된 대안과 그 결과.**
+
+| 대안 | 결과 | 판정 |
+|---|---|---|
+| 백본 적응 (SSL 6-block) | realsense ADD 0.531 < 0.567 | ❌ |
+| 백본 적응 (SSL 3-block) | 완전 OOD, ADD 0.0 | ❌ |
+| 백본 적응 (pseudo-kp co-finetune) | 0.497 → 0.434 단조 하락 | ❌ |
+| feature-metric (DINO) RC | azure −0.004 → −0.043 | ❌ |
+| edge-NCC RC | −0.10 → −0.18 발산 | ❌ |
+| multi-start RC | +0.000 (잔여 실패 R-basin 아님) | ❌ |
+| occl-robust 실루엣 다운웨이트 | −0.019 (depth 편향) | ❌ |
+| population/learned 상태 prior | −0.09 @20% (정답과 싸움) | ❌ |
+| translation(t_z) prior | realsense 0.66 → 0.37 | ❌ |
+| union-bbox (solved∪detected) | −0.002 | ❌ |
+| MCL 멀티가설 | oracle 0.720 < self-train 0.724 | ❌ |
+| RoboTAG reproj-consistency 이식 | azure −0.014 | ❌ |
+| 768-crop 고해상도 | −0.14 회귀 | ❌ |
+
+> EN: **Table 8. Refuted alternatives and their results.** Backbone adaptation (3 ways), feature-metric/edge-NCC/multi-start RC, learned/translation priors, union-bbox, MCL, ported RoboTAG consistency, and 768-crop all regressed or diverged.
+
 ---
 
 ## 5. Conclusion (결론)
