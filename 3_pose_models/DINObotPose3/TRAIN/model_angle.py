@@ -257,7 +257,9 @@ class AnglePredictor(nn.Module):
         self.fix_joint7_zero = fix_joint7_zero
         self.head_type = head_type
         self.backbone = DINOv3Backbone(dino_model_name, unfreeze_blocks=0)
-        feat_dim = self.backbone.model.config.hidden_size
+        _cfg = self.backbone.model.config
+        _vcfg = getattr(_cfg, "vision_config", _cfg)  # Siglip config nests hidden_size under vision_config
+        feat_dim = _vcfg.hidden_size
         self.keypoint_head = ViTKeypointHead(
             input_dim=feat_dim, heatmap_size=(self.heatmap_size, self.heatmap_size))
         self.kp_patch = int(os.environ.get('KP_PATCH_K', '3')) if head_type == 'mlp_patch' else 0  # k×k appearance patch
