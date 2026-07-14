@@ -60,6 +60,13 @@ Same-condition ablations on the locked 1000-frame held-out set, per-camera deplo
   real cols = our Table 1). Corrected paper+refs: RoboPEPP/RoboTAG = same auto protocol (fair win 0.804 vs
   0.780); GT-bbox = HoRoPose (collapses to ORB 0.098 under auto detector). Runtime T10 (feed-forward vs
   optimization). Synth logs Eval/synth_logs/SYNTH_comparison.txt.
+- **Comparison-group expansion (07-15)**: **#1** Table 1 → all predicted-joint methods per-camera (Ours beats
+  every auto-bbox method on every camera). **#2 KNOWN-JOINT CEILING** (`--oracle-angle`, GT θ + solve R,t):
+  **mean 0.841 (+0.037)** — gain on FAR cameras (+0.05, predicted-angle is the far headroom); **Azure unchanged
+  (0.788≈0.795) → its bottleneck is DEPTH not angles**. **#3** GISR in Table 2 (3-cam caveat). **#4 backbone
+  DINOv3 vs SigLIP2 (matched ViT-B/16)**: §4.10 Table 12 — frozen DINOv3 wins (0.80 vs 0.72), unfrozen equal
+  → justifies our FROZEN DINOv3. Paper now Tables 1–12, figs 1–11. 🔄 RUNNING (continue): pose-level siglip
+  cascade (crop-det DDP → angle→rot→eval → fill §4.10) + D2 RC resolution sweep (→ §4.8). EXPERIMENTS.md 07-15.
 
 ## Pipeline (deployable, oracle-free)
 ```

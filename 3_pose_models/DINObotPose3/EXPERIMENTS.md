@@ -1007,3 +1007,28 @@ Added §4.2 synth table (T4), §4.3 occlusion competitors (HPE/RoboPose in T5), 
   (HPE* ORB 0.098). Fixed §4.1/§4.2/§4.5/intro + Table 1/2/10 labels + references/{sota_survey,related_work}.md.
 Runtime T10: feed-forward real-time (HPE/RoboPEPP/RoboTAG/CtRNet) vs iterative optimization (RoboPose/ours);
 ours lightest optimization (no learned refiner, RC-iter knob). Synth logs Eval/synth_logs/SYNTH_comparison.txt.
+
+## 2026-07-15 — 🔬 COMPARISON-GROUP EXPANSION (#1 per-cam · #2 known-joint · #3 GISR · #4 backbone)
+User asked "what other comparison groups are needed?" → prioritized + executed:
+- **#1 full per-camera Table 1**: expanded from Ours/RoboPEPP/RoboTAG to ALL predicted-joint methods
+  per camera (RoboPose/HoRoPose(GT)/HoRoPose*(auto)/RoboTAG/RoboPEPP/Ours), numbers from RoboPEPP Table 2
+  + survey. Ours beats every AUTO-bbox method on every camera (+0.024 mean vs RoboPEPP).
+- **#2 KNOWN-JOINT CEILING** (`--oracle-angle`, new): inject GT joint angles, freeze theta, solve only R,t
+  (added `freeze_theta` to solve_batch; --oracle-angle to selfbbox_eval). Deployed 1000-held-out per-cam-best:
+  rs 0.867 / kinect 0.878 / azure 0.788 / orb 0.831 → **mean 0.841 (+0.037 vs predicted 0.804)**. KEY: gain
+  concentrates on FAR cameras (+0.05) → predicted-angle error is the far-camera headroom; AZURE UNCHANGED
+  (0.788≈0.795) → its bottleneck is DEPTH, not angles (complements RC = far-camera engine). RC over-corrects
+  known-θ realsense (0.867→0.825, RC is a predicted-θ tool). Table 1 italic row + note. Logs
+  Eval/ablation_logs/oracle_angle/KNOWN_JOINT.txt; script Eval/oracle_angle_run.sh.
+- **#3 GISR** added to Table 2 (RA-L'24 predicted, 3-cam mean 77.9* no-ORB caveat).
+- **#4 backbone DINOv3 vs SigLIP2 (matched ViT-B/16 ~86M)**: §4.10 + Table 12. Detector-level (already had,
+  EXPERIMENTS 07-06): unfrozen equal (~0.81 both), **frozen DINOv3 wins (0.80 vs 0.72)**. Since we DEPLOY
+  frozen backbone, justifies DINOv3. Paper §4.10 written.
+- Paper now: **Tables 1–12, figs 1–11** (fig renumber fig5-11→fig4-10 earlier this session closed the gap).
+- 🔄 RUNNING (post-compaction: CONTINUE THESE): (a) **pose-level SigLIP2 cascade** — crop-detector 4-GPU DDP
+  training (TRAIN/run_siglip_crop_ddp.sh, out siglip_crop_ddp_20260715_014111, warm from siglip2_unfrozen;
+  batch8/gpu=32eff matches DINOv3). NEXT: when detector matures → train siglip crop-angle + crop-rot
+  (train_angle.py/train_rotation.py --model-name google/siglip2-base-patch16-512 --crop-to-robot) → eval 4-cam
+  pose ADD → fill §4.10 pose-level. Expected: frozen siglip trails (detector already 0.72<0.80). (b) **D2 RC
+  render-resolution sweep** {224,320,448,512} on realsense (Eval/run_d2_reso.sh, d2_logs/) → add resolution
+  knob to §4.8 RC-design. Waiters: siglip=bi51dni92, D2=b0aok3k37.
