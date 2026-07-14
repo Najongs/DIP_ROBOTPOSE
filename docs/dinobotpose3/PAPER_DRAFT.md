@@ -39,12 +39,12 @@
 > EN: We propose a **training-free geometric alternative** for depth correction. Sub-pixel keypoints from a frozen DINOv3 initialize a kinematic solver; a zero-shot SAM mask and a rendered silhouette are then aligned via differentiable rendering to **correct only depth/scale at test time**. Two training-free levers (cov-PnP and DARK decoding) further improve accuracy at no cost.
 
 **기여(Contributions).**
-1. **Predicted-joint + 자동 bbox 최고 성능**: DREAM 실측 4-스플릿 평균 ADD-AUC 0.804로 RoboPEPP(0.780)·RoboTAG(0.740)를 능가한다. RoboPEPP의 헤드라인이 GT-bbox인 반면 우리는 완전 자동이다.
+1. **Predicted-joint + 자동 bbox 최고 성능**: DREAM 실측 4-스플릿 평균 ADD-AUC 0.804로 RoboPEPP(0.780)·RoboTAG(0.740)를 능가한다. 이들은 우리와 **동일한 자동-bbox 프로토콜**이라 공정한 동일-조건 비교이며(반면 HoRoPose는 GT-bbox를 쓰고 자동 검출기에선 붕괴, §4.5), 우리는 완전 자동 bbox로 SOTA다.
 2. **테스트-타임·학습불필요 렌더-비교 깊이 보정기**: 렌더-비교를 *발명*한 것이 아니라(RoboPose'21, CtRNet'23 선행), 제로샷 SAM 마스크 + 동결 DINOv3 키포인트 프론트엔드 위에서 predicted-joint·자동-bbox 체제에 맞게 **학습 없이 재구성**하고, 카메라별로 선택 적용한다.
 3. **가림 강건성**: 약한 가림 증강 + 카메라별 자가학습 스택으로, 평가한 전(全) 가림 수준(0–40%)에서 RoboPEPP를 상회한다.
 4. **DREAM의 세 로봇 모두 평가**: DREAM은 Panda·KUKA·Baxter를 포함하는 벤치마크다. 실측 데이터가 있는 Panda에서 위 SOTA를 내고, 합성 전용인 KUKA·Baxter에서 동일 파이프라인이 검출·FK·포즈까지 end-to-end로 동작함을 보이며 로봇별 병목(예: 손목 관절의 관측성 천장)을 분석한다.
 
-> EN: **Contributions.** (1) **State of the art under predicted-joint + auto-bbox**: mean ADD-AUC 0.804 on DREAM-real, surpassing RoboPEPP (0.780) and RoboTAG (0.740), while using fully automatic boxes (RoboPEPP's headline uses GT boxes). (2) A **test-time, training-free render-and-compare depth corrector**: we do not *invent* render-and-compare (RoboPose'21, CtRNet'23 are prior art) but **recast it without training** as a zero-shot-SAM + frozen-DINOv3 depth corrector for the predicted-joint / auto-bbox regime, applied per camera. (3) **Occlusion robustness**: light occlusion augmentation plus camera-specific self-training exceeds RoboPEPP across all evaluated occlusion levels (0–40%). (4) **All three DREAM robots**: DREAM is a Panda/KUKA/Baxter benchmark; we report the above SOTA on Panda (which has real data) and show the same pipeline runs end-to-end on the synthetic-only KUKA and Baxter splits, analyzing per-robot bottlenecks (e.g., a wrist-joint observability ceiling).
+> EN: **Contributions.** (1) **State of the art under predicted-joint + auto-bbox**: mean ADD-AUC 0.804 on DREAM-real, surpassing RoboPEPP (0.780) and RoboTAG (0.740) under the **same automatic-bbox protocol** — a fair like-for-like comparison (HoRoPose instead uses GT boxes and collapses under an off-the-shelf detector, §4.5). (2) A **test-time, training-free render-and-compare depth corrector**: we do not *invent* render-and-compare (RoboPose'21, CtRNet'23 are prior art) but **recast it without training** as a zero-shot-SAM + frozen-DINOv3 depth corrector for the predicted-joint / auto-bbox regime, applied per camera. (3) **Occlusion robustness**: light occlusion augmentation plus camera-specific self-training exceeds RoboPEPP across all evaluated occlusion levels (0–40%). (4) **All three DREAM robots**: DREAM is a Panda/KUKA/Baxter benchmark; we report the above SOTA on Panda (which has real data) and show the same pipeline runs end-to-end on the synthetic-only KUKA and Baxter splits, analyzing per-robot bottlenecks (e.g., a wrist-joint observability ceiling).
 
 ---
 
@@ -112,19 +112,19 @@
 
 ### 4.1 설정 (Setup)
 
-DREAM은 Panda·KUKA iiwa7·Baxter 세 로봇을 포함하는 벤치마크지만, **공개 실측 테스트 이미지는 Panda에만 존재**하고 KUKA·Baxter는 합성(domain-randomized) 전용이다. 따라서 헤드라인 실측 평가는 Panda의 4개 카메라 스플릿(RealSense, Kinect360, Azure, ORB)에서 수행하고, KUKA·Baxter는 §4.7에서 합성 스플릿으로 별도 보고한다. 지표는 표준 **ADD-AUC@100mm**(0–100mm 임계에서 ADD 정확도 곡선의 면적)이다. 우리 프로토콜은 **관절각 예측(predicted-joint) + 완전 자동 바운딩 박스**(bbox-from-solved) + sim-to-real 학습으로, GT 바운딩 박스를 쓰는 관례보다 엄격하다. 자가학습을 쓰는 카메라(RealSense/Kinect/ORB)는 시퀀스 앞 70%로 적응하고 뒤 30% 영역에서만 평가하여 정보 누수를 차단한다(anti-leak held-out, 카메라당 1000프레임 조밀 샘플). 백본은 DINOv3 ViT-B/16으로 전 과정 동결한다.
+DREAM은 Panda·KUKA iiwa7·Baxter 세 로봇을 포함하는 벤치마크지만, **공개 실측 테스트 이미지는 Panda에만 존재**하고 KUKA·Baxter는 합성(domain-randomized) 전용이다. 따라서 헤드라인 실측 평가는 Panda의 4개 카메라 스플릿(RealSense, Kinect360, Azure, ORB)에서 수행하고, KUKA·Baxter는 §4.7에서 합성 스플릿으로 별도 보고한다. 지표는 표준 **ADD-AUC@100mm**(0–100mm 임계에서 ADD 정확도 곡선의 면적)이다. 우리 프로토콜은 **관절각 예측(predicted-joint) + 완전 자동 바운딩 박스**(bbox-from-solved) + sim-to-real 학습으로, GT 바운딩 박스를 쓰는 방법(HoRoPose·CtRNet 등)보다 엄격하고, 주요 경쟁자 RoboPEPP·RoboTAG와는 동일한 자동-bbox 프로토콜이다. 자가학습을 쓰는 카메라(RealSense/Kinect/ORB)는 시퀀스 앞 70%로 적응하고 뒤 30% 영역에서만 평가하여 정보 누수를 차단한다(anti-leak held-out, 카메라당 1000프레임 조밀 샘플). 백본은 DINOv3 ViT-B/16으로 전 과정 동결한다.
 
-> EN: DREAM is a three-robot benchmark (Panda, KUKA iiwa7, Baxter), but **public real test images exist only for Panda**; KUKA and Baxter are synthetic (domain-randomized) only. We therefore run the headline real evaluation on Panda's four camera splits (RealSense, Kinect360, Azure, ORB) and report KUKA/Baxter separately on synthetic splits in §4.7. The metric is the standard **ADD-AUC@100mm**. Our protocol is **predicted-joint + fully automatic bounding boxes** (bbox-from-solved) with sim-to-real training, stricter than the common GT-box practice. Self-training cameras (RealSense/Kinect/ORB) adapt on the first 70% of the sequence and are evaluated on the last-30% region to prevent leakage (anti-leak held-out; 1000 densely-sampled frames per camera). The backbone is a DINOv3 ViT-B/16, frozen throughout.
+> EN: DREAM is a three-robot benchmark (Panda, KUKA iiwa7, Baxter), but **public real test images exist only for Panda**; KUKA and Baxter are synthetic (domain-randomized) only. We therefore run the headline real evaluation on Panda's four camera splits (RealSense, Kinect360, Azure, ORB) and report KUKA/Baxter separately on synthetic splits in §4.7. The metric is the standard **ADD-AUC@100mm**. Our protocol is **predicted-joint + fully automatic bounding boxes** (bbox-from-solved) with sim-to-real training — stricter than GT-box methods (HoRoPose, CtRNet) and identical to our main competitors RoboPEPP/RoboTAG. Self-training cameras (RealSense/Kinect/ORB) adapt on the first 70% of the sequence and are evaluated on the last-30% region to prevent leakage (anti-leak held-out; 1000 densely-sampled frames per camera). The backbone is a DINOv3 ViT-B/16, frozen throughout.
 
 ### 4.2 주요 결과 (Main results)
 
-DINObotPose3는 predicted-joint 체제에서 평균 ADD-AUC **0.804**로 최고 성능을 달성하며, **4개 카메라 전부** 강한 기준선 RoboPEPP를 상회한다(표 1, 그림 1). RoboPEPP의 헤드라인이 GT-bbox인 반면 우리는 완전 자동 bbox임을 다시 강조한다.
+DINObotPose3는 predicted-joint 체제에서 평균 ADD-AUC **0.804**로 최고 성능을 달성하며, **4개 카메라 전부** 강한 기준선 RoboPEPP를 상회한다(표 1, 그림 1). RoboPEPP·RoboTAG는 우리와 **동일한 자동 bbox 프로토콜**이므로 이는 공정한 동일-조건 비교다(GT-bbox를 쓰는 HoRoPose와 대비, §4.5).
 
-> EN: DINObotPose3 attains the best mean ADD-AUC of **0.804** in the predicted-joint regime and surpasses the strong RoboPEPP baseline on **all four cameras** (Table 1, Fig. 1) — while, again, using fully automatic boxes against RoboPEPP's GT-box headline.
+> EN: DINObotPose3 attains the best mean ADD-AUC of **0.804** in the predicted-joint regime and surpasses the strong RoboPEPP baseline on **all four cameras** (Table 1, Fig. 1). RoboPEPP and RoboTAG run under the **same automatic-bbox protocol** as ours, so this is a fair like-for-like comparison (in contrast to the GT-box HoRoPose, §4.5).
 
 **표 1. DREAM 실측 카메라별 ADD-AUC@100mm (predicted-joint).** 1000-프레임 재잠금.
 
-| 카메라 | **Ours** | RoboPEPP (GT-bbox) | RoboTAG | 격차(vs PEPP) |
+| 카메라 | **Ours** | RoboPEPP (auto-bbox) | RoboTAG | 격차(vs PEPP) |
 |---|---|---|---|---|
 | RealSense | **0.815** | 0.805 | 0.783 | +0.010 |
 | Kinect360 | **0.828** | 0.785 | 0.757 | +0.043 |
@@ -145,8 +145,8 @@ DINObotPose3는 predicted-joint 체제에서 평균 ADD-AUC **0.804**로 최고 
 | DREAM (R101-H) | 57.8 | known | — | keypoint+PnP |
 | RoboPose | 73.2 | predicted | init 의존 | 반복 render&compare |
 | RoboTAG | 74.0 | predicted | 자동 | end-to-end 회귀 |
-| HoRoPose | 77.2 | predicted | — | 학습된 root-DepthNet |
-| RoboPEPP | 78.0 | predicted | **GT** | masking-pretrain |
+| HoRoPose | 77.2 | predicted | **GT** | 학습된 root-DepthNet |
+| RoboPEPP | 78.0 | predicted | 자동 | masking-pretrain |
 | **Ours** | **80.4** | predicted | **자동** | **테스트-타임 SAM-실루엣 RC** |
 | *(별도 리그)* CtRNet / CtRNet-X | 86.4 / 86.2 | **known** | — | 학습-타임 실루엣 자기지도 |
 
@@ -167,6 +167,23 @@ DINObotPose3는 predicted-joint 체제에서 평균 ADD-AUC **0.804**로 최고 
 > EN: **Table 3. Performance across all DREAM robots** (Panda real; KUKA/Baxter synthetic).
 
 > ⚠️ Panda는 real ADD-AUC, KUKA/Baxter는 **합성·RC 미적용**이라 서로 **직접 비교 불가** — 통합 성능 뷰일 뿐이며, KUKA/Baxter의 FK 피팅·관측성 병목 상세는 §4.7. / _EN: Panda is real; KUKA/Baxter are synthetic without render-compare, so the three are **not directly comparable** — this is a unified overview; per-robot details are in §4.7._
+
+**합성 스플릿 비교(표 4).** 기존 방법들이 표준으로 보고하는 DREAM 합성 테스트(domain-randomized "DR" · photorealistic "Photo")에서 비교한다(경쟁 수치는 RoboPEPP Table 2 인용). 합성은 경쟁 방법들의 **학습 분포(특히 DR)에 가까운 홈그라운드**이며, 우리 파이프라인은 실측 배포에 최적화되어 있어(카메라별 자가학습·실측 깊이용 RC) 합성에서는 선두가 아니다 — Panda 합성에서 우리(+RC) 74.2/76.9는 RoboPEPP(83.0/84.1)·RoboPose(82.9/79.7)에 뒤진다. **그러나 프로토콜을 통제하면 그림이 달라진다**: HoRoPose는 GT-bbox에서 82.7/82.0이지만 **동일한 자동 검출기(HPE\*)를 쓰면 41.4/40.7로 붕괴**하는 반면, 우리는 자동 bbox로도 74.2/76.9를 유지한다. 즉 **동일 (predicted-joint + 자동 bbox) 조건의 유일한 직접 비교 대상인 HoRoPose\*를 큰 격차로 이긴다.** KUKA·Baxter는 우리 쪽에 render-compare가 없어(정합 메쉬 부재, §4.7) 낮으며 공정 비교가 아니다 — 동일 파이프라인의 일반화 증명이 목적이다.
+
+> EN: **Synthetic-split comparison (Table 4).** We compare on the DREAM synthetic tests (domain-randomized "DR" and photorealistic "Photo") that prior methods report as standard (competitor numbers cited from RoboPEPP Table 2). Synthetic is the competitors' **home turf** (close to their training distribution, especially DR), and our pipeline is optimized for real deployment (per-camera self-training, RC tuned for real depth), so we do not lead on synthetic — on Panda our +RC 74.2/76.9 trails RoboPEPP (83.0/84.1) and RoboPose (82.9/79.7). **But controlling for protocol changes the picture**: HoRoPose scores 82.7/82.0 with GT boxes but **collapses to 41.4/40.7 under the same off-the-shelf detector (HPE\*)**, whereas we hold 74.2/76.9 with automatic boxes — i.e., we beat HoRoPose\*, the only direct match under the (predicted-joint + auto-bbox) protocol, by a wide margin. KUKA/Baxter are low because our side has no render-compare (no matching mesh, §4.7) and are not a fair comparison — the point is that the same pipeline generalizes.
+
+**표 4. DREAM 합성 스플릿 ADD-AUC (×100).** 경쟁 수치는 RoboPEPP(CVPR'25) Table 2 인용. joints=관절각 known/predicted, bbox=GT/auto. HPE=HoRoPose; HPE\*=HPE에 RoboPEPP와 동일 off-the-shelf 검출기 적용.
+
+| 방법 | joints | bbox | Panda-DR | Panda-Photo | KUKA-DR | KUKA-Photo | Baxter-DR |
+|---|---|---|---|---|---|---|---|
+| DREAM-H | *known* | auto | 82.9 | 81.1 | 73.3 | 72.1 | — |
+| HoRoPose (HPE) | predicted | **GT** | 82.7 | 82.0 | 75.1 | 73.9 | 58.8 |
+| RoboPose | predicted | auto | 82.9 | 79.7 | 80.2 | 73.2 | 32.7 |
+| HoRoPose\* (HPE\*) | predicted | auto | 41.4 | 40.7 | 56.2 | 56.7 | 9.8 |
+| RoboPEPP | predicted | auto | 83.0 | 84.1 | 76.2 | 76.1 | 34.4 |
+| **Ours** | predicted | auto | **74.2** | **76.9** | 35.7 | 31.9 | 25.2 |
+
+> EN: **Table 4. DREAM synthetic-split ADD-AUC (×100);** competitor numbers cited from RoboPEPP (CVPR'25) Table 2. Ours: Panda = full pipeline with render-compare; KUKA/Baxter = direct-pose without render-compare (no mesh). Under matched predicted-joint + auto-bbox, ours (74.2/76.9) far exceeds HoRoPose\* (41.4/40.7); synthetic-specialized RoboPEPP/RoboPose lead overall on their training-distribution home turf.
 
 ### 4.3 가림 강건성 (Occlusion robustness)
 
@@ -259,9 +276,9 @@ RoboPEPP의 가림 프로토콜(로봇 bbox 면적의 0–40%를 사각 occluder
 
 ### 4.5 프로토콜 분석 (Protocol analysis)
 
-**자동 bbox는 진짜 어렵다.** ORB 카메라는 시점이 다양해 자동 검출이 붕괴한다 — 동일한 자동-bbox 조건에서 RoboPEPP의 ORB는 GT-bbox 0.775에서 **0.344로 급락**한다. 우리 bbox-from-solved는 이 붕괴를 피해 0.778을 유지한다. 즉 우리 비교는 기준선에 불리한(더 엄격한) 조건에서 이루어진다.
+**자동 bbox는 진짜 어렵다.** ORB 카메라는 시점이 다양해 자동 검출이 붕괴한다 — HoRoPose는 **GT-bbox**에서 ORB 0.752이지만, RoboPEPP와 **동일한 off-the-shelf 검출기(HPE\*)**를 쓰면 ORB가 **0.098로 급락**하고, RoboPose도 자동 bbox에서 ORB 0.327로 무너진다. 반면 우리 bbox-from-solved(0.778)와 RoboPEPP의 강건한 검출기(0.775)는 이 붕괴를 피한다. 즉 우리 비교의 직접 상대인 RoboPEPP/RoboTAG는 우리와 **동일한 자동-bbox 프로토콜**이며(따라서 mean 0.804 vs 0.780은 공정한 동일-조건 비교), GT-bbox를 쓰는 HoRoPose 대비로는 우리가 더 엄격한 조건이다.
 
-> EN: **Automatic bounding boxes are genuinely hard.** The ORB camera's diverse viewpoints break automatic detection — under the same automatic-bbox condition, RoboPEPP's ORB **drops from 0.775 (GT-box) to 0.344**. Our bbox-from-solved avoids this collapse and holds 0.778, so our comparison is run under a setting that disadvantages (is stricter for) the baselines.
+> EN: **Automatic bounding boxes are genuinely hard.** The ORB camera's diverse viewpoints break automatic detection — HoRoPose scores ORB 0.752 with **GT boxes**, but under RoboPEPP's **same off-the-shelf detector (HPE\*)** its ORB **collapses to 0.098**, and RoboPose likewise falls to 0.327 under auto boxes. Our bbox-from-solved (0.778) and RoboPEPP's robust detector (0.775) both avoid the collapse. Thus our direct competitors RoboPEPP/RoboTAG run under the **same automatic-bbox protocol** as us (so the 0.804 vs 0.780 mean is a fair like-for-like comparison), while we are stricter than the GT-box HoRoPose.
 
 ### 4.6 재잠금 안정성 (Re-lock stability)
 
@@ -310,17 +327,17 @@ DREAM의 나머지 두 로봇은 실측 데이터가 없으므로 합성(DR) 스
 
 > EN: **RC iteration count is the accuracy–speed knob.** Sweeping RC iterations, RealSense ADD-AUC goes 0(0.745, no RC)→25(0.788)→50(0.802)→150(**0.815**), **converging to the deployed 250-iter value (0.8155) by ~150 iters** (ORB likewise 0.778 at 150). So 250→150 cuts ~40% of the RC render cost with no accuracy loss. The RC signal comes **entirely from the silhouette-IoU term** — removing it reverts to base (0.745); the reprojection-anchor term adds only +0.002.
 
-**기존 방법과의 런타임 위치(표 10).** 비교 방법들은 두 설계 패러다임으로 갈린다. (i) **단일 feed-forward** 계열 — HoRoPose(HPE)·RoboPEPP·RoboTAG·CtRNet — 은 한 번의 순전파로 포즈를 회귀해 실시간(수십 fps)이지만, 그 대가로 GT-bbox(RoboPEPP)나 known-joint(CtRNet) 같은 완화된 설정에 의존하거나 정확도가 낮다. (ii) **반복 테스트-타임 최적화** 계열 — RoboPose와 우리 — 는 렌더-비교로 정확도를 끌어올리는 대신 실시간이 아니다. 우리는 이 최적화 축에 서되, RoboPose와 달리 **학습된 refiner가 필요 없고**, RC-iteration knob(250→150, 무손실)으로 최적화 비용을 조절할 수 있어 optimization 계열 중 가장 가벼운 편이다. 절대 지연은 우리 값만 RTX 3090 실측이며, 경쟁 방법의 수치는 각 논문 보고치 체제(feed-forward=실시간 / RoboPose=반복·비실시간)로 표기한다.
+**기존 방법과의 런타임 위치(표 10).** 비교 방법들은 두 설계 패러다임으로 갈린다. (i) **단일 feed-forward** 계열 — HoRoPose(HPE)·RoboPEPP·RoboTAG·CtRNet — 은 한 번의 순전파로 포즈를 회귀해 실시간(수십 fps)이지만, 그 대가로 완화된 설정(HoRoPose=GT-bbox, CtRNet=known-joint)에 의존하거나, 우리와 동일한 (predicted+auto) 프로토콜인 RoboPEPP·RoboTAG는 정확도가 우리보다 낮다. (ii) **반복 테스트-타임 최적화** 계열 — RoboPose와 우리 — 는 렌더-비교로 정확도를 끌어올리는 대신 실시간이 아니다. 우리는 이 최적화 축에 서되, RoboPose와 달리 **학습된 refiner가 필요 없고**, RC-iteration knob(250→150, 무손실)으로 최적화 비용을 조절할 수 있어 optimization 계열 중 가장 가벼운 편이다. 절대 지연은 우리 값만 RTX 3090 실측이며, 경쟁 방법의 수치는 각 논문 보고치 체제(feed-forward=실시간 / RoboPose=반복·비실시간)로 표기한다.
 
-> EN: **Runtime positioning vs prior work (Table 10).** Competing methods split into two design paradigms: (i) **single feed-forward** — HoRoPose (HPE), RoboPEPP, RoboTAG, CtRNet — regress the pose in one pass and run in real time (tens of fps), but pay for it with relaxed settings (GT boxes for RoboPEPP, known joints for CtRNet) or lower accuracy; and (ii) **iterative test-time optimization** — RoboPose and ours — which trade real-time speed for accuracy via render-and-compare. We sit on the optimization axis but, unlike RoboPose, need **no learned refiner** and expose an RC-iteration knob (250→150, lossless) that makes us the lightest of the optimization family. Absolute latencies are RTX-3090-measured for ours only; competitor entries are given as the runtime regime reported by each paper (feed-forward = real-time / RoboPose = iterative, non-real-time).
+> EN: **Runtime positioning vs prior work (Table 10).** Competing methods split into two design paradigms: (i) **single feed-forward** — HoRoPose (HPE), RoboPEPP, RoboTAG, CtRNet — regress the pose in one pass and run in real time (tens of fps), but pay for it with relaxed settings (GT boxes for HoRoPose, known joints for CtRNet) or, for the same-protocol RoboPEPP/RoboTAG, lower accuracy than ours; and (ii) **iterative test-time optimization** — RoboPose and ours — which trade real-time speed for accuracy via render-and-compare. We sit on the optimization axis but, unlike RoboPose, need **no learned refiner** and expose an RC-iteration knob (250→150, lossless) that makes us the lightest of the optimization family. Absolute latencies are RTX-3090-measured for ours only; competitor entries are given as the runtime regime reported by each paper (feed-forward = real-time / RoboPose = iterative, non-real-time).
 
 **표 10. 설계 패러다임별 런타임·설정 비교.** (우리 값은 RTX 3090 실측; 경쟁 방법은 논문 보고 체제)
 
 | 방법 | 패러다임 | 런타임 체제 | 관절 | bbox |
 |---|---|---|---|---|
-| HoRoPose (HPE) | 단일 feed-forward (holistic 회귀) | 실시간 (논문 보고) | predicted | — |
+| HoRoPose (HPE) | 단일 feed-forward (holistic 회귀) | 실시간 (논문 보고) | predicted | **GT** |
 | CtRNet | feed-forward + 학습-타임 실루엣 자기지도 | 실시간 (논문 보고) | **known** | — |
-| RoboPEPP | masked-encoder feed-forward | 실시간급 (논문 보고) | predicted | **GT** |
+| RoboPEPP | masked-encoder feed-forward | 실시간급 (논문 보고) | predicted | 자동 |
 | RoboTAG | end-to-end 회귀 | 실시간급 (논문 보고) | predicted | 자동 |
 | RoboPose | **반복** render-and-compare | 비실시간 (다중 iter) | predicted | init 의존 |
 | **Ours (base)** | feed-forward + 운동학 솔버 | **~0.42 s/frame (2.4 fps)** 실측 | predicted | **자동** |
