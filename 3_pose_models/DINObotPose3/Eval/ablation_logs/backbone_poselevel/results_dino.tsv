@@ -1,0 +1,4 @@
+dino	azure	ADD-AUC=0.8064
+dino	kinect	ADD-AUC=0.7392
+dino	realsense	ADD-AUC=0.7187
+dino	orb	ADD-AUC=0.7037

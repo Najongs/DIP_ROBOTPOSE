@@ -1078,3 +1078,19 @@ User asked "what other comparison groups are needed?" → prioritized + executed
   miscalibrated. DIRECTLY reinforces §4.3/§4.4 (cov value is under occlusion). Written into §4.4
   after conf-gate sensitivity (inline, no table — matches conf-gate style, avoids numbering break).
 - GPUs 0/3 freed after G1. siglip pose heads still on 1/2 (waiter b6u9ide18).
+
+## 2026-07-16 — ✅ §4.10 POSE-LEVEL backbone comparison DONE (DINOv3 >> SigLIP2 on real)
+- siglip pose heads finished: crop-angle best val MAE 20.26° (ep28, converged), crop-rot done
+  (30ep, best pose score 15.54 / geo 9.03°). Killed converged angle at ep29 to free GPU.
+- Ran matched pose-level eval (Eval/backbone_poselevel.sh): both backbones, --oracle-bbox (bypass
+  stage1, isolate backbone; single --model-name can't mix, siglip has no full-frame stage1 heads),
+  identical clean synth crop heads (angle_crop_174740/rot_crop_022535 vs siglip crop heads),
+  base-only, 4 real cameras, held-out 1000. Logs Eval/ablation_logs/backbone_poselevel/.
+- RESULT (ADD-AUC): DINOv3 azure0.806/kinect0.739/rs0.719/orb0.704 **mean 0.742** vs
+  SigLIP2 azure0.376/kinect0.236/rs0.582/orb0.371 **mean 0.391** → **Δ +0.351**.
+- 🔑 FINDING: pose-level gap FAR larger than detection. SigLIP2 crop-detector validates HIGH on
+  synth (synth-DR val AUC 0.859) but collapses on REAL dense keypoints/pose → image-text contrastive
+  features transfer to real-domain geometry markedly worse than DINOv3 dense SSL. Strengthens DINOv3
+  choice from "equal-and-frozen-better" to "materially better at pose on real". §4.10 rewritten
+  (two-level (i)detection (ii)pose), Table 12 extended with pose rows. Committed.
+- ✅ ALL PLANNED COMPARISON GROUPS COMPLETE. Paper: Tables 1-12, figs 1-11, §4.1-4.10 + G1 inline.
