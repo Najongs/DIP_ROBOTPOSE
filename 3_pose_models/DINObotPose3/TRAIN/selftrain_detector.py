@@ -139,10 +139,17 @@ def main():
 
     device = torch.device('cuda'); assert torch.cuda.is_available()
     os.makedirs(args.output_dir, exist_ok=True); IS = args.image_size
+    # SigLIP/SigLIP2 expect mean=std=0.5 ([-1,1]); DINOv3 uses ImageNet stats. Must match the backbone.
+    if "siglip" in args.model_name:
+        norm_mean = norm_std = [0.5, 0.5, 0.5]
+        print("==> SigLIP backbone detected: using mean=std=0.5 normalization")
+    else:
+        norm_mean = norm_std = None
     m = build_model(args, device)
 
     real_full = PoseEstimationDataset(args.real_dir, keypoint_names=KP, image_size=(IS, IS),
-                                      heatmap_size=(IS, IS), augment=False, include_angles=True, sigma=args.sigma)
+                                      heatmap_size=(IS, IS), augment=False, include_angles=True, sigma=args.sigma,
+                                      norm_mean=norm_mean, norm_std=norm_std)
     N = len(real_full.samples); cut = int(args.adapt_frac * N)
     adapt_idx = list(range(cut)); eval_idx = list(range(cut, N))
     if args.adapt_cap > 0 and len(adapt_idx) > args.adapt_cap:
@@ -176,7 +183,8 @@ def main():
 
     synth = PoseEstimationDataset(args.synth_dir, keypoint_names=KP, image_size=(IS, IS),
                                   heatmap_size=(IS, IS), augment=True, aug_level='strong',
-                                  include_angles=True, sigma=args.sigma)
+                                  include_angles=True, sigma=args.sigma,
+                                  norm_mean=norm_mean, norm_std=norm_std)
     pseudo_loader = DataLoader(Subset(real_wrap, kept), batch_size=args.batch_size, shuffle=True,
                                num_workers=8, pin_memory=True, drop_last=True)
     synth_loader = DataLoader(synth, batch_size=args.batch_size, shuffle=True, num_workers=8,

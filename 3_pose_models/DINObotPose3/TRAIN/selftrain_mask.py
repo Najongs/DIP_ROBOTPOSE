@@ -53,6 +53,12 @@ def main():
     mesh_verts = [((nm, fi), torch.from_numpy(load_obj_verts(mesh_path(nm))).to(device))
                   for nm, fi in LINK_MESH]
 
+    # SigLIP/SigLIP2 expect mean=std=0.5 ([-1,1]); DINOv3 uses ImageNet stats. Must match the backbone.
+    if "siglip" in args.model_name:
+        norm_mean = norm_std = [0.5, 0.5, 0.5]
+        print("==> SigLIP backbone detected: using mean=std=0.5 normalization")
+    else:
+        norm_mean = norm_std = None
     mp = AnglePredictor(args.model_name, S, head_type='mlp',
                         with_rotation=args.rot_head is not None, with_translation=args.rot_head is not None).to(device).eval()
     sd = torch.load(args.detector, map_location=device); sd = {k.replace('module.', ''): v for k, v in sd.items()}
@@ -67,7 +73,7 @@ def main():
     mask_head.load_state_dict(torch.load(args.mask_head, map_location=device))
 
     real = PoseEstimationDataset(args.real_dir, keypoint_names=KP, image_size=(S, S), heatmap_size=(S, S),
-                                 augment=False, include_angles=True)
+                                 augment=False, include_angles=True, norm_mean=norm_mean, norm_std=norm_std)
     N = len(real.samples); cut = int(args.adapt_frac * N); adapt = list(range(cut))
     if args.adapt_cap > 0 and len(adapt) > args.adapt_cap:
         st = max(1, len(adapt) // args.adapt_cap); adapt = adapt[::st][:args.adapt_cap]
@@ -101,7 +107,7 @@ def main():
     pseudo = pseudo.to(device)
 
     synth = PoseEstimationDataset(args.synth_dir, keypoint_names=KP, image_size=(S, S), heatmap_size=(S, S),
-                                  augment=False, include_angles=True)
+                                  augment=False, include_angles=True, norm_mean=norm_mean, norm_std=norm_std)
     ploader = DataLoader(Subset(rw, kept), batch_size=args.batch_size, shuffle=True, num_workers=8, pin_memory=True, drop_last=True)
     sloader = DataLoader(synth, batch_size=args.batch_size, shuffle=True, num_workers=8, pin_memory=True, drop_last=True)
 
