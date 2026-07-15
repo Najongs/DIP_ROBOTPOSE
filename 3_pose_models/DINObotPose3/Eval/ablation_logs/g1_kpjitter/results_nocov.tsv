@@ -1,0 +1,5 @@
+jitter	0	nocov	ADD-AUC=0.7469
+jitter	1	nocov	ADD-AUC=0.7222
+jitter	2	nocov	ADD-AUC=0.6615
+jitter	4	nocov	ADD-AUC=0.5200
+jitter	8	nocov	ADD-AUC=0.3074

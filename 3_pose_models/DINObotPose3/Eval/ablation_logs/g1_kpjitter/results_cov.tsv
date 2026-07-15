@@ -1,0 +1,5 @@
+jitter	0	cov	ADD-AUC=0.7452
+jitter	1	cov	ADD-AUC=0.7212
+jitter	2	cov	ADD-AUC=0.6561
+jitter	4	cov	ADD-AUC=0.4895
+jitter	8	cov	ADD-AUC=0.2932

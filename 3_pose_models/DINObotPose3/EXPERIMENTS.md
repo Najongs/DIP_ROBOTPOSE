@@ -1064,3 +1064,17 @@ User asked "what other comparison groups are needed?" → prioritized + executed
   google/siglip2-base-patch16-512, angle/rot ckpts = siglip best) → fill §4.10/Table 12 pose-level
   row (DINOv3 vs SigLIP2 pose ADD) → commit. Expected: siglip trails (detector real-Azure 0.72<0.80
   frozen; unfrozen ~equal at detection, pose TBD).
+
+## 2026-07-15 (cont.3) — G1 keypoint-noise sensitivity (on free GPUs 0/3, eval-only)
+- Added `--kp-jitter` to selfbbox_eval.py (inject isotropic Gaussian 2D noise into decoded kp before
+  solver; cov_inv kept from clean heatmap). Swept sigma={0,1,2,4,8}px on RealSense held-out 1000
+  base-only, cov-PnP ON vs OFF. Logs Eval/ablation_logs/g1_kpjitter/, script Eval/g1_kpjitter.sh.
+- RESULT (cov / no-cov): 0.745/0.747 · 0.721/0.722 · 0.656/0.662 · 0.490/0.520 · 0.293/0.307.
+- 🔑 HONEST FINDING (not the hypothesis): (a) solver degrades GRACEFULLY — gentle to sigma=2 (>DARK
+  decode error), cliff only sigma>=4; kinematic-reprojection solver tolerates sub-pixel-scale noise.
+  (b) cov-PnP ~= plain PnP under INJECTED uniform noise (even marginally worse at high sigma) →
+  cov-PnP's value is exploiting the heatmap's OWN uncertainty (blur/occlusion), NOT arbitrary-noise
+  robustness. Injected noise is uncorrelated with clean-heatmap covariance → anisotropic weighting
+  miscalibrated. DIRECTLY reinforces §4.3/§4.4 (cov value is under occlusion). Written into §4.4
+  after conf-gate sensitivity (inline, no table — matches conf-gate style, avoids numbering break).
+- GPUs 0/3 freed after G1. siglip pose heads still on 1/2 (waiter b6u9ide18).
