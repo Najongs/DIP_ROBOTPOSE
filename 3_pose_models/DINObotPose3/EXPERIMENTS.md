@@ -1094,3 +1094,17 @@ User asked "what other comparison groups are needed?" → prioritized + executed
   choice from "equal-and-frozen-better" to "materially better at pose on real". §4.10 rewritten
   (two-level (i)detection (ii)pose), Table 12 extended with pose rows. Committed.
 - ✅ ALL PLANNED COMPARISON GROUPS COMPLETE. Paper: Tables 1-12, figs 1-11, §4.1-4.10 + G1 inline.
+
+## 2026-07-16 (BUGFIX) — 🔴 SigLIP pose-level 0.391 INVALID (norm mismatch) → 재산출 중
+- User skeptical of −0.351 gap. INVESTIGATED → found bug: train_angle.py, train_rotation.py,
+  selfbbox_eval.py all used ImageNet norm even for SigLIP backbone, while train_heatmap.py (detector)
+  correctly used mean=std=0.5. So: siglip crop-detector trained @0.5 but heads trained @ImageNet AND
+  eval @ImageNet → 3-way inconsistency, siglip fed off-distribution input. **§4.10 siglip pose 0.391
+  is INVALID.** DINOv3 (ImageNet throughout: detector+heads+eval all consistent) UNAFFECTED → 0.742
+  valid. Detector-level Table 12 top rows also valid (train_heatmap was correct).
+- FIX (commit): added model-aware norm (0.5 for siglip) to all 3 files, mirroring train_heatmap.py.
+- Retraining siglip crop-angle+crop-rot with correct norm (run_siglip_pose_parallel.sh 1 2, GPU1/2,
+  confirmed "SigLIP backbone detected: mean=std=0.5"). out siglip_{angle,rot}_crop_20260716_010615.
+  Waiter **bmerxb3bu** fires on convergence → re-eval backbone_poselevel.sh siglip → fill real §4.10
+  numbers. Paper §4.10 pose (ii) + Table 12 pose rows marked ⏳ 재산출 pending. Expected: siglip
+  improves substantially from 0.391 (bug-inflated); true gap vs DINOv3 0.742 TBD.
