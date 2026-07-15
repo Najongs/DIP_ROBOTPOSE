@@ -71,11 +71,18 @@ def main(args):
     ang_names = args.angle_joint_names.split(',') if getattr(args, 'angle_joint_names', None) else None
     kp_names = (args.keypoint_names.split(',') if args.keypoint_names
                 else ['link0', 'link2', 'link3', 'link4', 'link6', 'link7', 'hand'])
+    # SigLIP/SigLIP2 expect mean=std=0.5 ([-1,1]); DINOv3 uses ImageNet stats. Must match the backbone.
+    if "siglip" in args.model_name:
+        norm_mean, norm_std = [0.5, 0.5, 0.5], [0.5, 0.5, 0.5]
+        print("==> SigLIP backbone detected: using mean=std=0.5 normalization")
+    else:
+        norm_mean = norm_std = None
     mk = lambda d, aug: PoseEstimationDataset(
         data_dir=d, keypoint_names=kp_names, image_size=(args.image_size, args.image_size),
         heatmap_size=(args.image_size, args.image_size), augment=aug, aug_level='strong',
         include_angles=True, sigma=2.5,
         crop_to_robot=args.crop_to_robot, crop_margin=args.crop_margin,
+        norm_mean=norm_mean, norm_std=norm_std,
         angle_joint_names=ang_names)
     train_ds, val_ds = mk(args.train_dir, True), mk(args.val_dir, False)
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True,

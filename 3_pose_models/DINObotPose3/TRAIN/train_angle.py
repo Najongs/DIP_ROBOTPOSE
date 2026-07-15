@@ -53,12 +53,20 @@ def main(args):
     ang_names = args.angle_joint_names.split(',') if getattr(args, 'angle_joint_names', None) else None
     fk_fn = _FK_BY_ROBOT[args.fk_robot]
     print(f"==> FK robot: {args.fk_robot} | angle joints: {ang_names or 'sim_state[:7]'}")
+    # SigLIP/SigLIP2 expect mean=std=0.5 ([-1,1]); DINOv3 uses ImageNet stats. Must match the
+    # backbone the frozen detector was trained under, or features go off-distribution.
+    if "siglip" in args.model_name:
+        norm_mean, norm_std = [0.5, 0.5, 0.5], [0.5, 0.5, 0.5]
+        print("==> SigLIP backbone detected: using mean=std=0.5 normalization")
+    else:
+        norm_mean = norm_std = None  # dataset default = ImageNet
     train_ds = PoseEstimationDataset(
         data_dir=args.train_dir, keypoint_names=kp_names,
         image_size=(args.image_size, args.image_size),
         heatmap_size=(args.image_size, args.image_size),
         augment=True, aug_level='strong', include_angles=True, sigma=2.5,
         crop_to_robot=args.crop_to_robot, crop_margin=args.crop_margin,
+        norm_mean=norm_mean, norm_std=norm_std,
         angle_joint_names=ang_names)
     val_ds = PoseEstimationDataset(
         data_dir=args.val_dir, keypoint_names=kp_names,
@@ -66,6 +74,7 @@ def main(args):
         heatmap_size=(args.image_size, args.image_size),
         augment=False, include_angles=True, sigma=2.5,
         crop_to_robot=args.crop_to_robot, crop_margin=args.crop_margin,
+        norm_mean=norm_mean, norm_std=norm_std,
         angle_joint_names=ang_names)
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True,
                               num_workers=args.num_workers, pin_memory=True, drop_last=True)

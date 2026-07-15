@@ -170,10 +170,18 @@ def main():
     print(f"stage1: {args.stage1_detector}\ncrop det: {args.crop_detector}\ncrop angle: {args.crop_angle}\nrot: {args.rot_head}\nval: {args.val_dir}")
 
     # full-frame dataset (NO crop) -> we crop ourselves from detected bbox
+    # SigLIP/SigLIP2 expect mean=std=0.5 ([-1,1]); DINOv3 uses ImageNet stats. Must match the backbone
+    # the heads/detector were trained under (train_heatmap/angle/rotation set the same).
+    if "siglip" in args.model_name:
+        _nm = _ns = [0.5, 0.5, 0.5]
+        print("==> SigLIP backbone detected: using mean=std=0.5 normalization")
+    else:
+        _nm = _ns = None
     ds = PoseEstimationDataset(args.val_dir,
                                keypoint_names=['link0', 'link2', 'link3', 'link4', 'link6', 'link7', 'hand'],
                                image_size=(IS, IS), heatmap_size=(IS, IS),
-                               augment=False, include_angles=True, sigma=2.5, crop_to_robot=False)
+                               augment=False, include_angles=True, sigma=2.5, crop_to_robot=False,
+                               norm_mean=_nm, norm_std=_ns)
     if args.frac_range:
         lo, hi = args.frac_range; Nall = len(ds.samples)
         ds.samples = ds.samples[int(lo * Nall):int(hi * Nall)]
