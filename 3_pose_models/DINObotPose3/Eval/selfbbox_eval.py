@@ -154,6 +154,8 @@ def main():
     ap.add_argument('--ms-local', type=int, default=0,
                     help='head-seeded local multi-start for the theta solve: N candidates = angle-head init + Gaussian(ms-sigma) perturbations, keep min-reproj. Fixes the monocular basin-finding for robots whose angle head cannot init within the solver basin (real-data robots without a synth angle prior).')
     ap.add_argument('--ms-sigma', type=float, default=45.0, help='local multi-start perturbation std in degrees (around the angle-head init)')
+    ap.add_argument('--kp-jitter', type=float, default=0.0,
+                    help='inject Gaussian 2D-localization noise (px std) into the decoded keypoints before the solver — PnP/solver robustness sweep (G1). cov_inv is kept from the clean heatmap, so this probes whether anisotropic whitening absorbs added noise.')
     args = ap.parse_args()
     _DUMP = {'fid': [], 'theta': [], 'kp_cam': [], 'gt3d': [], 'found': [], 'feat': [], 'reproj': []} if args.dump_npz else None
 
@@ -264,6 +266,10 @@ def main():
         if args.dark_decode:
             from decode_util import dark_decode
             kp2d = dark_decode(o2['heatmaps_2d'], sigma=args.dark_sigma)   # sub-pixel re-decode
+        if args.kp_jitter > 0:
+            # G1: additive 2D-localization noise (px std), deterministic per batch for reproducibility
+            _jg = torch.Generator(device=device).manual_seed(1234 + int(kp2d.shape[0]))
+            kp2d = kp2d + torch.randn(kp2d.shape, generator=_jg, device=device, dtype=kp2d.dtype) * args.kp_jitter
         R_init = o2.get('rot_matrix') if args.rot_head else None
         cov_inv = None
         if args.cov_pnp:
