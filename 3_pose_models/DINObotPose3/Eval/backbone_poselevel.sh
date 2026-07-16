@@ -18,8 +18,8 @@ else
   MODEL=google/siglip2-base-patch16-512
   S1DET=$T/outputs_heatmap/siglip2_unfrozen_20260602_184024/best_heatmap.pth
   CROPDET=$T/outputs_heatmap/siglip_crop_ddp_20260715_014111/best_heatmap.pth
-  ANG=$T/outputs_angle/siglip_angle_crop_20260715_071442/best_angle_head.pth
-  ROT=$T/outputs_rotation/siglip_rot_crop_20260715_071442/best_rot_head.pth
+  ANG=$T/outputs_angle/siglip_angle_crop_20260716_010615/best_angle_head.pth   # norm-fixed (mean=std=0.5)
+  ROT=$T/outputs_rotation/siglip_rot_crop_20260716_010615/best_rot_head.pth     # norm-fixed (mean=std=0.5)
 fi
 DR=../Dataset/Converted_dataset/DREAM_real
 RES=ablation_logs/backbone_poselevel; mkdir -p "$RES"
