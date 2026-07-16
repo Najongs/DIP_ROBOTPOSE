@@ -65,8 +65,9 @@ Same-condition ablations on the locked 1000-frame held-out set, per-camera deplo
   **mean 0.841 (+0.037)** — gain on FAR cameras (+0.05, predicted-angle is the far headroom); **Azure unchanged
   (0.788≈0.795) → its bottleneck is DEPTH not angles**. **#3** GISR in Table 2 (3-cam caveat). **#4 backbone
   DINOv3 vs SigLIP2 (matched ViT-B/16)**: §4.10 Table 12 — frozen DINOv3 wins (0.80 vs 0.72), unfrozen equal
-  → justifies our FROZEN DINOv3. Paper now Tables 1–12, figs 1–11. 🔄 RUNNING (continue): pose-level siglip
-  cascade (crop-det DDP → angle→rot→eval → fill §4.10) + D2 RC resolution sweep (→ §4.8). EXPERIMENTS.md 07-15.
+  → justifies our FROZEN DINOv3. Pose-level (norm-fixed, unfrozen both): **DINOv3 0.742 ≈ SigLIP2 0.752**
+  (essentially equal, confirms "unfrozen equal"; the early SigLIP 0.391 was a normalization bug, fixed).
+  G1 kp-noise sensitivity (§4.4) + D2 RC render-resolution sweep (§4.8, knee@448) done. Paper Tables 1–12, figs 1–11.
 
 ## Pipeline (deployable, oracle-free)
 ```

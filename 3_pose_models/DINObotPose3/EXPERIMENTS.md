@@ -1079,7 +1079,7 @@ User asked "what other comparison groups are needed?" → prioritized + executed
   after conf-gate sensitivity (inline, no table — matches conf-gate style, avoids numbering break).
 - GPUs 0/3 freed after G1. siglip pose heads still on 1/2 (waiter b6u9ide18).
 
-## 2026-07-16 — ✅ §4.10 POSE-LEVEL backbone comparison DONE (DINOv3 >> SigLIP2 on real)
+## 2026-07-16 — ~~§4.10 POSE-LEVEL backbone comparison (DINOv3 >> SigLIP2)~~ ⚠️ SUPERSEDED — see the RESOLVED entry below; the SigLIP 0.391/"DINOv3 >> SigLIP2" here was a NORMALIZATION BUG. Corrected truth: DINOv3 0.742 ≈ SigLIP2 0.752 (essentially equal).
 - siglip pose heads finished: crop-angle best val MAE 20.26° (ep28, converged), crop-rot done
   (30ep, best pose score 15.54 / geo 9.03°). Killed converged angle at ep29 to free GPU.
 - Ran matched pose-level eval (Eval/backbone_poselevel.sh): both backbones, --oracle-bbox (bypass
