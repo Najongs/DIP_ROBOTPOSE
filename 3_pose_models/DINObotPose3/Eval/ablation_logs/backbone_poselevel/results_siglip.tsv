@@ -1,4 +1,4 @@
-siglip	azure	ADD-AUC=0.3764
-siglip	kinect	ADD-AUC=0.2356
-siglip	realsense	ADD-AUC=0.5820
-siglip	orb	ADD-AUC=0.3708
+siglip	azure	ADD-AUC=0.7777
+siglip	kinect	ADD-AUC=0.7664
+siglip	realsense	ADD-AUC=0.7649
+siglip	orb	ADD-AUC=0.6978

@@ -390,9 +390,9 @@ DREAM의 나머지 두 로봇은 실측 데이터가 없으므로 합성(DR) 스
 
 ### 4.10 백본 선택: DINOv3 vs SigLIP2 (동일 크기) (Backbone choice)
 
-우리 파이프라인이 특정 백본에 의존하는지 확인하기 위해, **동일 크기(ViT-B/16, ~86M)**의 두 파운데이션 백본 DINOv3와 SigLIP2를 두 수준에서 비교한다(표 12). **(i) 2D 키포인트 검출 수준**(real-Azure 검출 AUC): **언프리즈(fine-tune) 시 둘은 동등**하고(둘 다 ~0.81), **동결(frozen) 시 DINOv3가 명확히 우위**(0.80 vs 0.72)다. 우리 배포 스택은 솔버의 서브픽셀 정밀도를 보존하기 위해 백본을 **동결**하므로(백본 적응은 §4.9에서 3중 반증), 이 동결-체제 우위가 DINOv3 선택을 정당화한다. **(ii) pose 수준**(4개 실측 카메라, GT-bbox·base-only로 백본만 격리, 동일 clean 합성 crop 헤드): DINOv3 mean **0.742**(az .806/ki .739/rs .719/orb .704). *[⏳ SigLIP2 pose 수치는 재산출 중 — 초기 실행에서 siglip 정규화(mean=std=0.5) 미적용 버그를 발견해 헤드 재학습 후 갱신 예정. DINOv3(ImageNet 정규화 일관)는 영향 없음.]*
+우리 파이프라인이 특정 백본에 의존하는지 확인하기 위해, **동일 크기(ViT-B/16, ~86M)**의 두 파운데이션 백본 DINOv3와 SigLIP2를 두 수준에서 비교한다(표 12). **(i) 2D 키포인트 검출 수준**(real-Azure 검출 AUC): **언프리즈(fine-tune) 시 둘은 동등**하고(둘 다 ~0.81), **동결(frozen) 시 DINOv3가 명확히 우위**(0.80 vs 0.72)다. 우리 배포 스택은 솔버의 서브픽셀 정밀도를 보존하기 위해 백본을 **동결**하므로(백본 적응은 §4.9에서 3중 반증), 이 동결-체제 우위가 DINOv3 선택을 정당화한다. **(ii) pose 수준**(4개 실측 카메라, GT-bbox·base-only로 백본만 격리, 동일 clean 합성 crop 헤드, 둘 다 unfreeze crop-detector): **두 백본은 pose에서도 사실상 동등**하다 — DINOv3 mean **0.742**(az .806/ki .739/rs .719/orb .704) vs SigLIP2 mean **0.752**(az .778/ki .766/rs .765/orb .698), 차이 +0.010로 실행-간 노이즈 수준이며 카메라별로도 엇갈린다(azure·orb는 DINOv3, kinect·realsense는 SigLIP2 근소 우위). 즉 pose-level 결과는 검출 수준의 "unfreeze 시 동등" 결론을 그대로 확인한다 — 성능은 특정 백본이 아니라 파운데이션 특징 일반에서 온다. **따라서 DINOv3 채택 근거는 pose 우위가 아니라, 우리가 배포하는 동결(frozen) 체제에서의 검출 우위(0.80 vs 0.72)다.**
 
-> EN: **Backbone choice: DINOv3 vs SigLIP2 (matched size).** To check our pipeline is not tied to a specific backbone, we compare DINOv3 and SigLIP2 at **matched size (ViT-B/16, ~86M)** at two levels (Table 12). **(i) 2D-keypoint detection** (real-Azure AUC): **unfrozen they are equal** (both ~0.81), while **frozen, DINOv3 clearly wins** (0.80 vs 0.72). Since our deployed stack **freezes** the backbone to preserve sub-pixel precision (adaptation triply refuted, §4.9), this frozen-regime edge justifies DINOv3. **(ii) pose level** (4 real cameras, GT-bbox + base-only to isolate the backbone, identical clean synthetic crop heads): DINOv3 mean **0.742** (az .806/ki .739/rs .719/orb .704). *[⏳ SigLIP2 pose numbers are being recomputed — an initial run used the wrong (ImageNet) normalization for the SigLIP backbone instead of mean=std=0.5; the heads are being retrained with the fix. DINOv3 (ImageNet throughout) is unaffected.]*
+> EN: **Backbone choice: DINOv3 vs SigLIP2 (matched size).** To check our pipeline is not tied to a specific backbone, we compare DINOv3 and SigLIP2 at **matched size (ViT-B/16, ~86M)** at two levels (Table 12). **(i) 2D-keypoint detection** (real-Azure AUC): **unfrozen they are equal** (both ~0.81), while **frozen, DINOv3 clearly wins** (0.80 vs 0.72). Since our deployed stack **freezes** the backbone to preserve sub-pixel precision (adaptation triply refuted, §4.9), this frozen-regime edge justifies DINOv3. **(ii) pose level** (4 real cameras, GT-bbox + base-only to isolate the backbone, identical clean synthetic crop heads, both with an unfrozen crop-detector): **the two backbones are essentially equal at pose level too** — DINOv3 mean **0.742** (az .806/ki .739/rs .719/orb .704) vs SigLIP2 mean **0.752** (az .778/ki .766/rs .765/orb .698), a +0.010 difference at the level of run-to-run noise, mixed per camera (DINOv3 leads on azure/orb, SigLIP2 on kinect/realsense). The pose-level result thus confirms the detection-level "equal when unfrozen" finding — performance comes from foundation features in general, not a specific backbone. **DINOv3 is therefore chosen not for a pose-level edge but for its detection advantage in the frozen regime we deploy (0.80 vs 0.72).**
 
 **표 12. DINOv3 vs SigLIP2 (ViT-B/16, ~86M) 백본 비교.** 상단: 2D 키포인트 검출 AUC(real-Azure, plateau). 하단: pose ADD-AUC@100mm(4개 실측 카메라, GT-bbox·base-only·동일 clean 합성 crop 헤드로 백본만 격리, held-out 1000).
 
@@ -400,14 +400,13 @@ DREAM의 나머지 두 로봇은 실측 데이터가 없으므로 합성(DR) 스
 |---|---|---|---|---|
 | 검출 (frozen) | real-Azure AUC | **0.80** | 0.72 | +0.08 |
 | 검출 (unfrozen, last-4 ft) | real-Azure AUC | 0.815 | 0.814 | ~0 |
-| 검출 (unfrozen) | synth-DR val AUC | — | 0.859 | — |
-| **pose** azure | ADD-AUC | **0.806** | ⏳ 재산출 | — |
-| **pose** kinect | ADD-AUC | **0.739** | ⏳ 재산출 | — |
-| **pose** realsense | ADD-AUC | **0.719** | ⏳ 재산출 | — |
-| **pose** orb | ADD-AUC | **0.704** | ⏳ 재산출 | — |
-| **pose mean** | ADD-AUC | **0.742** | ⏳ 재산출 | — |
+| pose azure | ADD-AUC | 0.806 | 0.778 | +0.028 |
+| pose kinect | ADD-AUC | 0.739 | 0.766 | −0.027 |
+| pose realsense | ADD-AUC | 0.719 | 0.765 | −0.046 |
+| pose orb | ADD-AUC | 0.704 | 0.698 | +0.006 |
+| **pose mean** | ADD-AUC | 0.742 | **0.752** | **−0.010** |
 
-> EN: **Table 12. DINOv3 vs SigLIP2 (ViT-B/16, ~86M) backbone comparison.** Top: 2D-keypoint detection AUC (real-Azure, plateau). Bottom: pose ADD-AUC@100mm (4 real cameras, GT-bbox + base-only + identical clean synthetic crop heads to isolate the backbone, held-out 1000). Detection is equal unfrozen and favors DINOv3 frozen; at pose level on real cameras the gap widens sharply (mean +0.351) despite SigLIP2's high synthetic-detection validation (0.859) — its image-text features transfer far worse to real-domain geometry than DINOv3's dense SSL features.
+> EN: **Table 12. DINOv3 vs SigLIP2 (ViT-B/16, ~86M) backbone comparison.** Top: 2D-keypoint detection AUC (real-Azure, plateau). Bottom: pose ADD-AUC@100mm (4 real cameras, GT-bbox + base-only + identical clean synthetic crop heads to isolate the backbone, both with an unfrozen crop-detector, held-out 1000). Detection is equal unfrozen and favors DINOv3 frozen; at pose level the two are essentially equal (mean 0.742 vs 0.752, within run-to-run noise, mixed per camera), confirming the "equal when unfrozen" finding. DINOv3 is deployed for its frozen-regime detection edge, not a pose-level advantage.
 
 ---
 

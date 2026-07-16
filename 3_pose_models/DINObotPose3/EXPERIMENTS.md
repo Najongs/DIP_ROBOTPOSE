@@ -1108,3 +1108,18 @@ User asked "what other comparison groups are needed?" → prioritized + executed
   Waiter **bmerxb3bu** fires on convergence → re-eval backbone_poselevel.sh siglip → fill real §4.10
   numbers. Paper §4.10 pose (ii) + Table 12 pose rows marked ⏳ 재산출 pending. Expected: siglip
   improves substantially from 0.391 (bug-inflated); true gap vs DINOv3 0.742 TBD.
+
+## 2026-07-16 (RESOLVED) — ✅ §4.10 pose-level CORRECTED: DINOv3 ≈ SigLIP2 (norm bug fixed)
+- Norm-fixed siglip heads (mean=std=0.5): angle val MAE **6.63°** (vs buggy 20.26°), rot geo **2.24°**
+  (vs 9.03°). Re-ran backbone_poselevel.sh siglip (eval also norm-fixed, "SigLIP backbone detected"
+  confirmed, all 1000 frames, no errors).
+- CORRECTED RESULT (ADD-AUC): DINOv3 az.806/ki.739/rs.719/orb.704 **mean 0.742** vs
+  SigLIP2 az.778/ki.766/rs.765/orb.698 **mean 0.752** → **Δ −0.010 (SigLIP2 marginally higher)**.
+- 🔑 CONCLUSION FLIPPED: the buggy 0.391/"DINOv3 materially better" was ENTIRELY a normalization
+  artifact. TRUTH: at pose level the two backbones are **essentially equal** (within run-noise, mixed
+  per camera: DINOv3 wins az/orb, SigLIP2 wins ki/rs). This CONFIRMS the detection-level "unfrozen
+  equal" finding — performance is from foundation features in general, not a specific backbone.
+  DINOv3 justified by FROZEN-regime detection edge (0.80 vs 0.72), NOT pose superiority.
+- §4.10 (i)/(ii) rewritten, Table 12 pose rows filled with real numbers + caption corrected, orphan
+  synth-val row removed. Old buggy tsv kept as results_siglip_BUGGY_imagenet_norm.tsv. Committed.
+- Lesson: always verify per-backbone preprocessing (siglip=0.5, dino=ImageNet) across train AND eval.
