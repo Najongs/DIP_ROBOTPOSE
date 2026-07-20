@@ -1,0 +1,123 @@
+% ============================================================================
+% DINObotPose3 — Overleaf-ready section content (generated from PAPER_DRAFT.md)
+% 규칙: 한국어 원문 = % 주석 / 영어 = 본문 / 인용 = \cite{key} (references.bib)
+%       그림·표 참조는 의도적으로 미기입 (마지막에 직접 추가 예정)
+% 주의: 아래 3개 키는 bib에 아직 없음 — 항목 추가 시 이 키와 일치시킬 것:
+%       li2018deepim (DeepIM), zhang2020distribution (DARK), laine2020modular (nvdiffrast)
+% Experiments 섹션은 C8 실험 반영 후 변환 예정 (표는 figures/table_dream.tex 참조)
+% ============================================================================
+
+% 제목: 단안 로봇 포즈 추정: 동결 파운데이션 특징과 불확실도-인지 기하 최적화, 제로샷 렌더 비교의 결합
+\title{Geometry-Guided Monocular Articulated Robot Pose Estimation with Frozen Foundation Features, Uncertainty-Aware Optimization, and Zero-Shot Render-and-Compare}
+
+% ----------------------------------------------------------------------------
+\begin{abstract}
+% 단안 RGB 영상 한 장으로 로봇 팔의 자세와 관절각을 추정하는 문제는 카메라-로봇 캘리브레이션의 핵심이지만, 관절각이 알려지지 않은 설정에서는 2차원 키포인트만으로 깊이와 스케일이 충분히 제약되지 않아 여전히 어렵다. 기존 방법들은 이 깊이 모호성을 학습된 깊이 회귀, 생성 모델 기반 키포인트 리프팅, 대규모 사전학습 prior 등 학습에 의존하여 해결해 왔다. 본 논문은 이를 추가 학습 없이 기하학적으로 해결하는 파이프라인 DINObotPose3를 제안한다. 동결된 파운데이션 백본이 서브픽셀 키포인트와 관절각·카메라 회전의 초기 추정을 제공하고, 운동학 솔버가 포즈를 복원하며, 제로샷 분할 마스크와 미분가능 렌더링으로 얻은 실루엣을 정합하는 테스트-타임 렌더-비교 단계가 깊이와 스케일만을 보정한다. 백본은 전 과정에서 동결되며, 백본을 실측 도메인에 적응시키는 것이 거친 2차원 지표를 개선하면서도 솔버가 요구하는 서브픽셀 정밀도를 훼손함을 실험으로 보인다. 가림에 대한 강건성은 약한 가림 증강과 카메라별 자가학습으로 확보한다. DREAM 실측 벤치마크 실험에서 제안 방법은 완전 자동 바운딩 박스를 사용하면서 4개 카메라 평균 ADD-AUC 0.804를 달성하여 동일 프로토콜에서 평가된 기존 방법들을 능가하며, 평가한 모든 가림 수준에서 가장 높은 정확도를 유지한다.
+Estimating the pose and joint angles of a robot arm from a single RGB image is central to camera-to-robot calibration, yet the problem remains difficult when the joint angles are unknown, because two-dimensional keypoints alone do not sufficiently constrain depth and scale. Existing methods address this depth ambiguity through learning, for example with learned depth regression, generative lifting of keypoints, or large-scale pretraining priors. This paper presents DINObotPose3, a pipeline that instead resolves the ambiguity geometrically, without additional training. A frozen foundation backbone provides sub-pixel keypoints together with initial estimates of the joint angles and camera rotation, a kinematic solver recovers the pose, and a test-time render-and-compare stage aligns a zero-shot segmentation mask with a differentiably rendered silhouette to correct only depth and scale. The backbone remains frozen throughout; we show experimentally that adapting it to real images improves coarse two-dimensional metrics while degrading the sub-pixel precision required by the solver. Robustness to occlusion is obtained with light occlusion augmentation and per-camera self-training. In experiments on the DREAM real-image benchmark, the proposed method attains a four-camera mean ADD-AUC of 0.804 with fully automatic bounding boxes, surpassing prior methods evaluated under the same protocol, and maintains the highest accuracy at every evaluated occlusion level. These results indicate that frozen foundation features combined with training-free geometric optimization are an effective alternative to learning-based depth estimation.
+\end{abstract}
+
+% ----------------------------------------------------------------------------
+\section{Introduction}
+\label{sec:introduction}
+
+% 로봇 팔을 단안 RGB 한 장에서 추정하는 문제는 카메라-로봇 캘리브레이션의 핵심이며, 정확한 캘리브레이션은 원격조작과 시각 서보잉 같은 하위 작업을 가능케 하는 전제다. 협업 환경에서는 로봇 링크의 3차원 상태 추정이 충돌 방지의 기반이 되기도 한다. 전통적 마커 기반 캘리브레이션의 한계로 마커리스 학습 기반이 표준이 되었다. 캘리브레이션은 저빈도·정확도-우선 작업. DREAM 벤치마크의 두 난이도 축과 최난 조합(predicted-joint + 완전 자동 bbox)을 목표.
+Estimating a robot arm from a single RGB image is the core of camera-to-robot calibration, which in turn enables downstream tasks such as teleoperation and visual servoing. In collaborative environments where humans and robots share a workspace, the ability to visually estimate the three-dimensional state of the robot links also underpins collision avoidance \cite{wang2024multimodal,othman2022overview}. Traditionally, this calibration has relied on fiducial markers such as ArUco and on controlled lighting, but installing and maintaining markers is cumbersome and poorly suited to dynamic environments \cite{garrido2014automatic,fiala2005artag,olson2011apriltag}. Learning-based methods that estimate the pose from the robot appearance alone have therefore become the standard. Calibration is a low-frequency, accuracy-first task, so this work prioritizes accuracy over real-time speed. The standard DREAM benchmark has two difficulty axes: whether the joint angles are known from encoders or must be predicted from the image, and whether the robot bounding box is given as ground truth or must be detected automatically. We target the hardest combination, predicted joint angles with fully automatic bounding boxes.
+
+% 이 설정의 근본 난제는 깊이와 스케일의 모호성이다. 단축 효과로 멀리 있는 팔과 가까이에서 접힌 팔이 거의 동일한 2차원 투영을 만들 수 있으므로, 키포인트가 정확해도 깊이 방향 오차가 최종 3차원 정확도를 지배한다.
+The fundamental difficulty of this setting is the ambiguity of depth and scale. Owing to foreshortening, a distant arm and a nearby folded arm can produce nearly identical two-dimensional projections, so errors along the depth direction dominate the final three-dimensional accuracy even when the keypoints themselves are precise. How this ambiguity is resolved therefore largely determines the performance of predicted-joint monocular estimation.
+
+% 계보: DREAM이 키포인트+PnP 파이프라인과 도메인 랜덤화 벤치마크를 확립. 이후 방법들은 깊이 모호성을 학습으로 해소(HoRoPose 루트깊이 회귀, RoboKeyGen 확산 리프팅, RoboPEPP 마스킹 사전학습, RoboPose 학습 refiner, SGTAPose 시간 정보, CtRNet known-joint 실루엣 손실). 공백: predicted-joint + 완전 자동 bbox에서 추가 학습 없는 해소는 부재. 배포 비용 논거. 본 연구가 공백을 채움.
+The foundation of this field was established by DREAM, which introduced the pipeline of predicting two-dimensional joint keypoints and recovering the camera-to-robot pose with PnP, together with a large-scale domain-randomized synthetic benchmark \cite{lee2020camera,lepetit2009ep}. Subsequent methods resolve the depth ambiguity through learning. HoRoPose trains a dedicated network to regress the root depth \cite{ban2024real}, RoboKeyGen lifts two-dimensional keypoints into three dimensions with a diffusion model \cite{tian2024robokeygen}, and RoboPEPP injects prior knowledge of the robot structure into its encoder through masked pretraining \cite{goswami2025robopepp}. In the render-and-compare lineage, RoboPose performs iterative refinement with a learned refiner network \cite{labbe2021single}, SGTAPose mitigates self-occlusion using temporal information from consecutive frames together with structural priors \cite{tian2023robot}, and CtRNet uses silhouette alignment as a training loss but operates in the known-joint setting where the joint angles are given \cite{lu2023markerless}. In summary, no existing method resolves the depth ambiguity without additional training in the predicted-joint regime with fully automatic bounding boxes. This gap also matters in practice: learning-based resolutions require collecting target data and retraining whenever the equipment layout or camera configuration changes, incurring substantial deployment cost, whereas a training-free correction removes this cost. This work fills that gap. A kinematic solver recovers the pose from sub-pixel keypoints and initial joint-angle and rotation estimates provided by a frozen foundation backbone, and a test-time optimization stage that aligns a zero-shot segmentation mask with a differentiably rendered silhouette corrects only depth and scale on each frame.
+
+% 설계 두 원칙: 1) 백본 동결(실험적 선택 — 적응은 거친 2차원 지표를 올리며 서브픽셀 정밀도 훼손) 2) 깊이는 기하로 보정(렌더-비교가 최대 단일 기여). 가림 강건성은 약한 증강 + 카메라별 자가학습. 결과 요약.
+The design follows two principles. First, the backbone remains frozen throughout. This is an experimental choice rather than a convenience: attempts to adapt the backbone to the real domain consistently improved coarse two-dimensional detection metrics while degrading the sub-pixel precision required by the solver. Second, depth is corrected geometrically rather than through learning. Test-time render-and-compare is the largest single contributor in the deployed stack, adding 0.043 to the mean accuracy, and recovers the depth errors of distant cameras whose depth signal is weak. In addition, robustness to occlusion is obtained with light occlusion augmentation and per-camera self-training that retains the augmentation, while training-free auxiliary components such as covariance-aware PnP and sub-pixel decoding add occlusion robustness at no extra cost. As a result, the method attains a mean ADD-AUC of 0.804 on the DREAM real benchmark with fully automatic bounding boxes, surpassing prior methods under the same protocol and maintaining the highest accuracy at every evaluated occlusion level.
+
+% 기여 3개: 1) 학습-불필요 테스트-타임 렌더-비교 깊이 보정 시스템(+cov-PnP, bbox-from-solved) 2) 동결 파운데이션 프론트엔드 발견 3) 가림 강건성. 추가로 DREAM 3로봇 적용 분석.
+The main contributions of this paper are threefold.
+\begin{itemize}
+  \item A training-free, test-time render-and-compare depth correction system. We present the first system in the predicted-joint regime with fully automatic bounding boxes that corrects only depth and scale on each test frame by aligning a zero-shot segmentation mask with a differentiably rendered silhouette. Covariance-aware PnP and an automatic cropping scheme that derives the bounding box from the forward-kinematic reprojection of the solved pose complete the system. It attains a mean ADD-AUC of 0.804 on the DREAM real benchmark, the best result under the same protocol, with render-and-compare as the largest single contributor.
+  \item An experimental finding on frozen foundation front-ends. Systematic ablations show that adapting the backbone improves coarse two-dimensional detection metrics while destroying the sub-pixel precision required by the geometric solver, and that pose accuracy derives from frozen foundation features in general rather than from one specific backbone.
+  \item Occlusion robustness. Combining light occlusion augmentation with per-camera self-training that retains the augmentation yields the highest accuracy at every evaluated occlusion level.
+\end{itemize}
+In addition, we apply the same pipeline to all three robots covered by DREAM, namely Panda, KUKA iiwa7, and Baxter, analyzing its applicability and the per-robot bottlenecks, such as an observability limit at the wrist joints.
+
+% ----------------------------------------------------------------------------
+\section{Related Work}
+\label{sec:related}
+
+% 관절각 known vs predicted가 비교의 전제. CtRNet·CtRNet-X는 known-joint라 직접 비교 불가. 실제 경쟁자는 RoboPose·HoRoPose·RoboTAG·RoboPEPP.
+Whether the joint angles are known or predicted is a prerequisite for any comparison. CtRNet and CtRNet-X consume encoder joint angles \cite{lu2023markerless,lu2025ctrnet} and are therefore not directly comparable to predicted-joint methods, as they solve an easier problem. The actual competitors in the predicted-joint regime are RoboPose \cite{labbe2021single}, HoRoPose \cite{ban2024real}, RoboTAG \cite{liu2025robotag}, and RoboPEPP \cite{goswami2025robopepp}, among which our method attains the best mean accuracy.
+
+% 렌더-비교는 우리 발명이 아님(DeepIM, RoboPose, CtRNet 선행). 우리 기여는 형태·체제·조합: 학습 refiner 없는 테스트-타임 최적화, 제로샷 SAM 마스크, predicted-joint·자동-bbox 체제, 깊이/스케일 보정기로 카메라별 선택 적용.
+Render-and-compare is not our invention. DeepIM introduced iterative render-and-compare for general objects \cite{li2018deepim}, RoboPose applied it to robots \cite{labbe2021single}, and CtRNet used differentiable silhouette matching as a self-supervised training loss \cite{lu2023markerless}. Our contribution is not the concept but its form, regime, and combination: the comparison is used as test-time pose optimization with no learned refiner; it targets zero-shot segmentation masks \cite{kirillov2023segment} rather than a trained segmenter; it is applied in the predicted-joint regime with automatic bounding boxes rather than the known-joint setting; and it acts as a depth and scale corrector applied selectively per camera rather than estimating the whole pose.
+
+% 최신 predicted-joint 기준선들은 렌더-비교를 쓰지 않음 → 구조적 차별점. 가림 메커니즘의 최근접 이웃은 RoboPEPP.
+Most recent predicted-joint baselines do not use render-and-compare. RoboPEPP, HoRoPose, RoboKeyGen, and RoboTAG all omit it, which makes our test-time silhouette-based depth corrector a structural differentiator. The nearest neighbor to our occlusion mechanism is RoboPEPP rather than the CLIP-based CtRNet-X: both use masking or occlusion training together with confidence filtering, but our method additionally benefits from the render-and-compare depth corrector and the training-free decoding components across all occlusion levels.
+
+% ----------------------------------------------------------------------------
+\section{Method}
+\label{sec:method}
+
+\subsection{Overview}
+\label{sec:overview}
+
+% 파이프라인 다섯 단계: 동결 DINOv3 백본 → DARK 서브픽셀 디코딩 → 관절각·회전 헤드 → cov-PnP + 운동학 재투영 정제 → 제로샷 SAM + 미분가능 렌더링 테스트-타임 깊이/스케일 보정. 백본은 끝까지 동결.
+% (그림: 파이프라인 개요 fig_pipeline — 참조는 나중에 삽입)
+The pipeline has five stages: a frozen DINOv3 ViT-B/16 backbone \cite{simeoni2025dinov3} detects heatmap keypoints; DARK sub-pixel decoding removes grid-quantization error \cite{zhang2020distribution}; joint-angle and rotation heads predict the joint configuration and the camera-to-robot rotation; covariance-aware PnP with kinematic reprojection refinement solves the pose; and a zero-shot segmentation mask \cite{kirillov2023segment} and a rendered silhouette are aligned by differentiable rendering \cite{laine2020modular} to correct depth and scale at test time. The backbone stays frozen throughout; we verified across three experiments that adapting it destroys the sub-pixel keypoint precision the solver needs.
+
+\subsection{Why Frozen, and Free Robustness Levers}
+\label{sec:frozen}
+
+% 용어 정의: 동결 = 백본 트랜스포머 가중치를 갱신하지 않음. 경량 헤드는 학습 대상.
+In this paper, frozen means that the DINOv3 backbone transformer weights are never updated. The lightweight heads on top, namely the keypoint, joint-angle, and rotation heads, are trained; the backbone-adaptation experiments discussed below are those that moved the backbone weights themselves.
+
+% 왜 동결인가: 적응 시도 일관 실패(공격적 SSL·co-finetune은 ADD 악화, 온건 SSL은 헤드 비정합으로 평가 불능). PCK 상승/ADD 하락 해리 = 거친 2차원 강건성과 서브픽셀 정밀도의 트레이드. 키포인트-노이즈 민감도와 정량 정합. 반대편 증거: known-joint 상한 0.841, SigLIP2 스왑에도 유지.
+Freezing the backbone is an experimental finding, not a convenience. Attempts to adapt the backbone to real images consistently failed: aggressive self-supervised adaptation and pseudo-keypoint co-finetuning degraded ADD, while a gentler variant left the downstream heads out of distribution and could not be evaluated. Notably, aggressive adaptation raised the real-image PCK at a five-pixel threshold by 0.069 while dropping ADD from 0.567 to 0.531; adaptation buys coarse two-dimensional robustness, which a coarse-threshold PCK rewards, at the cost of the sub-pixel precision the geometric solver needs. This dissociation is quantitatively consistent with our keypoint-noise sensitivity analysis, in which ADD-AUC loses 0.024 to 0.089 in the one-to-two-pixel noise range that a five-pixel PCK cannot even detect. Supervised co-finetuning fails in the same direction, with a monotone drop from 0.497 to 0.434, so the cause is not a particular training objective but moving the backbone at all. Conversely, the frozen front-end is precise enough: injecting ground-truth joint angles reaches a mean of 0.841, and swapping the backbone for SigLIP2 preserves pose accuracy, indicating that performance comes from frozen foundation features in general rather than from one specific model.
+
+% 무료 강건성 레버: DARK와 cov-PnP는 클린 기여 사실상 0(−0.003/−0.001), 채택 근거는 가림 강건성. DARK = log-히트맵 테일러 보정. cov-PnP = 이방성 2×2 공분산 마할라노비스 백색화, 20% 가림 +0.011. 기전은 노이즈 민감도 분석이 규명.
+The following two components require no training and contribute essentially nothing to clean accuracy, with leave-one-out mean changes of $-0.003$ and $-0.001$; they are adopted for occlusion robustness. DARK sub-pixel decoding applies a Taylor correction based on the first and second derivatives of the log-heatmap around the peak, removing the grid quantization of the argmax \cite{zhang2020distribution}. Covariance-aware PnP extracts a per-keypoint anisotropic $2\times2$ covariance from the local second moments of the heatmap and whitens the reprojection residual into a Mahalanobis distance, continuously down-weighting diffuse or multimodal keypoints per direction and generalizing scalar confidence gating; it adds 0.011 at twenty percent occlusion. Their mechanism, which exploits the uncertainty structure of the heatmap itself and is ineffective against externally injected noise, is established by our noise-sensitivity analysis.
+
+\subsection{Test-Time Render-and-Compare}
+\label{sec:rc}
+
+% 키포인트+운동학 추정 위에서 SAM 전경 마스크와 nvdiffrast 실루엣의 IoU를 최대화하도록 깊이/스케일을 미분가능 정제. 카메라별 토글(근거리 off, 원거리 +0.04~0.07).
+On top of the keypoint and kinematic estimates, we differentiably refine the depth and scale of the pose to maximize the intersection over union between a zero-shot robot foreground mask and a robot silhouette rendered with nvdiffrast \cite{kirillov2023segment,laine2020modular}. The segmentation model cleanly separates external occluders from the robot. This stage is toggled per camera: it is disabled for near cameras whose depth signal is already strong, and it is most beneficial on far cameras, contributing 0.04 to 0.07 ADD-AUC per camera.
+
+% 구현 노트: 오리지널 SAM ViT-B, 1차 패스 렌더 유도 점+박스 프롬프트, init-render 일치 마스크 선택. 더 크고 새로운 세그멘터 불필요(병목은 예측 관절각).
+Masks come from the original zero-shot SAM ViT-B model. Prompts are points and a box derived from the rendered mask of the first-pass pose, and among the multiple mask outputs we select the one most consistent with the initial render. Since geometry already indicates where the target is, larger segmenters promptable by text or concepts are unnecessary, and the dominant residual error is the predicted joint angles rather than mask quality.
+
+\subsection{Occlusion Robustness}
+\label{sec:occlusion}
+
+% 가림은 배포 시 흔하지만 합성 학습 데이터엔 거의 없음. 두 단계로 처리.
+Partial visibility is common at deployment but nearly absent from synthetic training data. We address it in two stages.
+
+% 약한 가림 증강 헤드: 노이즈 텍스처 사각 occluder 페이스트, 비율 0.3 이하, 키포인트 드롭 없음. 40% 가림에서 0.420 vs 깨끗 헤드 0.376. 강한 증강은 역효과.
+When training the joint-angle and rotation heads, we enable occlusion augmentation that pastes noise-textured rectangular occluders onto the robot. The key is to keep the augmentation gentle: the paste ratio is limited to at most 0.3 and no keypoint drop is used. A head exposed to occlusion from the start is more robust under occlusion, reaching 0.420 at forty percent occlusion compared with 0.376 for a head trained only on clean images, whereas strong augmentation backfires by hurting clean accuracy.
+
+% 합성 망각 방지를 유지한 카메라별 자가학습: 의사라벨 자가학습 중 가림 증강 유지. 실측 적응과 가림 강건성 동시 확보. 카메라별 최적 구성 선택.
+For each real camera we self-train on detector pseudo-labels to close the domain gap. Because pure self-training washes out occlusion robustness, we keep the occlusion augmentation on during self-training. This stack secures real-image adaptation and occlusion robustness simultaneously: for example, the Kinect camera gains real accuracy from self-training while its robustness at forty percent occlusion still exceeds both the head trained only on clean images and RoboPEPP. We select the best configuration per camera, using the full stack for Kinect and ORB and the light occlusion head directly for RealSense and Azure.
+
+% ----------------------------------------------------------------------------
+\section{Experiments}
+\label{sec:experiments}
+
+% TODO: PAPER_DRAFT.md 4.1~4.10을 C8(zero-real-adaptation 절제) 결과 반영 후 변환.
+% 표: figures/table_dream.tex(메인 결과) 재사용, 나머지 표는 마크다운→booktabs 변환 필요.
+% 그림·표 참조도 이 단계에서 일괄 삽입.
+
+% ----------------------------------------------------------------------------
+\section{Conclusion}
+\label{sec:conclusion}
+
+% 결론 P1: 문제·설계 원칙 요약(동결=발견, 무료 레버=가림 강건성, RC=최대 레버) + 결과.
+We presented DINObotPose3, a geometry-guided pipeline for monocular articulated robot pose estimation under the hardest setting, namely predicted joint angles and fully automatic bounding boxes. Its central design principle is to trust frozen foundation features and to handle depth, uncertainty, and occlusion with geometry rather than learned regression. Freezing is a finding, not a convenience: backbone-adaptation attempts consistently destroyed the sub-pixel precision the solver needs. On top of this, DARK sub-pixel decoding and covariance-aware PnP add occlusion robustness at no training cost, while differentiable render-and-compare against zero-shot segmentation masks corrects only depth and scale at test time and is the largest single contributor. The result is a mean ADD-AUC of 0.804 on the DREAM real benchmark, the best in the predicted-joint regime, surpassing RoboPEPP and RoboTAG with fully automatic bounding boxes and leading across all evaluated occlusion levels.
+
+% 결론 P2: 렌더-비교 발명 주장 아님 — 재구성이 기여. 학습형 깊이·종단간 회귀만이 답이 아님.
+We do not claim to have invented render-and-compare; the concept is prior art from RoboPose and CtRNet \cite{labbe2021single,lu2023markerless}. Our contribution is recasting it as a training-free test-time depth corrector built on a zero-shot segmentation model and a frozen foundation keypoint front-end for the predicted-joint regime with automatic bounding boxes. This shows that learned depth regression and end-to-end regression are not the only answers: the combination of foundation features, uncertainty-aware geometry, and zero-shot render comparison is a strong alternative.
+
+% 결론 P3: 3로봇 적용(적용 가능성) + 원위 관절 관측성 천장 정량 규명.
+Applying the same pipeline to all three DREAM robots, we confirmed that detection, data-fitted kinematics, and pose estimation run end-to-end on each of them. In doing so we quantified a fundamental limit, an observability ceiling for distal joints: a wrist joint's rotation about its own axis does not move its own keypoint, so its angle is under-determined even with perfect keypoints and is resolvable only from appearance. This insight applies broadly to keypoint-based robot pose estimation.
+
+% 결론 P4: 한계와 향후 과제(KUKA·Baxter 실측 부재, 메쉬 정합, 손목 관측성, RC 정식화).
+DREAM provides no public real data for KUKA or Baxter, precluding a real-data comparison for those robots. Extending the render-and-compare depth correction to KUKA requires a robot mesh matching the benchmark; public iiwa7 meshes differed from the DREAM model by roughly twenty millimeters and could not be aligned, whereas the Baxter mesh matched exactly. We attempted to break the Baxter wrist observability ceiling with an end-effector appearance-patch head, but it did not surpass the standard head, so resolving it likely requires additional information such as higher-resolution wrist crops or temporal and multi-view cues. Finally, our render-and-compare relies on per-camera gating and anchoring for stability; a formulation that suppresses the depth ambiguity of free silhouette optimization in a principled way remains future work.

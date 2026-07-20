@@ -108,4 +108,27 @@ RoboPEPP(CVPR'25)은 **순수 feed-forward**: masking 기반 embedding-predictiv
 
 ---
 
-관련: [sota_survey.md](sota_survey.md)(전체 계보·프로토콜 3축), [next_directions.md](next_directions.md)(로드맵), [../FINAL_MODEL.md](../FINAL_MODEL.md).
+## 5. "테스트-타임 최적화" 용어 근거 — 인용 후보 문헌 (2026-07-21 추가)
+
+우리 §2·기여의 "test-time (pose) optimization" 표현이 확립된 용어임을 뒷받침하는 문헌. 용어는 두 갈래이며 **우리 용법은 ②**다:
+
+- **① Test-time training / adaptation** — 모델 **가중치**를 추론 시점에 갱신하는 계열 (우리와 다름, 배경 인용용)
+- **② Test-time optimization** — 테스트 인스턴스별로 **변수(포즈·형상 등)를 최적화**하는 계열 (우리 RC = 이 형태: 프레임별로 깊이/스케일 변수만 경사 최적화, 가중치 불변)
+
+| 문헌 | 발표처 | 확립하는 것 | 우리 논문 인용 위치 | 검증 |
+|---|---|---|---|---|
+| Sun et al., "Test-Time Training with Self-Supervision..." (TTT) | ICML 2020 | ① 용어의 기원 | §2 배경 (선택) | 기억 기반 — LaTeX 시 서지 재확인 |
+| Wang et al., "Tent: Fully Test-Time Adaptation by Entropy Minimization" | ICLR 2021 | ① 계열 정석 | §2 배경 (선택) | 기억 기반 — 재확인 |
+| Liang et al., "A Comprehensive Survey on Test-Time Adaptation under Distribution Shifts" | IJCV 2024 (arXiv:2303.15361) | ①②를 아우르는 서베이 — 우산 인용 | §2 한 줄 | 기억 기반 — 재확인 |
+| **Rempe et al., "HuMoR: 3D Human Motion Model for Robust Pose Estimation"** | ICCV 2021 | ② **"TestOpt(test-time optimization)"를 명명**하고 포즈·형상 변수를 추론 시점 최적화 — **우리 용법과 가장 가까움** | **§2·§3.3 (권장 인용)** | ✅ 웹 확인 (geometry.stanford.edu/projects/humor) |
+| **Yen-Chen et al., "iNeRF: Inverting Neural Radiance Fields for Pose Estimation"** | IROS 2021 | ② **render-and-compare를 추론 시점 경사 최적화로 포즈 추정** — RC-as-test-time-optimization의 직계 | **§2 (권장 인용)** | ✅ 웹 확인 (iComMa 논문 경유) |
+| iComMa (Sun et al.), "Inverting 3D Gaussian Splatting for Camera Pose Estimation..." | arXiv 2312.09031 | ② 3DGS 버전 후속 — 계열이 현재도 활발함 | §2 (선택) | ✅ 웹 확인 |
+| "Uncertainty-Aware Testing-Time Optimization for 3D Human Pose Estimation" | arXiv 2402.02339 | ② 용어가 논문 **제목**에 쓰이는 수준으로 정착 | 각주감 (선택) | ✅ 웹 확인 |
+
+**권장 최소 인용 세트**: HuMoR + iNeRF (②의 대표, 우리와 형태 동일) + TTA 서베이(우산). 나머지는 지면 여유 시.
+**포지셔닝 문장 예**: "사람 포즈·NeRF 계열에서 확립된 per-instance test-time optimization(HuMoR의 TestOpt, iNeRF의 render-and-compare 포즈 최적화)을, 로봇 포즈의 predicted-joint·auto-bbox 체제에 깊이/스케일 보정기로 도입한다."
+**주의**: 로봇 포즈 서브필드(RoboPEPP·RoboTAG 등 feed-forward 계열)에는 이 용어가 등장하지 않음 — 낯설게 느껴질 수 있으나 그것이 오히려 위치 선언(계열 도입)의 근거.
+
+---
+
+관련: [sota_survey.md](sota_survey.md)(전체 계보·프로토콜 3축), [next_directions.md](next_directions.md)(로드맵), [references.bib](references.bib)(BibTeX — PAPER_DRAFT의 `[key]` 인용과 키 일치, 누락분은 파일 끝 TODO), [../FINAL_MODEL.md](../FINAL_MODEL.md).
