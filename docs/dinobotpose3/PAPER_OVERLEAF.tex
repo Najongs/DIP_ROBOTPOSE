@@ -130,69 +130,41 @@ Evaluation is performed on the DREAM benchmark \cite{lee2020camera}, which cover
 \subsection{Results}
 \label{sec:results}
 
-% 통합 대형 표 (RoboPEPP Table 2 스타일): 그룹 = known-joint / GT-box / 완전 자동. AUC(×100)↑ + Mean ADD(mm)↓.
-% 경쟁 수치는 RoboPEPP Table 2 인용, Ours의 mm는 배포 로그(full_*_rc / azure base)에서 추출(18.6/18.5/25.1/30.3).
-% cellcolor(yesbg/nobg)를 쓰려면 preamble에 \definecolor 필요 — 현재는 Yes/No 텍스트로 유지.
+% 통합 대형 표 (RoboPEPP Table 2 스타일): 실측 4스플릿+ALL과 합성 5스플릿을 한 표에. AUC(×100)만 표기, mm는 부록.
+% 경쟁 수치는 RoboPEPP Table 2 인용. cellcolor는 preamble \definecolor 필요 — 현재 Yes/No 텍스트.
 \begin{table*}[t!]
 \centering
 \footnotesize
 \setlength{\tabcolsep}{4pt}
 \resizebox{\textwidth}{!}{
-\begin{tabular}{@{} p{3.4cm} c c cc cc cc cc cc @{}}
+\begin{tabular}{@{} p{3.4cm} c c ccccc ccccc @{}}
 \toprule
-\multirow{4}{*}{\textbf{Method}} & \multirow{4}{*}{\shortstack{\textbf{Known}\\\textbf{Joint}\\\textbf{Angles}}} & \multirow{4}{*}{\shortstack{\textbf{Known}\\\textbf{Bounding}\\\textbf{Box}}} & \multicolumn{8}{c}{\textbf{DREAM Panda (real)}} & \multicolumn{2}{c}{\multirow{2}{*}{\textbf{ALL}}} \\
-\cmidrule(lr){4-11}
- & & & \multicolumn{2}{c}{AK} & \multicolumn{2}{c}{XK} & \multicolumn{2}{c}{RS} & \multicolumn{2}{c}{ORB} & & \\
-\cmidrule(lr){4-5} \cmidrule(lr){6-7} \cmidrule(lr){8-9} \cmidrule(lr){10-11} \cmidrule(l){12-13}
- & & & \textbf{AUC $\uparrow$} & \textbf{Mean $\downarrow$} & \textbf{AUC $\uparrow$} & \textbf{Mean $\downarrow$} & \textbf{AUC $\uparrow$} & \textbf{Mean $\downarrow$} & \textbf{AUC $\uparrow$} & \textbf{Mean $\downarrow$} & \textbf{AUC $\uparrow$} & \textbf{Mean $\downarrow$} \\
+\multirow{3}{*}{\textbf{Method}} & \multirow{3}{*}{\shortstack{\textbf{Known}\\\textbf{Joint}\\\textbf{Angles}}} & \multirow{3}{*}{\shortstack{\textbf{Known}\\\textbf{Bounding}\\\textbf{Box}}} & \multicolumn{5}{c}{\textbf{DREAM Panda (real)}} & \multicolumn{5}{c}{\textbf{DREAM (synthetic)}} \\
+\cmidrule(lr){4-8} \cmidrule(l){9-13}
+ & & & \textbf{AK} & \textbf{XK} & \textbf{RS} & \textbf{ORB} & \textbf{ALL} & \shortstack{\textbf{Panda}\\\textbf{DR}} & \shortstack{\textbf{Panda}\\\textbf{Photo}} & \shortstack{\textbf{KUKA}\\\textbf{DR}} & \shortstack{\textbf{KUKA}\\\textbf{Photo}} & \shortstack{\textbf{Baxter}\\\textbf{DR}} \\
 \midrule
-DREAM-F \cite{lee2020camera} & Yes & No & 68.9 & 11413.1 & 24.4 & 491911.4 & 76.1 & 2077.4 & 61.9 & 95319.1 & 57.8 & 150180.3 \\
-DREAM-Q \cite{lee2020camera} & Yes & No & 52.4 & 78089.3 & 37.5 & 54178.2 & 78.0 & 27.2 & 57.1 & 64247.6 & 56.3 & 49135.6 \\
-DREAM-H \cite{lee2020camera} & Yes & No & 60.5 & 56.5 & 64.0 & 7381.6 & 78.8 & 23.6 & 69.1 & 25685.3 & 68.1 & 8286.8 \\
-\textit{\textsc{DINObotPose} (known angles)} & Yes & No & \textit{78.8} & -- & \textit{87.8} & -- & \textit{86.7} & -- & \textit{83.1} & -- & \textit{84.1} & -- \\
+DREAM-F \cite{lee2020camera} & Yes & No & 68.9 & 24.4 & 76.1 & 61.9 & 57.8 & -- & -- & -- & -- & -- \\
+DREAM-Q \cite{lee2020camera} & Yes & No & 52.4 & 37.5 & 78.0 & 57.1 & 56.3 & -- & -- & -- & -- & -- \\
+DREAM-H \cite{lee2020camera} & Yes & No & 60.5 & 64.0 & 78.8 & 69.1 & 68.1 & 82.9 & 81.1 & 73.3 & 72.1 & -- \\
+\textit{\textsc{DINObotPose} (known angles)} & Yes & No & \textit{78.8} & \textit{87.8} & \textit{86.7} & \textit{83.1} & \textit{84.1} & -- & -- & -- & -- & -- \\
 \midrule
-HoRoPose \cite{ban2024real} & No & Yes & 82.2 & 18.9 & 76.0 & 24.0 & 75.2 & 24.8 & 75.2 & 24.8 & 77.2 & 23.1 \\
+HoRoPose \cite{ban2024real} & No & Yes & 82.2 & 76.0 & 75.2 & 75.2 & 77.2 & 82.7 & 82.0 & 75.1 & 73.9 & 58.8 \\
 \midrule
-RoboPose \cite{labbe2021single} & No & No & 70.4 & 34.3 & 77.6 & 22.3 & 74.3 & 26.0 & 70.4 & 30.1 & 73.2 & 28.2 \\
-HoRoPose$^{*}$ & No & No & 66.7 & 46.0 & -- & -- & 49.1 & 61.0 & 51.6 & 52.0 & -- & -- \\
-RoboTAG \cite{liu2025robotag} & No & No & \textbf{83.1} & -- & 75.7 & -- & 78.3 & -- & 58.8 & -- & 74.0 & -- \\
-RoboPEPP \cite{goswami2025robopepp} & No & No & 75.3 & \textbf{29.0} & 78.5 & 22.0 & 80.5 & 23.0 & 77.5 & 27.0 & 78.0 & 25.3 \\
-\textsc{DINObotPose} (Ours) & No & No & 79.5 & 30.3 & \textbf{82.8} & \textbf{18.5} & \textbf{81.5} & \textbf{18.6} & \textbf{77.8} & \textbf{25.1} & \textbf{80.4} & \textbf{23.1} \\
+RoboPose \cite{labbe2021single} & No & No & 70.4 & 77.6 & 74.3 & 70.4 & 73.2 & 82.9 & 79.7 & \textbf{80.2} & 73.2 & 32.7 \\
+HoRoPose$^{*}$ & No & No & 66.7 & -- & 49.1 & 51.6 & -- & 41.4 & 40.7 & 56.2 & 56.7 & 9.8 \\
+RoboTAG \cite{liu2025robotag} & No & No & \textbf{83.1} & 75.7 & 78.3 & 58.8 & 74.0 & -- & -- & -- & -- & -- \\
+RoboPEPP \cite{goswami2025robopepp} & No & No & 75.3 & 78.5 & 80.5 & 77.5 & 78.0 & \textbf{83.0} & \textbf{84.1} & 76.2 & \textbf{76.1} & \textbf{34.4} \\
+\textsc{DINObotPose} (Ours) & No & No & 79.5 & \textbf{82.8} & \textbf{81.5} & \textbf{77.8} & \textbf{80.4} & 74.2 & 76.9 & 35.7 & 31.9 & 25.2 \\
 \bottomrule
 \end{tabular}
 }
-\caption{Comprehensive evaluation on the real-world DREAM Panda splits. AUC denotes ADD-AUC at 100 mm ($\times$100, higher is better) and Mean the average ADD in mm (lower is better); AK, XK, RS, and ORB denote the Azure Kinect, Kinect 360, RealSense, and ORB splits, and ALL averages the four splits. Competitor numbers are cited from the RoboPEPP evaluation \cite{goswami2025robopepp}; HoRoPose$^{*}$ denotes HoRoPose re-evaluated with an off-the-shelf detector as reported by RoboPEPP, and (--) indicates unavailable values. The italic row injects ground-truth joint angles and solves only the camera pose, giving an upper bound of the proposed pipeline. Bold marks the best among methods with fully automatic boxes.}
-\label{tab:main_real}
+\caption{Comprehensive ADD-AUC evaluation on DREAM ($\times$100, higher is better). AK, XK, RS, and ORB denote the Azure Kinect, Kinect 360, RealSense, and ORB real splits, ALL averages the four real splits, and the synthetic columns cover the domain-randomized (DR) and photorealistic (Photo) test sets. Competitor numbers are cited from the RoboPEPP evaluation \cite{goswami2025robopepp}; HoRoPose$^{*}$ denotes HoRoPose re-evaluated with an off-the-shelf detector as reported by RoboPEPP, and (--) indicates unavailable values. The italic row injects ground-truth joint angles and solves only the camera pose, giving an upper bound of the proposed pipeline. On the synthetic splits the proposed method uses the full pipeline with render-and-compare for Panda and the direct-pose configuration for KUKA and Baxter, as no benchmark-matched mesh is available. Bold marks the best among methods with fully automatic boxes; per-camera mean ADD in millimeters is reported in the appendix.}
+\label{tab:main}
 \end{table*}
 
 \subsubsection{Comparison with the State of the Art}
 DINObotPose attains the best mean ADD-AUC of 80.4 in the predicted-joint regime. The mean margin of 2.4 over RoboPEPP is more than twice the estimated run-to-run noise of about 1.0. Per camera, the lead is clear on Kinect and Azure, where the margins reach 4.3 and 4.2, while RealSense and ORB are statistical ties within noise; the method trails on no camera. The known-joint upper bound of 84.1 concentrates its gain on the distant cameras, indicating that most of the remaining gap there is predicted-angle error, whereas the near Azure camera is unchanged, pointing to a depth rather than an angle bottleneck.
 % DINObotPose는 predicted-joint 체제에서 최고 평균 ADD-AUC 80.4를 달성한다. RoboPEPP 대비 평균 마진 2.4는 실행-간 노이즈 추정치(약 1.0)의 2배가 넘는다. 카메라별로는 Kinect와 Azure에서 각각 4.3, 4.2로 명확히 앞서고, RealSense와 ORB는 노이즈 범위 내 통계적 동률이며, 어느 카메라에서도 뒤지지 않는다. known-joint 상한 84.1의 이득은 원거리 카메라에 집중되어 그쪽 잔여 격차의 대부분이 예측 관절각 오차임을 보이고, 근거리 Azure는 불변이라 병목이 각도가 아니라 깊이임을 가리킨다.
-
-% 표: 합성 스플릿 (DR·Photo) ADD-AUC
-\begin{table}[t!]
-\centering
-\footnotesize
-\setlength{\tabcolsep}{3pt}
-\begin{tabular}{@{} l c c ccccc @{}}
-\toprule
-\multirow{2}{*}{\textbf{Method}} & \multirow{2}{*}{\shortstack{\textbf{Known}\\\textbf{Angles}}} & \multirow{2}{*}{\shortstack{\textbf{Known}\\\textbf{Box}}} & \multicolumn{2}{c}{\textbf{Panda}} & \multicolumn{2}{c}{\textbf{KUKA}} & \textbf{Baxter} \\
-\cmidrule(lr){4-5} \cmidrule(lr){6-7} \cmidrule(l){8-8}
- & & & \textbf{DR} & \textbf{Photo} & \textbf{DR} & \textbf{Photo} & \textbf{DR} \\
-\midrule
-DREAM-H \cite{lee2020camera} & Yes & No & 82.9 & 81.1 & 73.3 & 72.1 & -- \\
-\midrule
-HoRoPose \cite{ban2024real} & No & Yes & 82.7 & 82.0 & 75.1 & 73.9 & 58.8 \\
-\midrule
-RoboPose \cite{labbe2021single} & No & No & 82.9 & 79.7 & \textbf{80.2} & 73.2 & 32.7 \\
-HoRoPose$^{*}$ & No & No & 41.4 & 40.7 & 56.2 & 56.7 & 9.8 \\
-RoboPEPP \cite{goswami2025robopepp} & No & No & \textbf{83.0} & \textbf{84.1} & 76.2 & \textbf{76.1} & \textbf{34.4} \\
-\textsc{DINObotPose} (Ours) & No & No & 74.2 & 76.9 & 35.7 & 31.9 & 25.2 \\
-\bottomrule
-\end{tabular}
-\caption{ADD-AUC on the DREAM synthetic test splits, with domain-randomized (DR) and photorealistic (Photo) sets. Competitor numbers are cited from RoboPEPP \cite{goswami2025robopepp}; HoRoPose$^{*}$ as in the main table. For the proposed method, Panda uses the full pipeline with render-and-compare, while KUKA and Baxter use the direct-pose configuration without render-and-compare, as no benchmark-matched mesh is available. Bold marks the best among methods with fully automatic boxes.}
-\label{tab:synthetic}
-\end{table}
 
 On the synthetic splits that prior methods report as standard, the pipeline does not lead: on the Panda synthetic tests it reaches 74.2 and 76.9 against 83.0 and 84.1 for RoboPEPP, whose training distribution matches those splits. Controlling the protocol changes the picture, however: HoRoPose scores 82.7 and 82.0 with ground-truth boxes but collapses to 41.4 and 40.7 under an off-the-shelf detector, whereas the fully automatic pipeline holds 74.2 and 76.9, exceeding the only directly comparable configuration by a wide margin.
 % 기존 방법들이 표준으로 보고하는 합성 스플릿에서는 우리 파이프라인이 선두가 아니다: Panda 합성 테스트에서 74.2와 76.9로, 학습 분포가 그 스플릿과 일치하는 RoboPEPP의 83.0과 84.1에 미치지 못한다. 그러나 프로토콜을 통제하면 그림이 달라진다: HoRoPose는 정답 박스로 82.7과 82.0을 기록하지만 기성 검출기 아래에서 41.4와 40.7로 붕괴하는 반면, 완전 자동인 우리 파이프라인은 74.2와 76.9를 유지하여 유일한 직접 비교 구성을 큰 격차로 상회한다.
@@ -324,3 +296,30 @@ Applied to all three DREAM robots, the pipeline runs end-to-end on each, and the
 The practical appeal of the design lies in its deployment cost. The depth corrector requires no training, the backbone is never adapted, and even the configuration without any real-image adaptation remains competitive with the strongest feed-forward baseline, so the pipeline can be moved to a new camera or site with little additional data collection. This property suits safety monitoring in human-robot collaboration environments and makes the pipeline a practical tool for automatically generating labeled 3D robot-pose data for training future robot foundation models.
 % 이 설계의 실용적 매력은 배포 비용에 있다. 깊이 보정기는 학습이 필요 없고 백본은 결코 적응시키지 않으며, 실측 적응을 전혀 쓰지 않는 구성조차 최강 feed-forward 기준선과 경쟁 가능하므로, 파이프라인을 새 카메라나 현장으로 옮길 때 추가 데이터 수집이 거의 필요 없다. 이 성질은 인간-로봇 협업 환경의 안전 모니터링에 적합하며, 향후 로봇 파운데이션 모델 학습을 위한 라벨링된 3D 로봇 포즈 데이터의 자동 생성 도구로도 파이프라인을 활용할 수 있게 한다.
 \newpage
+% ----------------------------------------------------------------------------
+\appendix
+\section{Appendix}
+\label{sec:appendix}
+
+% 부록: 본문 통합 표에서 제외한 카메라별 평균 ADD(mm). 경쟁 수치는 RoboPEPP Table 2 인용, Ours는 배포 로그에서 추출.
+\begin{table}[t!]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{} l ccccc @{}}
+\toprule
+\textbf{Method} & \textbf{AK} & \textbf{XK} & \textbf{RS} & \textbf{ORB} & \textbf{ALL} \\
+\midrule
+DREAM-F \cite{lee2020camera} & 11413.1 & 491911.4 & 2077.4 & 95319.1 & 150180.3 \\
+DREAM-Q \cite{lee2020camera} & 78089.3 & 54178.2 & 27.2 & 64247.6 & 49135.6 \\
+DREAM-H \cite{lee2020camera} & 56.5 & 7381.6 & 23.6 & 25685.3 & 8286.8 \\
+HoRoPose \cite{ban2024real} & 18.9 & 24.0 & 24.8 & 24.8 & 23.1 \\
+RoboPose \cite{labbe2021single} & 34.3 & 22.3 & 26.0 & 30.1 & 28.2 \\
+HoRoPose$^{*}$ & 46.0 & -- & 61.0 & 52.0 & -- \\
+RoboPEPP \cite{goswami2025robopepp} & 29.0 & 22.0 & 23.0 & 27.0 & 25.3 \\
+\textsc{DINObotPose} (Ours) & 30.3 & \textbf{18.5} & \textbf{18.6} & \textbf{25.1} & \textbf{23.1} \\
+\bottomrule
+\end{tabular}
+\caption{Per-camera mean ADD in millimeters on the DREAM Panda real splits (lower is better), complementing the AUC comparison in the main table. Competitor numbers are cited from the RoboPEPP evaluation \cite{goswami2025robopepp}; (--) indicates unavailable values, and bold marks the best among methods with fully automatic boxes.}
+\label{tab:mean_mm}
+\end{table}
