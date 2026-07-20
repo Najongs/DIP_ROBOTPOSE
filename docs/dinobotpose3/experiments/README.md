@@ -23,4 +23,6 @@
 
 | 비평가↔보완자 에이전트 토론 (사전 리뷰) | 07-20 | 🔴 **C8 발견**: 표 6 self-train 절제가 rot 자가학습을 유지 → zero-real-adaptation 수치 미측정(임계 실험 `zero_adapt` 실행) + P0 문구 수정 일괄 반영 | [2026-07-20_critic_debate.md](2026-07-20_critic_debate.md) |
 
+| PAPER_OVERLEAF.tex 논문 조립 | 07-21 | 📝 오버리프 초안 완성 — 전 섹션 작성·무인칭·×100·통합 표(로봇별+Real/Synth)·수식 코드검증·스타일 규칙 확정. 남은 것: 그림·\ref·RoboPEPP 재현 | [2026-07-21_overleaf_paper_assembly.md](2026-07-21_overleaf_paper_assembly.md) |
+
 관련 문서: [SOTA 서베이](../references/sota_survey.md) · [다음 시도 로드맵](../references/next_directions.md) · 반증 맵은 로드맵 §3
