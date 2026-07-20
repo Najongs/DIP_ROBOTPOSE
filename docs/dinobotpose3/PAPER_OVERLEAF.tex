@@ -139,26 +139,26 @@ Evaluation is performed on the DREAM benchmark \cite{lee2020camera}, which cover
 \resizebox{\textwidth}{!}{
 \begin{tabular}{@{} p{3.4cm} c c ccccc ccccc @{}}
 \toprule
-\multirow{3}{*}{\textbf{Method}} & \multirow{3}{*}{\shortstack{\textbf{Known}\\\textbf{Joint}\\\textbf{Angles}}} & \multirow{3}{*}{\shortstack{\textbf{Known}\\\textbf{Bounding}\\\textbf{Box}}} & \multicolumn{7}{c}{\textbf{Panda}} & \multicolumn{2}{c}{\textbf{KUKA}} & \textbf{Baxter} \\
-\cmidrule(lr){4-10} \cmidrule(lr){11-12} \cmidrule(l){13-13}
- & & & \textbf{AK} & \textbf{XK} & \textbf{RS} & \textbf{ORB} & \textbf{ALL} & \textbf{DR} & \textbf{Photo} & \textbf{DR} & \textbf{Photo} & \textbf{DR} \\
+\multirow{3}{*}{\textbf{Method}} & \multirow{3}{*}{\shortstack{\textbf{Known}\\\textbf{Joint}\\\textbf{Angles}}} & \multirow{3}{*}{\shortstack{\textbf{Known}\\\textbf{Bounding}\\\textbf{Box}}} & \multirow{3}{*}{\textbf{ALL}} & \multicolumn{6}{c}{\textbf{Panda}} & \multicolumn{2}{c}{\textbf{KUKA}} & \textbf{Baxter} \\
+\cmidrule(lr){5-10} \cmidrule(lr){11-12} \cmidrule(l){13-13}
+ & & & & \textbf{AK} & \textbf{XK} & \textbf{RS} & \textbf{ORB} & \textbf{DR} & \textbf{Photo} & \textbf{DR} & \textbf{Photo} & \textbf{DR} \\
 \midrule
-DREAM-F \cite{lee2020camera} & Yes & No & 68.9 & 24.4 & 76.1 & 61.9 & 57.8 & -- & -- & -- & -- & -- \\
-DREAM-Q \cite{lee2020camera} & Yes & No & 52.4 & 37.5 & 78.0 & 57.1 & 56.3 & -- & -- & -- & -- & -- \\
-DREAM-H \cite{lee2020camera} & Yes & No & 60.5 & 64.0 & 78.8 & 69.1 & 68.1 & 82.9 & 81.1 & 73.3 & 72.1 & -- \\
-\textit{\textsc{DINObotPose} (known angles)} & Yes & No & \textit{78.8} & \textit{87.8} & \textit{86.7} & \textit{83.1} & \textit{84.1} & -- & -- & -- & -- & -- \\
+DREAM-F \cite{lee2020camera} & Yes & No & -- & 68.9 & 24.4 & 76.1 & 61.9 & -- & -- & -- & -- & -- \\
+DREAM-Q \cite{lee2020camera} & Yes & No & -- & 52.4 & 37.5 & 78.0 & 57.1 & -- & -- & -- & -- & -- \\
+DREAM-H \cite{lee2020camera} & Yes & No & -- & 60.5 & 64.0 & 78.8 & 69.1 & 82.9 & 81.1 & 73.3 & 72.1 & -- \\
+\textit{\textsc{DINObotPose} (known angles)} & Yes & No & -- & \textit{78.8} & \textit{87.8} & \textit{86.7} & \textit{83.1} & -- & -- & -- & -- & -- \\
 \midrule
-HoRoPose \cite{ban2024real} & No & Yes & 82.2 & 76.0 & 75.2 & 75.2 & 77.2 & 82.7 & 82.0 & 75.1 & 73.9 & 58.8 \\
+HoRoPose \cite{ban2024real} & No & Yes & 75.7 & 82.2 & 76.0 & 75.2 & 75.2 & 82.7 & 82.0 & 75.1 & 73.9 & 58.8 \\
 \midrule
-RoboPose \cite{labbe2021single} & No & No & 70.4 & 77.6 & 74.3 & 70.4 & 73.2 & 82.9 & 79.7 & \textbf{80.2} & 73.2 & 32.7 \\
-HoRoPose$^{*}$ & No & No & 66.7 & -- & 49.1 & 51.6 & -- & 41.4 & 40.7 & 56.2 & 56.7 & 9.8 \\
-RoboTAG \cite{liu2025robotag} & No & No & \textbf{83.1} & 75.7 & 78.3 & 58.8 & 74.0 & -- & -- & -- & -- & -- \\
-RoboPEPP \cite{goswami2025robopepp} & No & No & 75.3 & 78.5 & 80.5 & 77.5 & 78.0 & \textbf{83.0} & \textbf{84.1} & 76.2 & \textbf{76.1} & \textbf{34.4} \\
-\textsc{DINObotPose} (Ours) & No & No & 79.5 & \textbf{82.8} & \textbf{81.5} & \textbf{77.8} & \textbf{80.4} & 74.2 & 76.9 & 35.7 & 31.9 & 25.2 \\
+RoboPose \cite{labbe2021single} & No & No & 71.3 & 70.4 & 77.6 & 74.3 & 70.4 & 82.9 & 79.7 & \textbf{80.2} & 73.2 & 32.7 \\
+HoRoPose$^{*}$ & No & No & -- & 66.7 & -- & 49.1 & 51.6 & 41.4 & 40.7 & 56.2 & 56.7 & 9.8 \\
+RoboTAG \cite{liu2025robotag} & No & No & -- & \textbf{83.1} & 75.7 & 78.3 & 58.8 & -- & -- & -- & -- & -- \\
+RoboPEPP \cite{goswami2025robopepp} & No & No & \textbf{74.0} & 75.3 & 78.5 & 80.5 & 77.5 & \textbf{83.0} & \textbf{84.1} & 76.2 & \textbf{76.1} & \textbf{34.4} \\
+\textsc{DINObotPose} (Ours) & No & No & 62.8 & 79.5 & \textbf{82.8} & \textbf{81.5} & \textbf{77.8} & 74.2 & 76.9 & 35.7 & 31.9 & 25.2 \\
 \bottomrule
 \end{tabular}
 }
-\caption{Comprehensive ADD-AUC evaluation on DREAM ($\times$100, higher is better), grouped by robot. For Panda, AK, XK, RS, and ORB denote the Azure Kinect, Kinect 360, RealSense, and ORB real splits with ALL their average, while DR and Photo are the domain-randomized and photorealistic synthetic test sets; KUKA and Baxter are synthetic only. Competitor numbers are cited from the RoboPEPP evaluation \cite{goswami2025robopepp}; HoRoPose$^{*}$ denotes HoRoPose re-evaluated with an off-the-shelf detector as reported by RoboPEPP, and (--) indicates unavailable values. The italic row injects ground-truth joint angles and solves only the camera pose, giving an upper bound of the proposed pipeline. On the synthetic splits the proposed method uses the full pipeline with render-and-compare for Panda and the direct-pose configuration for KUKA and Baxter, as no benchmark-matched mesh is available. Bold marks the best among methods with fully automatic boxes; per-camera mean ADD in millimeters is reported in the appendix.}
+\caption{Comprehensive ADD-AUC evaluation on DREAM ($\times$100, higher is better), grouped by robot. ALL averages all nine splits and is reported only when every split is available. For Panda, AK, XK, RS, and ORB denote the Azure Kinect, Kinect 360, RealSense, and ORB real splits, while DR and Photo are the domain-randomized and photorealistic synthetic test sets; KUKA and Baxter are synthetic only. Competitor numbers are cited from the RoboPEPP evaluation \cite{goswami2025robopepp}; HoRoPose$^{*}$ denotes HoRoPose re-evaluated with an off-the-shelf detector as reported by RoboPEPP, and (--) indicates unavailable values. The italic row injects ground-truth joint angles and solves only the camera pose, giving an upper bound of the proposed pipeline. On the synthetic splits the proposed method uses the full pipeline with render-and-compare for Panda and the direct-pose configuration for KUKA and Baxter, as no benchmark-matched mesh is available. Bold marks the best among methods with fully automatic boxes; per-camera mean ADD in millimeters is reported in the appendix.}
 \label{tab:main}
 \end{table*}
 
