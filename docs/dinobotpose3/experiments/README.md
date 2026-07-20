@@ -21,4 +21,6 @@
 
 | 논문 포지셔닝 재구성 + 파이프라인 피규어 | 07-20 | 📝 세션(측정 없음) — 2축 스토리(frozen 기여 승격+PCK/ADD 해리 본문 반영, 무료 레버 격하), fig_pipeline 제작, SAM=v1 확인 | [2026-07-20_paper_positioning.md](2026-07-20_paper_positioning.md) |
 
+| 비평가↔보완자 에이전트 토론 (사전 리뷰) | 07-20 | 🔴 **C8 발견**: 표 6 self-train 절제가 rot 자가학습을 유지 → zero-real-adaptation 수치 미측정(임계 실험 `zero_adapt` 실행) + P0 문구 수정 일괄 반영 | [2026-07-20_critic_debate.md](2026-07-20_critic_debate.md) |
+
 관련 문서: [SOTA 서베이](../references/sota_survey.md) · [다음 시도 로드맵](../references/next_directions.md) · 반증 맵은 로드맵 §3

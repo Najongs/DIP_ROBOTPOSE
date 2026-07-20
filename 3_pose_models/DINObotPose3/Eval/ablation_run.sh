@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Paper ablation campaign — run ONE (ablation, camera) cell on a given GPU.
 #   ablation_run.sh <ablation> <camera> <gpu_uuid>
-#   ablation ∈ full|no_cov|no_dark|no_rot|no_rc|gt_bbox|no_confgate|no_occaug
+#   ablation ∈ full|no_cov|no_dark|no_rot|no_rc|gt_bbox|no_confgate|no_occaug|zero_adapt
 #   camera   ∈ realsense|kinect|orb|azure
 # Deployed locked config (@1000, lightstack heads, per-camera RC) from FINAL_MODEL.md.
 set -uo pipefail
@@ -38,6 +38,9 @@ case "$ABL" in
   gt_bbox)     BASE="--oracle-bbox --cov-pnp --dark-decode";;
   no_confgate) BASE="$BASE --conf-gate 0";;
   no_occaug)   HEAD=$CLEANHEAD;;
+  zero_adapt)  # C8: zero-real-adaptation — synthetic angle+rot heads (= azure deployed config) on every camera, RC per camera
+               HEAD=../TRAIN/outputs_angle/angle_occaug_light_20260704_015400/best_angle_head.pth
+               ROTFLAG="--rot-head ../TRAIN/outputs_rotation/rot_crop_occaug_20260704_002102/best_rot_head.pth";;
   *) echo "unknown ablation $ABL"; exit 1;;
 esac
 
