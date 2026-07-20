@@ -2,10 +2,7 @@
 % DINObotPose — Overleaf-ready section content (generated from PAPER_DRAFT.md)
 % 규칙: 한국어 원문 = % 주석 / 영어 = 본문 / 인용 = \cite{key} (references.bib)
 %       그림·표 참조는 의도적으로 미기입 (마지막에 직접 추가 예정)
-% 주의: 아래 6개 키는 bib에 아직 없음 — 항목 추가 시 이 키와 일치시킬 것:
-%       li2018deepim (DeepIM), zhang2020distribution (DARK), laine2020modular (nvdiffrast),
-%       rempe2021humor (HuMoR), yenchen2021inerf (iNeRF), liang2024comprehensive (TTA survey)
-%       (풀네임·저자·발표처는 references.bib 끝 TODO 참조)
+% 인용 키는 references.bib과 대조 완료 (2026-07-21). iNeRF=yeninerf, TTA survey=liang2025comprehensive 주의.
 % ============================================================================
 
 % 제목: 단안 로봇 포즈 추정: 동결 파운데이션 특징과 불확실도-인지 기하 최적화, 제로샷 렌더 비교의 결합
@@ -60,7 +57,7 @@ Two frozen foundation models supply the perception in our pipeline. Self-supervi
 % 문단: 동결 컴포넌트로서의 파운데이션 모델. 두 개의 동결 파운데이션 모델이 우리 파이프라인의 인식을 담당한다. DINOv3 같은 자기지도 비전 트랜스포머는 외관 변화에 강건하고 국소화에 충분히 조밀한 패치 특징을 제공한다; 우리는 이들이 백본 적응 없이 서브픽셀 키포인트 디코딩을 지원하며, 검출 용량을 통제하면 동일 크기의 대조학습 대안도 동등하게 동작함을 보인다. 이는 인코더를 로봇 도메인에 사전학습 후 파인튜닝하는 RoboPEPP와 정반대의 설계 선택이다; 우리 실험은 백본을 움직이는 것이 거친 강건성을 얻는 대가로 기하 솔버가 요구하는 서브픽셀 정밀도를 내준다는 것을 보인다. 분할에서는 SAM이 기하 프롬프트로부터 제로샷 로봇 마스크를 제공하여, CtRNet 계열이 의존하는 학습된 분할기를 제거한다.
 
 \paragraph{Test-time optimization.}
-Optimizing variables on the test instance itself is an established alternative to feed-forward prediction: HuMoR fits latent motion and body parameters at test time \cite{rempe2021humor}, and iNeRF estimates camera pose by inverting a radiance field with gradient-based render-and-compare \cite{yenchen2021inerf}. Our render-and-compare stage belongs to this per-instance optimization family, as opposed to test-time adaptation of network weights \cite{liang2024comprehensive}, and to our knowledge it is the first application of the idea as a training-free depth corrector for articulated robot pose in the predicted-joint regime.
+Optimizing variables on the test instance itself is an established alternative to feed-forward prediction: HuMoR fits latent motion and body parameters at test time \cite{rempe2021humor}, and iNeRF estimates camera pose by inverting a radiance field with gradient-based render-and-compare \cite{yeninerf}. Our render-and-compare stage belongs to this per-instance optimization family, as opposed to test-time adaptation of network weights \cite{sun2020test,wang2020tent,liang2025comprehensive}, and to our knowledge it is the first application of the idea as a training-free depth corrector for articulated robot pose in the predicted-joint regime.
 % 문단: 테스트-타임 최적화. 테스트 인스턴스 자체에서 변수를 최적화하는 것은 피드포워드 예측의 확립된 대안이다: HuMoR는 잠재 모션과 신체 파라미터를 테스트 시점에 피팅하고, iNeRF는 경사 기반 렌더-비교로 radiance field를 뒤집어 카메라 포즈를 추정한다. 우리 렌더-비교 단계는 네트워크 가중치의 테스트-타임 적응이 아니라 이 인스턴스별 최적화 계열에 속하며, 우리가 아는 한 predicted-joint 체제의 관절형 로봇 포즈에 이 아이디어를 학습-불필요 깊이 보정기로 적용한 첫 사례다.
 
 % ----------------------------------------------------------------------------
@@ -87,12 +84,12 @@ The keypoint head predicts heatmaps for $N=7$ keypoints placed along the kinemat
 % 키포인트 헤드는 로봇 베이스에서 핸드까지 운동학 체인을 따라 배치된 $N=7$개 키포인트의 히트맵을 예측한다. 거친 토큰 격자로부터 양자화 왜곡 없이 공간 해상도를 복원하기 위해, 디코더는 채널을 공간 해상도로 재배치하는 서브픽셀 컨볼루션(PixelShuffle) 블록과, 그룹 통계와 레이어 통계를 학습 가능한 계수로 혼합하는 배치-독립 적응 정규화를 사용한다; 배치 통계를 피함으로써 디코더는 합성과 실측 사이의 도메인 변화에 둔감해진다. 학습 시에는 날카로운 온도의 공간 soft-argmax가 연속 좌표를 미분가능하게 추출한다. 추론 시에는 DARK 디코딩을 추가로 적용한다: 봉우리 주변 log-히트맵 $h$의 1·2차 미분으로 평가한 테일러 오프셋 $\delta = -(\nabla^{2}\log h)^{-1}\nabla\log h$가 최댓값을 서브픽셀 위치로 재국소화하여 히트맵의 잔여 격자 양자화를 제거한다. 같은 히트맵에서 관절별 신뢰도(봉우리 값)와 이방성 $2\times2$ 공분산(국소 2차 모멘트)을 추가 비용 없이 추출하며, 둘 다 솔버에 입력된다.
 
 Two lightweight heads provide the solver with initial estimates. The joint-angle head fuses four inputs, namely the normalized 2D keypoint coordinates with their pairwise geometry, the per-joint confidences, a global backbone feature, and per-keypoint backbone features sampled at the detected locations, and regresses each joint angle as a 2D unit vector $(\cos\theta_j, \sin\theta_j)$ through a feed-forward network; the final wrist rotation, which is unobservable from keypoints alone, is fixed to zero. The rotation head maps the global appearance feature to a continuous 6D rotation representation, providing the initial camera-to-robot rotation together with an auxiliary translation estimate. This appearance-based initialization is important on distant cameras, where the reprojection objective alone has multiple rotation basins and a purely geometric initialization can converge to the wrong one.
-% 두 개의 경량 헤드가 솔버에 초기 추정을 제공한다. 관절각 헤드는 정규화된 2D 키포인트 좌표와 그 쌍별 기하, 관절별 신뢰도, 전역 백본 특징, 검출 위치에서 샘플링한 키포인트별 백본 특징의 네 입력을 융합하여, 각 관절각을 2D 단위 벡터 $(\cos\theta_j, \sin\theta_j)$로 피드포워드 네트워크를 통해 회귀한다; 키포인트만으로는 관측 불가능한 마지막 손목 회전은 0으로 고정한다. 회전 헤드는 전역 외관 특징을 연속 6D 회전 표현으로 매핑하여 초기 카메라-로봇 회전을 제공한다. 이 외관 기반 초기화는 원거리 카메라에서 중요하다: 재투영 목적함수만으로는 회전 분지(basin)가 여럿 존재하여 순수 기하 초기화가 잘못된 분지로 수렴할 수 있기 때문이다.
+% 두 개의 경량 헤드가 솔버에 초기 추정을 제공한다. 관절각 헤드는 정규화된 2D 키포인트 좌표와 그 쌍별 기하, 관절별 신뢰도, 전역 백본 특징, 검출 위치에서 샘플링한 키포인트별 백본 특징의 네 입력을 융합하여, 각 관절각을 2D 단위 벡터 $(\cos\theta_j, \sin\theta_j)$로 피드포워드 네트워크를 통해 회귀한다; 키포인트만으로는 관측 불가능한 마지막 손목 회전은 0으로 고정한다. 회전 헤드는 전역 외관 특징을 연속 6D 회전 표현으로 매핑하여 초기 카메라-로봇 회전을 보조 병진 추정과 함께 제공한다. 이 외관 기반 초기화는 원거리 카메라에서 중요하다: 재투영 목적함수만으로는 회전 분지(basin)가 여럿 존재하여 순수 기하 초기화가 잘못된 분지로 수렴할 수 있기 때문이다.
 
 \subsection{Uncertainty-Aware Solver and Automatic Bounding Boxes}
 \label{sec:solver}
 
-The solver recovers the full pose $(\theta, R, t)$ by combining a closed-form initialization with gradient-based refinement. The translation is initialized by EPnP \cite{lepetit2009ep} on the highest-confidence keypoints, the rotation by the rotation head, and the joint angles by the angle head. All variables are then refined jointly by minimizing the whitened reprojection residual
+The solver recovers the full pose $(\theta, R, t)$ by combining a closed-form initialization with gradient-based refinement. The translation is initialized by EPnP \cite{lepetit2009ep} on the highest-confidence keypoints, the rotation by the rotation head, and the joint angles by the angle head. All variables are then refined jointly by minimizing the whitened reprojection residual \cite{hartley2003multiple}
 \begin{equation}
 \min_{\theta, R, t}\; \sum_{i} w_i\, \rho\!\left( \left\| \Sigma_i^{-1/2}\left( \pi\!\left(K,\, R\, f_i(\theta) + t\right) - \hat{k}_i \right) \right\| \right),
 \end{equation}
@@ -122,7 +119,7 @@ Training is split into two stages so that 2D detection and angle regression do n
 \begin{equation}
 \mathcal{L}_{\text{angle}} = \sum_{j} \mathrm{SmoothL}_1\!\left(\hat{v}_j, v_j\right) \;+\; \lambda_{\text{fk}} \left\| \mathrm{FK}(\hat{\theta}) - \mathrm{FK}(\theta) \right\|_2^2,
 \end{equation}
-where the second term enforces consistency of the resulting 3D keypoints in the robot base frame through differentiable forward kinematics. No loss is backpropagated through the PnP solve, which avoids gradient conflict between the pixel and camera coordinate systems. The rotation head is optimized with
+where the second term enforces consistency of the resulting 3D keypoints in the robot base frame through differentiable forward kinematics. No loss is backpropagated through the PnP solve, unlike end-to-end differentiable PnP formulations \cite{chen2020end}, which avoids gradient conflict between the pixel and camera coordinate systems. The rotation head is optimized with
 \begin{equation}
 \mathcal{L}_{\text{rot}} = \big\| \hat{R} - R^{\ast} \big\|_{F}^{2} \;+\; \lambda_{t}\, \mathrm{SmoothL}_1\!\big(\hat{t}, t^{\ast}\big),
 \end{equation}
