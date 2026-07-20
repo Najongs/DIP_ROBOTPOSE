@@ -169,6 +169,31 @@ RoboPEPP \cite{goswami2025robopepp} & No & No & 75.3 & \textbf{29.0} & 78.5 & 22
 DINObotPose attains the best mean ADD-AUC of 80.4 in the predicted-joint regime. The mean margin of 2.4 over RoboPEPP is more than twice the estimated run-to-run noise of about 1.0. Per camera, the lead is clear on Kinect and Azure, where the margins reach 4.3 and 4.2, while RealSense and ORB are statistical ties within noise; the method trails on no camera. The known-joint upper bound of 84.1 concentrates its gain on the distant cameras, indicating that most of the remaining gap there is predicted-angle error, whereas the near Azure camera is unchanged, pointing to a depth rather than an angle bottleneck.
 % DINObotPose는 predicted-joint 체제에서 최고 평균 ADD-AUC 80.4를 달성한다. RoboPEPP 대비 평균 마진 2.4는 실행-간 노이즈 추정치(약 1.0)의 2배가 넘는다. 카메라별로는 Kinect와 Azure에서 각각 4.3, 4.2로 명확히 앞서고, RealSense와 ORB는 노이즈 범위 내 통계적 동률이며, 어느 카메라에서도 뒤지지 않는다. known-joint 상한 84.1의 이득은 원거리 카메라에 집중되어 그쪽 잔여 격차의 대부분이 예측 관절각 오차임을 보이고, 근거리 Azure는 불변이라 병목이 각도가 아니라 깊이임을 가리킨다.
 
+% 표: 합성 스플릿 (DR·Photo) ADD-AUC
+\begin{table}[t!]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{} l c c ccccc @{}}
+\toprule
+\multirow{2}{*}{\textbf{Method}} & \multirow{2}{*}{\shortstack{\textbf{Known}\\\textbf{Angles}}} & \multirow{2}{*}{\shortstack{\textbf{Known}\\\textbf{Box}}} & \multicolumn{2}{c}{\textbf{Panda}} & \multicolumn{2}{c}{\textbf{KUKA}} & \textbf{Baxter} \\
+\cmidrule(lr){4-5} \cmidrule(lr){6-7} \cmidrule(l){8-8}
+ & & & \textbf{DR} & \textbf{Photo} & \textbf{DR} & \textbf{Photo} & \textbf{DR} \\
+\midrule
+DREAM-H \cite{lee2020camera} & Yes & No & 82.9 & 81.1 & 73.3 & 72.1 & -- \\
+\midrule
+HoRoPose \cite{ban2024real} & No & Yes & 82.7 & 82.0 & 75.1 & 73.9 & 58.8 \\
+\midrule
+RoboPose \cite{labbe2021single} & No & No & 82.9 & 79.7 & \textbf{80.2} & 73.2 & 32.7 \\
+HoRoPose$^{*}$ & No & No & 41.4 & 40.7 & 56.2 & 56.7 & 9.8 \\
+RoboPEPP \cite{goswami2025robopepp} & No & No & \textbf{83.0} & \textbf{84.1} & 76.2 & \textbf{76.1} & \textbf{34.4} \\
+\textsc{DINObotPose} (Ours) & No & No & 74.2 & 76.9 & 35.7 & 31.9 & 25.2 \\
+\bottomrule
+\end{tabular}
+\caption{ADD-AUC on the DREAM synthetic test splits, with domain-randomized (DR) and photorealistic (Photo) sets. Competitor numbers are cited from RoboPEPP \cite{goswami2025robopepp}; HoRoPose$^{*}$ as in the main table. For the proposed method, Panda uses the full pipeline with render-and-compare, while KUKA and Baxter use the direct-pose configuration without render-and-compare, as no benchmark-matched mesh is available. Bold marks the best among methods with fully automatic boxes.}
+\label{tab:synthetic}
+\end{table}
+
 On the synthetic splits that prior methods report as standard, the pipeline does not lead: on the Panda synthetic tests it reaches 74.2 and 76.9 against 83.0 and 84.1 for RoboPEPP, whose training distribution matches those splits. Controlling the protocol changes the picture, however: HoRoPose scores 82.7 and 82.0 with ground-truth boxes but collapses to 41.4 and 40.7 under an off-the-shelf detector, whereas the fully automatic pipeline holds 74.2 and 76.9, exceeding the only directly comparable configuration by a wide margin.
 % 기존 방법들이 표준으로 보고하는 합성 스플릿에서는 우리 파이프라인이 선두가 아니다: Panda 합성 테스트에서 74.2와 76.9로, 학습 분포가 그 스플릿과 일치하는 RoboPEPP의 83.0과 84.1에 미치지 못한다. 그러나 프로토콜을 통제하면 그림이 달라진다: HoRoPose는 정답 박스로 82.7과 82.0을 기록하지만 기성 검출기 아래에서 41.4와 40.7로 붕괴하는 반면, 완전 자동인 우리 파이프라인은 74.2와 76.9를 유지하여 유일한 직접 비교 구성을 큰 격차로 상회한다.
 
@@ -231,8 +256,8 @@ Automatic bounding boxes are genuinely hard. The ORB camera's diverse viewpoints
 On an RTX 3090, the frozen backbone forward pass takes about 40 ms for the two-pass scheme, keypoint decoding about 3 ms, the kinematic solver 352 ms at 250 iterations, and render-and-compare about 1.3 s per frame, giving roughly 2.4 frames per second for the base pipeline and 0.6 with render-and-compare. The method is accuracy-focused rather than real-time, which matches the calibration use case; feed-forward competitors run in real time but either rely on relaxed settings or achieve lower accuracy, and the only other optimization-based method, RoboPose, is likewise non-real-time while requiring a learned refiner. Two knobs trade accuracy for speed: the render-and-compare iteration count, where reducing it from 250 to 150 cuts about forty percent of the render-and-compare cost with no accuracy loss, and the render resolution, which reaches its knee at 448 with wall time essentially flat across resolutions.
 % RTX 3090에서 동결 백본 순전파는 2-패스 기준 약 40ms, 키포인트 디코딩 약 3ms, 운동학 솔버는 250회 반복에 352ms, 렌더-비교는 프레임당 약 1.3초가 걸려, base 파이프라인은 약 2.4 fps, 렌더-비교 포함 시 0.6 fps다. 이 방법은 실시간이 아니라 정확도 우선이며 이는 캘리브레이션 용례와 부합한다; feed-forward 경쟁 방법들은 실시간이지만 완화된 설정에 의존하거나 정확도가 낮고, 유일한 다른 최적화 기반 방법인 RoboPose도 비실시간이면서 학습된 정제기를 요구한다. 두 개의 손잡이가 정확도와 속도를 절충한다: 렌더-비교 반복을 250에서 150으로 줄이면 비용의 약 40\%를 정확도 손실 없이 절감하고, 렌더 해상도는 448에서 무릎점에 도달하며 벽시계 시간은 해상도에 사실상 무관하다.
 
-The same pipeline runs end-to-end on the two synthetic-only robots. Detectors transferred from the Panda detector reach 2D keypoint AUCs of 73.5 for KUKA and 81.7 for Baxter, and the kinematics are fitted directly to the benchmark data, reproducing link origins at 0.003 mm. Because no matching mesh is available for render-and-compare and no real data exist for self-training, poses are obtained directly from the heads, reaching ADD-AUCs of 35.7 for KUKA and 25.3 for Baxter; these numbers are not comparable to the Panda real results and serve as an applicability study with a bottleneck analysis. The analysis reveals an observability ceiling at distal joints: a wrist joint's rotation about its own axis does not move its own keypoint, so injecting perfect keypoints barely improves the wrist angle, and an end-effector appearance head does not surpass the standard head either, indicating a robust limit of keypoint-based estimation.
-% 동일 파이프라인이 합성 전용 두 로봇에서 end-to-end로 동작한다. Panda 검출기에서 전이한 검출기는 KUKA 73.5, Baxter 81.7의 2D 키포인트 AUC에 도달하고, 운동학은 벤치마크 데이터에 직접 피팅되어 링크 원점을 0.003mm로 재현한다. 렌더-비교에 쓸 정합 메쉬가 없고 자가학습에 쓸 실측 데이터도 없으므로 포즈는 헤드에서 직접 얻으며, ADD-AUC는 KUKA 35.7, Baxter 25.3이다; 이 수치는 Panda 실측 결과와 비교 대상이 아니며 병목 분석을 동반한 적용 가능성 연구다. 분석은 원위 관절의 관측성 천장을 드러낸다: 손목 관절의 자기축 회전은 자기 키포인트를 움직이지 않으므로 완벽한 키포인트를 주입해도 손목 각도가 거의 개선되지 않고, 엔드이펙터 외관 헤드도 표준 헤드를 넘지 못해, 키포인트 기반 추정의 견고한 한계를 보인다.
+The same pipeline runs end-to-end on the two synthetic-only robots. Detectors transferred from the Panda detector reach 2D keypoint AUCs of 73.5 for KUKA and 81.7 for Baxter, and the kinematics are fitted directly to the benchmark data, reproducing link origins at 0.003 mm. Because no matching mesh is available for render-and-compare and no real data exist for self-training, poses are obtained directly from the heads, reaching ADD-AUCs of 35.7 for KUKA and 25.2 for Baxter; these numbers are not comparable to the Panda real results and serve as an applicability study with a bottleneck analysis. The analysis reveals an observability ceiling at distal joints: a wrist joint's rotation about its own axis does not move its own keypoint, so injecting perfect keypoints barely improves the wrist angle, and an end-effector appearance head does not surpass the standard head either, indicating a robust limit of keypoint-based estimation.
+% 동일 파이프라인이 합성 전용 두 로봇에서 end-to-end로 동작한다. Panda 검출기에서 전이한 검출기는 KUKA 73.5, Baxter 81.7의 2D 키포인트 AUC에 도달하고, 운동학은 벤치마크 데이터에 직접 피팅되어 링크 원점을 0.003mm로 재현한다. 렌더-비교에 쓸 정합 메쉬가 없고 자가학습에 쓸 실측 데이터도 없으므로 포즈는 헤드에서 직접 얻으며, ADD-AUC는 KUKA 35.7, Baxter 25.2다; 이 수치는 Panda 실측 결과와 비교 대상이 아니며 병목 분석을 동반한 적용 가능성 연구다. 분석은 원위 관절의 관측성 천장을 드러낸다: 손목 관절의 자기축 회전은 자기 키포인트를 움직이지 않으므로 완벽한 키포인트를 주입해도 손목 각도가 거의 개선되지 않고, 엔드이펙터 외관 헤드도 표준 헤드를 넘지 못해, 키포인트 기반 추정의 견고한 한계를 보인다.
 
 % 표: 반증된 대안
 \begin{table}[t!]
