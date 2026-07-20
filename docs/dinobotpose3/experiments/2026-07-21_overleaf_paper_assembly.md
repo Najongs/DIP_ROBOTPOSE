@@ -33,8 +33,31 @@
 
 학습 부족 아님: ① Panda 합성 열세(74.2/76.9 vs RoboPEPP 83.0/84.1) = 실측 지향 설계의 트레이드(합성은 경쟁자 학습분포 홈그라운드; 동일 조건 HoRoPose* 41.4는 33점 차 승) ② KUKA/Baxter(35.7/31.9/25.2) = 솔버 정제(링크 혼동으로 발산)와 RC(메쉬 부재/레버 불일치) 둘 다 빠진 direct-pose 반쪽 구성 + 로봇 고유 병목(KUKA rot-head R·t, Baxter 손목 관측성 천장 — GT 키포인트로도 불개선).
 
+## 2차 검증·토론 라운드 (07-21 저녁, 8-에이전트 워크플로우)
+
+**원논문 수치 검증 (4 verifier, arXiv HTML 원문 대조)**:
+- RoboPEPP(2411.17662) Table 2 대조 — 54셀 중 50 일치. **DREAM-F·DREAM-Q의 Panda DR/Photo가 원문과 스왑**되어 있었음(원문은 Photo-먼저 순서: F는 DR=81.3/Photo=79.5, Q는 DR=77.8/Photo=74.3) → 표 수정. DREAM-H·RoboPose·HoRoPose\*·RoboPEPP 행은 전부 정확. HoRoPose\* XK 결측은 원문 각주(가중치 미공개)와 일치.
+- 가림 표: RoboPEPP는 **Fig. 6 플롯으로만** 보고, 본문에 명시된 수치는 40\% 지점(35.1/28.2/14.5)뿐 — 정확히 일치. 0~30\%는 플롯 판독값 → 캡션에 출처 명시 추가.
+- HoRoPose(2402.05655): 9개 값 전부 원문 Table 1과 일치. GT-bbox 전제(A_bbox 사용, RoboPEPP known-box 라벨) 확인 → 하단 그룹 제외 타당.
+- RoboTAG(2511.07717): 9셀 전부 정확. 관절각 예측 확인(known은 \* 표시, Ours 무표시), 박스는 명시 없음(RoboPEPP 프로토콜 준수 서술에서 추론) → §4.1 문구를 "RoboPEPP 평가 프로토콜을 따라 보고"로 완화. **RoboTAG도 실측 테스트 이미지에 자기지도 2단계 적응**(transductive) → §4.1에 공정성 문맥으로 추가.
+- RoboTAG Table 3 = 누적 빌드업 표(Baseline → +컴포넌트, 괄호 증분, 최종행 볼드). 우리 빌드업 로그는 RealSense 단일이라 전면 이식 불가 → leave-one-out 유지 + 3블록 재구성(배포 앵커 / leave-one-out |Δ|정렬 / 적응·프로토콜 변형)으로 tab:ablation 교체.
+
+**비평↔보완 토론 (critic 10건 → defender → verdict)**: FIX 8 / DEFER 2.
+- C1 (P0, FIX): §4.2 프로토콜 문단의 "HoRoPose ORB 9.8 붕괴 / RoboPose 32.7"은 **Baxter 열 오전사** — 실제 ORB는 51.6/70.4. tex + PAPER_DRAFT(§4.5, 표1 노트) + SUMMARY까지 정정. "붕괴" 프레이밍도 "24점 하락, RoboPose는 유지"로 완화.
+- C2 (FIX): tab:main 캡션에 held-out 30% 프레임셋 차이 한 문장, 기여 1번에 프로토콜 정의 명시, Comparison에 zero-adapt 79.3 한 문장.
+- C4 (FIX): RW RoboTAG 서술을 위상 정렬 그래프·종단간으로 정확화 (concurrent 라벨은 부적절해 미기입).
+- C5 (FIX): 이탤릭 행 "upper bound" → **known-angle reference** (Azure 78.8 < 배포 79.5라 상한 명칭 모순; 노이즈 범위 내 서술로 교체).
+- C6 (FIX): 가림 표 캡션에 측정 스플릿(Panda photorealistic synthetic, occ-aug 헤드+RC) 명시.
+- C7 (FIX): tab:backbone 캡션에 Pose (mean)=실측 4캠 평균·unfrozen 명시 (로그 확인: dino 0.742, siglip 0.752).
+- C8 (FIX): 배포 하이퍼파라미터 명시 — conf-gate 0.05, RC Adam lr 5e-4·250회·λ_uv=100·min-IoU 0.35·렌더 448/448/512. **revert 가드(max-uv-shift)는 코드 기본 0.0=비활성으로 배포에서 미사용** → 본문의 "픽셀 한계 초과 시 되돌림" 주장 삭제.
+- C10 (FIX): 결론의 "파운데이션 모델 학습 데이터 생성 도구" 단정 → "경로 시사, 향후 과제"로 완화.
+- C3 (**DEFER, 미해결**): "카메라별 최적 구성 선택"의 선택 기준 — RC on/off는 근거리 깊이신호 규칙(문제없음)이나, **헤드/구성 선택이 held-out(뒤 30%) 평가 점수 argmax였음**(EXPERIMENTS 574/578/593/846). 선택지: ① 70% 적응 스플릿 점수로 재선택(분석 재실행) ② 현행대로 정직 공개 + zero-adapt 79.3에 기대기. **사용자 결정 필요.**
+- C9 (DEFER→표 재설계로 해소): tab:ablation 3블록 교체 적용됨.
+- 부수 정정: RC Kinect 기여 6.2→6.3 (82.8−76.5 산술).
+
 ## 남은 작업
 
+- [ ] **C3 결정**: 카메라별 구성 선택이 평가 프레임 argmax였던 문제 — 70% 스플릿 재선택 vs 정직 공개 (위 2차 라운드 참조)
 - [ ] 그림 삽입(fig_pipeline은 PPT 재제작 예정) + 표·수식 \ref 일괄 연결
 - [ ] bib: zhou2019continuity·kabsch1976solution 추가됨(연결 완료). sgdr 재추가 여부 사용자 결정
 - [ ] RoboPEPP 동일 1000-프레임 재현(사용자 PEPP env 대기) → 페어드 부트스트랩

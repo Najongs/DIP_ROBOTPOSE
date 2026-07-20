@@ -26,7 +26,7 @@ self-train + synth occ-aug on an already-adapted head does NOT instill it (reals
 occ-aug→self-train stack (2026-07-05): light occlusion-aug head → per-camera self-train with occlusion-aug
 on the synth anti-forget batch — recovers real adaptation WHILE retaining occlusion robustness. kinect +0.017,
 orb +0.001, both now occlusion-robust (40% 0.39 > RoboPEPP 0.351); realsense keeps its already-optimal head.
-Protocol: predicted angles + fully-automatic bbox — SAME auto-bbox protocol as RoboPEPP/RoboTAG (fair like-for-like; RoboPEPP Table2 Known-BBox=No, ORB 77.5 robust), stricter only than GT-bbox HoRoPose (which collapses to ORB 9.8 under an auto detector). [corrected 2026-07-14; earlier "RoboPEPP GT-bbox" was wrong]; rs/kinect/orb
+Protocol: predicted angles + fully-automatic bbox — SAME auto-bbox protocol as RoboPEPP/RoboTAG (fair like-for-like; RoboPEPP Table2 Known-BBox=No, ORB 77.5 robust), stricter only than GT-bbox HoRoPose (which drops to ORB 51.6 under an auto detector; the earlier "ORB 9.8" was the Baxter cell mis-transcribed, corrected 2026-07-21). [corrected 2026-07-14; earlier "RoboPEPP GT-bbox" was wrong]; rs/kinect/orb
 anti-leak held-out 1000/cam (re-locked 2026-07-06). DARK decode (`--dark-decode`, `Eval/decode_util.py`) lifts pose 2D precision
 universally (+0.0035–0.017 per cam, free) — closed the orb gap −0.010→−0.004. RC = depth/scale corrector →
 per-camera on/off (helps far cams; azure RC OFF). Details EXPERIMENTS.md 2026-07-04; survey
