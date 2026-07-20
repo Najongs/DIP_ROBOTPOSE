@@ -34,17 +34,18 @@
 
 > EN: The core difficulty of this setting is **depth/scale ambiguity**: from 2D keypoints alone, "a far arm" and "a foreshortened near arm" are hard to disambiguate. Existing predicted-joint methods resolve this differently — HoRoPose via a learned root-depth regressor, RoboKeyGen via diffusion-based 2D→3D lifting, and RoboPEPP by injecting a physics prior through masking pretraining.
 
-우리는 **학습 없이 기하로 깊이를 보정하는** 대안을 제시한다. 동결 DINOv3에서 뽑은 서브픽셀 키포인트를 운동학 솔버에 넣어 포즈를 초기화한 뒤, 제로샷 SAM 마스크와 렌더된 실루엣을 미분가능 렌더링으로 정합해 **테스트-타임에 깊이/스케일만 보정**한다. 여기에 학습이 전혀 필요 없는 두 레버(cov-PnP, DARK 디코딩)를 더해 정확도를 공짜로 끌어올린다.
+우리는 **학습 없이 기하로 깊이를 보정하는** 대안을 제시한다. 동결 DINOv3에서 뽑은 서브픽셀 키포인트를 운동학 솔버에 넣어 포즈를 초기화한 뒤, 제로샷 SAM 마스크와 렌더된 실루엣을 미분가능 렌더링으로 정합해 **테스트-타임에 깊이/스케일만 보정**한다. 여기에 학습이 전혀 필요 없는 두 레버(cov-PnP, DARK 디코딩)를 더한다 — 클린 정확도 기여는 미미하지만(§4.4), 가림 하의 강건성을 무비용으로 보탠다(§4.3).
 
-> EN: We propose a **training-free geometric alternative** for depth correction. Sub-pixel keypoints from a frozen DINOv3 initialize a kinematic solver; a zero-shot SAM mask and a rendered silhouette are then aligned via differentiable rendering to **correct only depth/scale at test time**. Two training-free levers (cov-PnP and DARK decoding) further improve accuracy at no cost.
+> EN: We propose a **training-free geometric alternative** for depth correction. Sub-pixel keypoints from a frozen DINOv3 initialize a kinematic solver; a zero-shot SAM mask and a rendered silhouette are then aligned via differentiable rendering to **correct only depth/scale at test time**. Two training-free levers (cov-PnP and DARK decoding) are added at zero cost — their contribution on clean images is minor (§4.4); their value is robustness under occlusion (§4.3).
 
 **기여(Contributions).**
 1. **Predicted-joint + 자동 bbox 최고 성능**: DREAM 실측 4-스플릿 평균 ADD-AUC 0.804로 RoboPEPP(0.780)·RoboTAG(0.740)를 능가한다. 이들은 우리와 **동일한 자동-bbox 프로토콜**이라 공정한 동일-조건 비교이며(반면 HoRoPose는 GT-bbox를 쓰고 자동 검출기에선 붕괴, §4.5), 우리는 완전 자동 bbox로 SOTA다.
-2. **테스트-타임·학습불필요 렌더-비교 깊이 보정기**: 렌더-비교를 *발명*한 것이 아니라(RoboPose'21, CtRNet'23 선행), 제로샷 SAM 마스크 + 동결 DINOv3 키포인트 프론트엔드 위에서 predicted-joint·자동-bbox 체제에 맞게 **학습 없이 재구성**하고, 카메라별로 선택 적용한다.
-3. **가림 강건성**: 약한 가림 증강 + 카메라별 자가학습 스택으로, 평가한 전(全) 가림 수준(0–40%)에서 RoboPEPP를 상회한다.
-4. **DREAM의 세 로봇 모두 평가**: DREAM은 Panda·KUKA·Baxter를 포함하는 벤치마크다. 실측 데이터가 있는 Panda에서 위 SOTA를 내고, 합성 전용인 KUKA·Baxter에서 동일 파이프라인이 검출·FK·포즈까지 end-to-end로 동작함을 보이며 로봇별 병목(예: 손목 관절의 관측성 천장)을 분석한다.
+2. **동결 파운데이션 프론트엔드는 제약이 아니라 발견이다**: 백본 적응은 세 방식(공격적 SSL·온건 SSL·pseudo-keypoint co-finetune) 모두 ADD를 악화시킨다(§4.9). 특히 공격적 SSL은 real PCK@5를 +0.069 올리면서도 ADD를 0.567→0.531로 떨어뜨린다 — 적응은 거친 2D 강건성을 얻는 대가로 기하 솔버가 요구하는 서브픽셀 정밀도를 판다(키포인트-노이즈 민감도와 정량 정합, §4.4). 성능은 특정 백본이 아니라 파운데이션 특징 일반에서 오며(§4.10, DINOv3≈SigLIP2), DINOv3 채택 근거는 동결 체제의 검출 우위다.
+3. **테스트-타임·학습불필요 렌더-비교 깊이 보정기**: 렌더-비교를 *발명*한 것이 아니라(RoboPose'21, CtRNet'23 선행), 제로샷 SAM 마스크 + 동결 DINOv3 키포인트 프론트엔드 위에서 predicted-joint·자동-bbox 체제에 맞게 **학습 없이 재구성**하고, 카메라별로 선택 적용한다. 단일 최대 레버다(ΔMean +0.043, §4.4).
+4. **가림 강건성**: 약한 가림 증강 + 카메라별 자가학습 스택으로, 평가한 전(全) 가림 수준(0–40%)에서 RoboPEPP를 상회한다.
+5. **DREAM의 세 로봇 모두 평가**: DREAM은 Panda·KUKA·Baxter를 포함하는 벤치마크다. 실측 데이터가 있는 Panda에서 위 SOTA를 내고, 합성 전용인 KUKA·Baxter에서 동일 파이프라인이 검출·FK·포즈까지 end-to-end로 동작함을 보이며 로봇별 병목(예: 손목 관절의 관측성 천장)을 분석한다.
 
-> EN: **Contributions.** (1) **State of the art under predicted-joint + auto-bbox**: mean ADD-AUC 0.804 on DREAM-real, surpassing RoboPEPP (0.780) and RoboTAG (0.740) under the **same automatic-bbox protocol** — a fair like-for-like comparison (HoRoPose instead uses GT boxes and collapses under an off-the-shelf detector, §4.5). (2) A **test-time, training-free render-and-compare depth corrector**: we do not *invent* render-and-compare (RoboPose'21, CtRNet'23 are prior art) but **recast it without training** as a zero-shot-SAM + frozen-DINOv3 depth corrector for the predicted-joint / auto-bbox regime, applied per camera. (3) **Occlusion robustness**: light occlusion augmentation plus camera-specific self-training exceeds RoboPEPP across all evaluated occlusion levels (0–40%). (4) **All three DREAM robots**: DREAM is a Panda/KUKA/Baxter benchmark; we report the above SOTA on Panda (which has real data) and show the same pipeline runs end-to-end on the synthetic-only KUKA and Baxter splits, analyzing per-robot bottlenecks (e.g., a wrist-joint observability ceiling).
+> EN: **Contributions.** (1) **State of the art under predicted-joint + auto-bbox**: mean ADD-AUC 0.804 on DREAM-real, surpassing RoboPEPP (0.780) and RoboTAG (0.740) under the **same automatic-bbox protocol** — a fair like-for-like comparison (HoRoPose instead uses GT boxes and collapses under an off-the-shelf detector, §4.5). (2) **The frozen foundation front-end is a finding, not a limitation**: all three backbone-adaptation variants (aggressive SSL, gentle SSL, pseudo-keypoint co-finetuning) degrade ADD (§4.9); notably, aggressive SSL raises real PCK@5 by +0.069 while dropping ADD 0.567→0.531 — adaptation buys coarse 2D robustness at the cost of the sub-pixel precision the geometric solver needs (quantitatively consistent with the keypoint-noise sensitivity, §4.4). Performance comes from foundation features in general, not a specific backbone (§4.10, DINOv3≈SigLIP2); DINOv3 is chosen for its frozen-regime detection edge. (3) A **test-time, training-free render-and-compare depth corrector**: we do not *invent* render-and-compare (RoboPose'21, CtRNet'23 are prior art) but **recast it without training** as a zero-shot-SAM + frozen-DINOv3 depth corrector for the predicted-joint / auto-bbox regime, applied per camera — the single largest lever (ΔMean +0.043, §4.4). (4) **Occlusion robustness**: light occlusion augmentation plus camera-specific self-training exceeds RoboPEPP across all evaluated occlusion levels (0–40%). (5) **All three DREAM robots**: DREAM is a Panda/KUKA/Baxter benchmark; we report the above SOTA on Panda (which has real data) and show the same pipeline runs end-to-end on the synthetic-only KUKA and Baxter splits, analyzing per-robot bottlenecks (e.g., a wrist-joint observability ceiling).
 
 ---
 
@@ -72,21 +73,27 @@
 
 > EN: The pipeline has five stages: **(1)** a frozen DINOv3 ViT-B/16 backbone detects heatmap keypoints, **(2)** DARK sub-pixel decoding removes grid-quantization error, **(3)** joint-angle and rotation heads predict the joint configuration and camera-to-robot rotation, **(4)** covariance-aware PnP with kinematic reprojection refinement solves the pose, and **(5)** a zero-shot SAM mask and a rendered silhouette are aligned by differentiable rendering to correct depth/scale at test time. The backbone stays frozen throughout (we verified across three experiments that adapting it destroys the sub-pixel keypoint precision the solver needs).
 
-### 3.2 동결 특징과 무료 레버 (Frozen features and free levers)
+> 그림(파이프라인 개요): [figures/fig_pipeline](figures/README.md) — 5단계 흐름 + frozen/trained/test-time 색 구분 + azure RC off 분기. 번호는 LaTeX 단계에서 부여(그림 1~10은 결과 그림에 이미 배정됨), 최종본은 PPT로 재제작 예정. / _EN: Pipeline overview figure: `figures/fig_pipeline` (unnumbered — figure numbering assigned at the LaTeX stage; Figs. 1–10 are already results figures)._
 
-**DARK 서브픽셀 디코딩.** 히트맵은 저해상도 격자라 argmax는 위치를 격자 단위로 양자화한다. DARK는 봉우리 근처 밝기의 1·2차 미분으로 테일러 보정을 적용해 정점을 소수점 위치로 재국소화한다. 학습이 전혀 필요 없으며, 원거리 카메라에서 작은 위치 오차가 증폭되던 것을 완화한다.
+### 3.2 왜 동결인가, 그리고 무료 강건성 레버 (Why frozen, and free robustness levers)
 
-> EN: **DARK sub-pixel decoding.** Heatmaps are low-resolution grids, so argmax quantizes locations to the grid. DARK applies a Taylor correction using the first/second derivatives of the intensity around the peak, re-localizing it to a sub-pixel position. It requires no training and mitigates the amplification of small localization errors on far cameras.
+**왜 동결인가.** 백본 동결은 편의가 아니라 실험적 발견이다. 백본을 실측에 적응시키는 세 방식 — 공격적 SSL(masked-feature, 6-block), 온건한 SSL(3-block), pseudo-keypoint co-finetune — 이 전부 ADD를 악화시켰다(§4.9, 표 11). 특히 공격적 SSL은 real PCK@5를 +0.069 올리면서도 ADD는 0.567→0.531로 떨어뜨렸다: 적응은 거친 2D 강건성(굵은 임계의 PCK가 보상하는 것)을 얻는 대가로, 기하 솔버가 요구하는 서브픽셀 정밀도를 판다. 이 해리는 §4.4의 키포인트-노이즈 민감도와 정량적으로 정합한다 — PCK@5가 감지하지 못하는 σ=1–2px 구간에서 ADD-AUC가 0.024–0.089 빠진다. 감독형 co-finetune도 같은 방향으로 실패하므로(0.497→0.434 단조 하락) 원인은 특정 목적함수가 아니라 백본을 움직이는 행위 자체다. 반대편 증거로 동결 프론트엔드는 충분히 정밀하다: 관절각을 GT로 주입하면 평균 0.841에 도달하고(§4.2), 백본을 SigLIP2로 바꿔도 포즈 성능이 유지된다(§4.10) — 성능은 특정 모델이 아니라 동결 파운데이션 특징 일반에서 온다.
 
-**공분산-인지 PnP(cov-PnP).** 히트맵의 국소 2차 모멘트에서 키포인트별 이방성 2×2 공분산을 공짜로 추출해, 재투영 잔차를 마할라노비스(백색화) 거리로 바꾼다. 흐리거나 다봉인(가려진) 키포인트는 방향별로 연속 다운웨이트되어, 스칼라 신뢰도 게이팅을 자연스럽게 일반화한다.
+> EN: **Why frozen.** Freezing the backbone is an experimental finding, not a convenience. All three ways of adapting the backbone to real images — aggressive SSL (masked-feature, 6 blocks), gentle SSL (3 blocks), and pseudo-keypoint co-finetuning — degraded ADD (§4.9, Table 11). Notably, aggressive SSL raised real PCK@5 by +0.069 while dropping ADD 0.567→0.531: adaptation buys coarse 2D robustness (what a coarse-threshold PCK rewards) at the cost of the sub-pixel precision the geometric solver needs. This dissociation is quantitatively consistent with the keypoint-noise sensitivity of §4.4 — ADD-AUC loses 0.024–0.089 in the σ=1–2 px range that PCK@5 cannot even detect. Supervised co-finetuning fails in the same direction (monotone 0.497→0.434), so the cause is not a particular objective but moving the backbone at all. Conversely, the frozen front-end is precise enough: injecting GT joint angles reaches a mean of 0.841 (§4.2), and swapping the backbone for SigLIP2 preserves pose accuracy (§4.10) — performance comes from frozen foundation features in general, not one specific model.
 
-> EN: **Covariance-aware PnP (cov-PnP).** From the local second moments of the heatmap we extract a per-keypoint anisotropic 2×2 covariance for free, turning the reprojection residual into a Mahalanobis (whitened) distance. Diffuse or multimodal (occluded) keypoints are continuously down-weighted per direction, generalizing scalar confidence gating.
+**무료 강건성 레버.** 다음 두 레버는 학습이 전혀 필요 없고, 클린 정확도 기여는 사실상 0이다(leave-one-out ΔMean −0.003/−0.001, §4.4) — 채택 근거는 가림 강건성이다(§4.3). **DARK 서브픽셀 디코딩**은 봉우리 근처 log-히트맵의 1·2차 미분으로 테일러 보정을 적용해 argmax의 격자 양자화를 제거한다(원거리 ORB 격차 −0.010→−0.004). **공분산-인지 PnP(cov-PnP)**는 히트맵의 국소 2차 모멘트에서 키포인트별 이방성 2×2 공분산을 추출해 재투영 잔차를 마할라노비스(백색화) 거리로 바꾼다 — 흐리거나 다봉인(가려진) 키포인트를 방향별로 연속 다운웨이트하여 스칼라 신뢰도 게이팅을 일반화하며, 20% 가림에서 +0.011을 더한다. 두 레버의 작동 기전 — 히트맵 자체의 불확실성 구조를 활용하며, 외부 주입 노이즈에는 무익 — 은 §4.4의 G1 분석이 규명한다.
+
+> EN: **Free robustness levers.** The following two levers require no training and contribute essentially nothing to clean accuracy (leave-one-out ΔMean −0.003/−0.001, §4.4) — they are adopted for occlusion robustness (§4.3). **DARK sub-pixel decoding** applies a Taylor correction from the first/second derivatives of the log-heatmap around the peak, removing argmax grid quantization (narrowing the far-camera ORB gap −0.010→−0.004). **Covariance-aware PnP (cov-PnP)** extracts a per-keypoint anisotropic 2×2 covariance from the heatmap's local second moments and whitens the reprojection residual into a Mahalanobis distance — continuously down-weighting diffuse or multimodal (occluded) keypoints per direction, generalizing scalar confidence gating, and adding +0.011 at 20% occlusion. Their mechanism — exploiting the heatmap's own uncertainty structure, useless against externally injected noise — is established by the G1 analysis in §4.4.
 
 ### 3.3 테스트-타임 렌더-비교 깊이 보정 (Test-time render-and-compare)
 
 이미 좋은 키포인트+운동학 추정 위에, 제로샷 SAM으로 얻은 로봇 전경 마스크와 nvdiffrast로 렌더한 로봇 메쉬 실루엣의 IoU를 최대화하도록 포즈의 깊이/스케일을 미분가능하게 정제한다. SAM은 외부 가림체를 로봇에서 분리해 주므로 마스크가 깨끗하다. 이 단계는 카메라별로 켜고 끈다 — 근거리 카메라(azure)는 깊이 신호가 이미 강해 끄고, 원거리에서 크게 이득을 본다(카메라별 +0.04~0.07 ADD-AUC).
 
 > EN: **Test-time render-and-compare.** On top of already-good keypoint + kinematic estimates, we differentiably refine the pose's depth/scale to maximize the IoU between a zero-shot SAM robot foreground mask and an nvdiffrast-rendered robot silhouette. SAM cleanly separates external occluders from the robot. This stage is toggled per camera — off for near cameras (azure), whose depth signal is already strong, and most beneficial on far cameras (+0.04–0.07 ADD-AUC per camera).
+
+**구현 노트(세그멘터 선택).** 마스크는 오리지널 SAM ViT-B(제로샷)로 얻는다. 프롬프트는 1차 패스 포즈의 렌더 마스크에서 유도한 점+박스이고, multimask 출력 중 초기 렌더와 가장 일치하는 마스크를 선택한다(init-render-consistent selection). 분할할 대상의 위치를 기하로 이미 알고 있으므로 텍스트/컨셉 프롬프트형의 더 크고 새로운 세그멘터는 불필요하며, 남은 오차의 지배 요인도 마스크 품질이 아니라 예측 관절각이다(§4.2 known-joint 분석).
+
+> EN: **Implementation note (segmenter choice).** Masks come from the original zero-shot SAM ViT-B. Prompts are points+box derived from the pass-1 pose's rendered mask, and among the multimask outputs we select the one most consistent with the initial render (init-render-consistent selection). Since geometry already tells us where the target is, larger text/concept-promptable segmenters are unnecessary — and the dominant residual error is predicted joint angles, not mask quality (§4.2 known-joint analysis).
 
 ### 3.4 가림 강건성 (Occlusion robustness)
 
@@ -364,15 +371,15 @@ DREAM의 나머지 두 로봇은 실측 데이터가 없으므로 합성(DR) 스
 
 ### 4.9 시도했으나 반증된 대안 (What did not work)
 
-강한 부정 증거를 리뷰어에게 투명하게 제시한다(표 11). 특히 **백본 적응은 3가지 방식 모두 ADD를 악화**시켜(솔버가 요구하는 sub-pixel 키포인트 정밀도 파괴), 동결 백본 결정을 정당화한다. RC 계열에서도 feature-metric·edge-NCC·multi-start 변형이 실루엣 RC를 못 이겼고, 학습형 상태 prior(population/DPoser식)와 translation prior는 오히려 해로웠다.
+강한 부정 증거를 리뷰어에게 투명하게 제시한다(표 11). 특히 **백본 적응은 3가지 방식 모두 ADD를 악화**시켜(솔버가 요구하는 sub-pixel 키포인트 정밀도 파괴), 동결 백본 결정을 정당화한다. 공격적 SSL은 real PCK@5를 +0.069 올리면서도 ADD를 떨어뜨렸는데(표 11), 이는 적응이 거친 2D 강건성과 서브픽셀 정밀도를 맞바꾼다는 직접 증거다(§3.2, G1 민감도와 정량 정합). RC 계열에서도 feature-metric·edge-NCC·multi-start 변형이 실루엣 RC를 못 이겼고, 학습형 상태 prior(population/DPoser식)와 translation prior는 오히려 해로웠다.
 
-> EN: **What did not work (Table 11).** We transparently report strong negative evidence. In particular, **backbone adaptation failed in all three variants** (destroying the sub-pixel keypoint precision the solver needs), justifying the frozen backbone. Among RC variants, feature-metric / edge-NCC / multi-start did not beat plain silhouette RC, and learned state priors (population/DPoser-style) and a translation prior were actively harmful.
+> EN: **What did not work (Table 11).** We transparently report strong negative evidence. In particular, **backbone adaptation failed in all three variants** (destroying the sub-pixel keypoint precision the solver needs), justifying the frozen backbone; aggressive SSL raises real PCK@5 by +0.069 yet lowers ADD (Table 11) — direct evidence that adaptation trades sub-pixel precision for coarse 2D robustness (§3.2, quantitatively consistent with the G1 sensitivity). Among RC variants, feature-metric / edge-NCC / multi-start did not beat plain silhouette RC, and learned state priors (population/DPoser-style) and a translation prior were actively harmful.
 
 **표 11. 반증된 대안과 그 결과.**
 
 | 대안 | 결과 | 판정 |
 |---|---|---|
-| 백본 적응 (SSL 6-block) | realsense ADD 0.531 < 0.567 | ❌ |
+| 백본 적응 (SSL 6-block) | real PCK@5 **+0.069↑** 인데 realsense ADD 0.531 < 0.567**↓** (정밀도-강건성 트레이드) | ❌ |
 | 백본 적응 (SSL 3-block) | 완전 OOD, ADD 0.0 | ❌ |
 | 백본 적응 (pseudo-kp co-finetune) | 0.497 → 0.434 단조 하락 | ❌ |
 | feature-metric (DINO) RC | azure −0.004 → −0.043 | ❌ |

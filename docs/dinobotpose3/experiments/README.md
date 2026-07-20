@@ -19,4 +19,6 @@
 
 | 멀티로봇 DREAM 포즈 (KUKA / Baxter) | 07-09~13 | ✅ 검출기 0.735/0.817, 포즈 ADD 0.34/0.25(synth, direct-pose). 천장: KUKA rot-t, Baxter wrist(관측성). RC 양쪽 막힘. wrist appearance(mlp_patch) 재학습 중 | [2026-07-10_multirobot_dream_detectors.md](2026-07-10_multirobot_dream_detectors.md) |
 
+| 논문 포지셔닝 재구성 + 파이프라인 피규어 | 07-20 | 📝 세션(측정 없음) — 2축 스토리(frozen 기여 승격+PCK/ADD 해리 본문 반영, 무료 레버 격하), fig_pipeline 제작, SAM=v1 확인 | [2026-07-20_paper_positioning.md](2026-07-20_paper_positioning.md) |
+
 관련 문서: [SOTA 서베이](../references/sota_survey.md) · [다음 시도 로드맵](../references/next_directions.md) · 반증 맵은 로드맵 §3

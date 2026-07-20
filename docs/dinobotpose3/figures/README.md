@@ -4,10 +4,13 @@
 
 ```bash
 python docs/dinobotpose3/figures/make_figs.py
+python docs/dinobotpose3/figures/make_fig_pipeline.py   # fig_pipeline (§3.1 개요)
 ```
 
 | 파일 | 내용 | 출처 데이터 |
 |---|---|---|
+**파이프라인 (§3.1 Method 개요, `make_fig_pipeline.py`):**
+| `fig_pipeline` | 5단계 파이프라인 블록 다이어그램 + 인셋 — 입력 프레임(RealSense #2700)·디코딩 키포인트·메쉬 오버레이는 실제 이미지, 히트맵·SAM-vs-실루엣 IoU는 도식(로컬에 가중치 없음, 추후 GPU 서버에서 실물 교체 가능). frozen(파랑)/trained(주황)/training-free·test-time(초록) 색 구분, azure RC OFF 표기. **번호 없음(LaTeX 단계에서 부여). 최종본은 PPT 재제작 예정 — 이 그림은 레이아웃·라벨·수치 참고 초안** | [PAPER_DRAFT §3.1](../PAPER_DRAFT.md), [FINAL_MODEL.md](../FINAL_MODEL.md), architecture/model.md |
 **결과 (무엇을 달성했나):**
 | `fig1_scorecard` | 카메라별 ADD-AUC 막대(Ours/RoboPEPP/RoboTAG) + MEAN, orb auto-bbox 붕괴(RoboPEPP 0.344) 주석 | [FINAL_MODEL.md](../FINAL_MODEL.md) 재잠금 테이블 |
 | `fig2_occlusion` | 가림 강건성 곡선 0~40% (RoboPEPP Fig.6 프로토콜), 전 구간 초과 | [experiments/2026-07-05](../experiments/2026-07-05_occaug_selftrain_stack.md), SUMMARY.md |
