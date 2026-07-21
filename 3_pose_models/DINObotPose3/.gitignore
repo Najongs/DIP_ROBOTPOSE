@@ -9,7 +9,11 @@ RoboPEPP/
 robopose/
 outputs/
 output*/
-.claude/
+# .claude holds local agent state (ignored) EXCEPT the committed run skill.
+# Must be ".claude/*" not ".claude/" — git cannot re-include under an excluded dir.
+.claude/*
+!.claude/skills/
+Eval/driver_out/
 Dataset/
 DREAM/
 robopose/
