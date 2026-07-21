@@ -62,4 +62,12 @@
 - [ ] bib: zhou2019continuity·kabsch1976solution 추가됨(연결 완료). sgdr 재추가 여부 사용자 결정
 - [ ] RoboPEPP 동일 1000-프레임 재현(사용자 PEPP env 대기) → 페어드 부트스트랩
 - [ ] P1: 프레임 CI(--dump-adds), 3-시드 std, zero_adapt angle 변형
-- [ ] 오버리프 프리앰블: multirow·booktabs·resizebox·cellcolor(선택) 패키지 필요
+- [ ] 오버리프 프리앰블: multirow·booktabs·resizebox·**amsmath**(RC 수식 split 사용) 패키지 필요
+
+## 3차 다듬기 (07-21 밤, 사용자 요청)
+
+- RC 수식이 단 폭을 넘어 `\begin{split}`로 2줄 분할 (amsmath 필요).
+- 중복 제거: "hardest setting" 3→2회(§4.1 삭제), frozen 서술 §3.2 압축+§3.5 첫 문장 삭제(§3.2와 중복), 결론의 "learned depth regression...not the only answers"(초록 중복)·"파운데이션 데이터" 문장 잔여 정리.
+- 경쟁 수치 본문 반복 축소: 합성 문단에서 RoboPEPP 83.0/84.1 제거(표에 있음), ORB 문단에서 51.6/70.4/77.8 나열 제거("약 24점 하락"만 유지, RoboPEPP 인용 각주 문장은 캡션과 중복이라 삭제), zero-adapt 79.3 vs 78.0 재비교 삭제(Comparison에 이미 있음), 백본 문단 80.0/72.0 제거(표에 있음).
+- 캡션 축약: tab:main ~200→~120단어, tab:occlusion·tab:ablation도 읽는 법 핵심만.
+- 부록 mm 표: DREAM-F/Q/H 행 삭제(수십만 mm 무의미 값) + 캡션에 생략 사유 1문장.
