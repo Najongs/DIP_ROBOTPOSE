@@ -26,7 +26,7 @@ sys.path.append(TRAIN); sys.path.append(HERE)
 from model_angle import AnglePredictor
 from model_v4 import iiwa7_forward_kinematics, _IIWA7_JOINT_LIMITS
 from dataset import PoseEstimationDataset
-from refine_eval import scale_K, add_auc, wrapped_abs_deg
+from refine_eval import scale_K, add_auc, wrapped_abs_deg, geometric_K
 import solve_pose_kinematic as spk
 
 FK = iiwa7_forward_kinematics
@@ -75,9 +75,12 @@ def main():
     ap.add_argument('--head-direct', action='store_true',
                     help='trust head angles; (R,t) via learned-R+reprojection-t or PnP')
     ap.add_argument('--direct-pose', action='store_true',
-                    help='trust head angles AND rot-head R+t DIRECTLY (no solve/re-solve). Best for '
-                         'iiwa7: the reprojection angle-refine AND t-re-solve both diverge (depth '
-                         'ambiguity + link-confusion); rot-head direct t (~t-err) beats re-solving.')
+                    help='trust head angles AND rot-head R+t DIRECTLY (no solve/re-solve). '
+                         'SUPERSEDED 2026-07-22: this mode existed because the solver appeared to '
+                         'diverge, but that was an identity-K bug (dataset camera_K = eye(3) fed '
+                         'into PnP => 320x-wrong focal => collapsed depth), NOT depth ambiguity or '
+                         'link-confusion. With true intrinsics the solver beats direct-pose by a '
+                         'wide margin. Kept only for reproducing the old baseline.')
     ap.add_argument('--cov-pnp', action='store_true')
     ap.add_argument('--conf-gate', type=float, default=0.05)
     args = ap.parse_args()
@@ -105,7 +108,12 @@ def main():
         img = batch['image'].to(device)
         gt = batch['angles'].to(device)[:, :6]              # joint_1..6 (joint_7 unobservable)
         gt3d = batch['keypoints_3d'].to(device)             # (B,7,3) camera frame, meters
+        # DISCIPLINE: dataset K -> MODEL (checkpoints learned bearing features from the eye(3)
+        # DREAM fallback), TRUE metric K -> any geometric solve. The kuka/baxter synth trees
+        # carry no meta.K, so passing the dataset K into PnP/refine put a 320x-wrong focal in
+        # and collapsed solved depth — that, not "link confusion", was the solver divergence.
         K = scale_K(batch['camera_K'], batch['original_size'], IS).to(device)
+        K_true = geometric_K(args.val_dir, batch['camera_K'], batch['original_size'], IS).to(device)
         with torch.no_grad():
             o = m(img, K)
         init_ang = o['joint_angles']                         # (B,7), joint_7=0
@@ -133,14 +141,14 @@ def main():
                 w = conf.clamp(min=1e-3)
                 for _ in range(80):
                     cam = cam0 + t_h.unsqueeze(1); z = cam[..., 2].clamp(min=1e-3)
-                    u = cam[..., 0] / z * K[:, 0, 0:1] + K[:, 0, 2:3]
-                    v = cam[..., 1] / z * K[:, 1, 1:2] + K[:, 1, 2:3]
+                    u = cam[..., 0] / z * K_true[:, 0, 0:1] + K_true[:, 0, 2:3]
+                    v = cam[..., 1] / z * K_true[:, 1, 1:2] + K_true[:, 1, 2:3]
                     loss = (((torch.stack([u, v], -1) - kp2d).norm(dim=-1)) * w).sum() / w.sum()
                     opt_t.zero_grad(); loss.backward(); opt_t.step()
                 t_h = t_h.detach()
             else:
                 Rn, tn, _ = spk.pnp_init(kp2d.detach().cpu().numpy(), fk_h.detach().cpu().numpy(),
-                                         K.detach().cpu().numpy(), conf.detach().cpu().numpy(),
+                                         K_true.detach().cpu().numpy(), conf.detach().cpu().numpy(),
                                          min_kp=6, pnp_drop=1)
                 R_h = torch.from_numpy(Rn).float().to(device); t_h = torch.from_numpy(tn).float().to(device)
             refined = init_ang
@@ -153,7 +161,7 @@ def main():
             elif args.rot_head:
                 R_init = o.get('rot_matrix'); t_init = o.get('trans')
             with torch.enable_grad():
-                refined, kp_cam, reproj = spk.solve_batch(kp2d, conf, K, fix_joint7=True, iters=args.iters,
+                refined, kp_cam, reproj = spk.solve_batch(kp2d, conf, K_true, fix_joint7=True, iters=args.iters,
                                                           lr=2e-2, img_size=IS, device=device, prior_w=0.0,
                                                           theta_init=init_ang, cov_inv=cov_inv,
                                                           conf_gate=args.conf_gate, R_init=R_init, t_init=t_init)

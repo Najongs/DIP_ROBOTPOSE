@@ -1,0 +1,4 @@
+==== SWEEP A_deployed_lightstack  head=/home/najo/NAS/DIP/3_pose_models/DINObotPose3/TRAIN/outputs_selftrain/realsense_lightstack_20260705_003546/best_selftrain_head.pth ====
+OCCL A_deployed_lightstack  ratio=0.0  ADD-AUC@100mm=0.7591
+OCCL A_deployed_lightstack  ratio=0.2  ADD-AUC@100mm=0.6245
+OCCL A_deployed_lightstack  ratio=0.4  ADD-AUC@100mm=0.3956

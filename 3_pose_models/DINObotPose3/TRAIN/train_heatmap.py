@@ -27,6 +27,7 @@ from PIL import Image
 
 from model import DINOv3Backbone, ViTKeypointHead, soft_argmax_2d
 from dataset import PoseEstimationDataset
+from norm_utils import get_norm_stats
 
 def visualize_heatmaps(image_tensor, gt_heatmaps, pred_heatmaps, num_images=4):
     images_to_log = []
@@ -88,9 +89,9 @@ def keypoint_metrics(keypoints_detected, keypoints_gt, image_resolution, auc_pix
     return results
 
 class HeatmapModel(nn.Module):
-    def __init__(self, model_name, heatmap_size, unfreeze_blocks=2):
+    def __init__(self, model_name, heatmap_size, unfreeze_blocks=2, pretrained=True, num_joints=7):
         super().__init__()
-        self.backbone = DINOv3Backbone(model_name, unfreeze_blocks=unfreeze_blocks)
+        self.backbone = DINOv3Backbone(model_name, unfreeze_blocks=unfreeze_blocks, pretrained=pretrained)
         if "siglip" in model_name:
             cfg = self.backbone.model.config
             vcfg = getattr(cfg, "vision_config", cfg)  # Siglip2Model -> vision_config.hidden_size
@@ -98,7 +99,7 @@ class HeatmapModel(nn.Module):
         else:
             config = self.backbone.model.config
             feature_dim = config.hidden_sizes[-1] if "conv" in model_name else config.hidden_size
-        self.keypoint_head = ViTKeypointHead(input_dim=feature_dim, heatmap_size=heatmap_size)
+        self.keypoint_head = ViTKeypointHead(input_dim=feature_dim, num_joints=num_joints, heatmap_size=heatmap_size)
     def forward(self, x):
         features = self.backbone(x)
         return self.keypoint_head(features)
@@ -122,13 +123,9 @@ def main(args):
 
     keypoint_names = (args.keypoint_names.split(',') if getattr(args, 'keypoint_names', None)
                       else ['link0', 'link2', 'link3', 'link4', 'link6', 'link7', 'hand'])
-    # SigLIP/SigLIP2 expect mean=std=0.5 ([-1,1]); DINOv3 uses ImageNet stats.
-    if "siglip" in args.model_name:
-        norm_mean, norm_std = [0.5, 0.5, 0.5], [0.5, 0.5, 0.5]
-        if is_main:
-            print("==> SigLIP backbone detected: using mean=std=0.5 normalization")
-    else:
-        norm_mean = norm_std = None  # dataset default = ImageNet
+    # Normalization is backbone-specific (read from the model's own AutoImageProcessor):
+    # DINOv3=ImageNet, SigLIP2/google-vit=0.5, random-init=0.5. Prevents train/eval mismatch.
+    norm_mean, norm_std = get_norm_stats(args.model_name, random_init=args.random_init, verbose=is_main)
     full_train_dataset = PoseEstimationDataset(
         data_dir=args.data_dir[0], keypoint_names=keypoint_names,
         image_size=(args.image_size, args.image_size), heatmap_size=(args.heatmap_size, args.heatmap_size),
@@ -137,6 +134,9 @@ def main(args):
         aug_level=args.aug_level,
         norm_mean=norm_mean, norm_std=norm_std,
         crop_to_robot=args.crop_to_robot, crop_margin=args.crop_margin,
+        crop_aspect=args.crop_aspect, crop_aspect_jitter=args.crop_aspect_jitter,
+        crop_res_jitter=args.crop_res_jitter,
+        crop_res_range=(args.crop_res_min, args.image_size),
         sigma=2.5
     )
     if args.val_dir:
@@ -144,7 +144,8 @@ def main(args):
             data_dir=args.val_dir, keypoint_names=keypoint_names,
             image_size=(args.image_size, args.image_size), heatmap_size=(args.heatmap_size, args.heatmap_size),
             augment=False, norm_mean=norm_mean, norm_std=norm_std,
-            crop_to_robot=args.crop_to_robot, crop_margin=args.crop_margin, sigma=2.5
+            crop_to_robot=args.crop_to_robot, crop_margin=args.crop_margin,
+            crop_aspect=args.crop_aspect, sigma=2.5   # val: 지터 없이 배포 기하 그대로
         )
         train_dataset = full_train_dataset
     else:
@@ -158,7 +159,8 @@ def main(args):
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, sampler=val_sampler, num_workers=args.num_workers, pin_memory=True)
 
     # Model 초기화
-    model = HeatmapModel(args.model_name, (args.heatmap_size, args.heatmap_size), args.unfreeze_blocks).to(device)
+    model = HeatmapModel(args.model_name, (args.heatmap_size, args.heatmap_size), args.unfreeze_blocks,
+                         pretrained=not args.random_init, num_joints=len(keypoint_names)).to(device)
     
     # 체크포인트 로드 (가중치만 불러오고 옵티마이저/스케줄러는 초기화)
     if args.checkpoint and os.path.isfile(args.checkpoint):
@@ -188,9 +190,29 @@ def main(args):
         # strict=False로 설정하여 누락된 키가 있어도 에러 없이 넘어가게 로드
         model.load_state_dict(filtered_dict, strict=False)
     
-    if local_rank != -1: model = nn.parallel.DistributedDataParallel(model, device_ids=[local_rank])
+    if local_rank != -1:
+        # random-init trains the whole ViT incl. genuinely-unused params (pooler/mask_token that
+        # never touch patch-token loss) -> DDP needs find_unused_parameters. Frozen/fine-tune runs
+        # freeze those params so they're excluded from reduction and don't need the flag.
+        model = nn.parallel.DistributedDataParallel(
+            model, device_ids=[local_rank], find_unused_parameters=args.random_init)
     
-    joint_weights = torch.tensor([2.5, 1.5, 1.3, 1.0, 1.3, 1.5, 2.5]).to(device)
+    # Per-keypoint MSE loss weights. Default = legacy Panda U-shape (base+hand up-weighted).
+    # --joint-weights overrides to attack the empirical catastrophic-argmax tail, which is
+    # concentrated on DISTAL joints (link6 9.24% / hand 9.09% / link7 7.95% / link3 6.02%)
+    # that the legacy U-shape under-weights. Backward-compatible: None -> identical old behavior.
+    if getattr(args, 'joint_weights', None):
+        jw = [float(x) for x in args.joint_weights.split(',')]
+        assert len(jw) == len(keypoint_names), \
+            f"--joint-weights has {len(jw)} values but there are {len(keypoint_names)} keypoints"
+        joint_weights = torch.tensor(jw).to(device)
+        if is_main:
+            print(f"==> Per-keypoint loss weights (custom): {dict(zip(keypoint_names, jw))}")
+    elif len(keypoint_names) == 7:
+        joint_weights = torch.tensor([2.5, 1.5, 1.3, 1.0, 1.3, 1.5, 2.5]).to(device)
+    else:
+        # Non-7-keypoint robots (e.g. whole-body Baxter, 17): uniform weighting by default.
+        joint_weights = torch.ones(len(keypoint_names)).to(device)
     criterion = nn.MSELoss(reduction='none')
     loss_scale = 1000.0
     # Two LR groups: head at --learning-rate, unfrozen backbone blocks at --backbone-lr (lower).
@@ -228,11 +250,12 @@ def main(args):
                 warmup_lr = args.min_lr + (args.learning_rate - args.min_lr) * (global_step / warmup_steps)
                 set_lr(optimizer, warmup_lr)
             imgs, gt_hms = batch['image'].to(device), batch['heatmaps'].to(device)
-            preds = model(imgs)
-            raw_loss = criterion(preds, gt_hms).mean(dim=[2, 3])
+            with torch.autocast('cuda', dtype=torch.bfloat16, enabled=args.amp):
+                preds = model(imgs)
+                raw_loss = criterion(preds, gt_hms).mean(dim=[2, 3])
+                loss = (raw_loss * joint_weights.view(1, -1)).mean() * loss_scale
             train_joint_losses += raw_loss.mean(dim=0).detach() * loss_scale
-            loss = (raw_loss * joint_weights.view(1, -1)).mean() * loss_scale
-            optimizer.zero_grad(); loss.backward(); optimizer.step()
+            optimizer.zero_grad(); loss.backward(); optimizer.step()  # bf16 autocast: no GradScaler needed
             train_loss_accum += loss.item()
             global_step += 1
             if is_main: pbar.set_postfix({'loss': f"{loss.item():.4f}", 'lr': f"{optimizer.param_groups[0]['lr']:.2e}"})
@@ -243,10 +266,12 @@ def main(args):
         with torch.no_grad():
             for i, batch in enumerate(val_loader):
                 imgs, gt_hms = batch['image'].to(device), batch['heatmaps'].to(device)
-                preds = model(imgs)
-                raw_val_loss = criterion(preds, gt_hms).mean(dim=[2, 3])
+                with torch.autocast('cuda', dtype=torch.bfloat16, enabled=args.amp):
+                    preds = model(imgs)
+                    raw_val_loss = criterion(preds, gt_hms).mean(dim=[2, 3])
+                    weighted_val_loss = (raw_val_loss * joint_weights.view(1, -1)).mean() * loss_scale
+                preds = preds.float()  # bf16->fp32 for argmax decode / viz (numpy has no bf16)
                 val_joint_losses += raw_val_loss.mean(dim=0).detach() * loss_scale
-                weighted_val_loss = (raw_val_loss * joint_weights.view(1, -1)).mean() * loss_scale
                 val_loss += weighted_val_loss.item()
                 if i == 0: viz_batch = (imgs, gt_hms, preds)
                 
@@ -288,6 +313,10 @@ if __name__ == '__main__':
     parser.add_argument('--val-split', type=float, default=0.2)
     parser.add_argument('--checkpoint', type=str, default=None, help='Path to weights checkpoint to load')
     parser.add_argument('--model-name', type=str, default='facebook/dinov3-vitb16-pretrain-lvd1689m')
+    parser.add_argument('--random-init', action='store_true',
+                        help='from-scratch: random-init backbone (same arch, no pretrained weights); full backbone trains')
+    parser.add_argument('--amp', action='store_true',
+                        help='bf16 mixed-precision training (~1.6-2x faster). Default off=fp32. Use uniformly across compared cells.')
     parser.add_argument('--output-dir', type=str, default='./outputs_heatmap')
     parser.add_argument('--image-size', type=int, default=512)
     parser.add_argument('--heatmap-size', type=int, default=512)
@@ -305,12 +334,27 @@ if __name__ == '__main__':
     parser.add_argument('--occlusion-size', type=float, default=0.2, help='Max size of occlusion patch relative to image')
     parser.add_argument('--crop-to-robot', action='store_true', help='square-crop around robot (GT-kp bbox) before resize')
     parser.add_argument('--crop-margin', type=float, default=1.5, help='bbox expansion factor for crop')
+    parser.add_argument('--crop-aspect', type=float, default=1.0,
+                        help='crop rect w/h. 1.0=legacy square. Set to the deploy frame aspect '
+                             '(640x480 -> 1.3333) to match Eval/selfbbox_eval.py, which crops a '
+                             'square out of the anisotropically-resized 512x512 frame (= 4:3 in original px).')
+    parser.add_argument('--crop-aspect-jitter', type=float, default=0.0,
+                        help='log-uniform multiplicative jitter on --crop-aspect (train only)')
+    parser.add_argument('--crop-res-jitter', type=float, default=0.0,
+                        help='probability of resampling the crop to a lower effective resolution '
+                             '(simulates the small-robot upsampled-crop regime)')
+    parser.add_argument('--crop-res-min', type=int, default=140,
+                        help='lower bound of the --crop-res-jitter target side in px')
     parser.add_argument('--fda-real-dir', type=str, default=None)
     parser.add_argument('--fda-prob', type=float, default=0.0)
     parser.add_argument('--fda-beta', type=float, default=0.05)
     parser.add_argument('--wandb-project', type=str, default='dinov3-heatmap-only')
     parser.add_argument('--wandb-run-name', type=str, default=None)
     parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--joint-weights', type=str, default=None,
+                        help='comma-separated per-keypoint MSE loss weights (must match keypoint '
+                             'count). Default = legacy Panda U-shape 2.5,1.5,1.3,1.0,1.3,1.5,2.5. '
+                             'Up-weight distal (link3/6/7/hand) to attack the catastrophic argmax tail.')
     parser.add_argument('--keypoint-names', type=str, default=None,
                         help='comma-separated keypoint suffixes (default = Panda 7). Meca500/FR5 6-DOF: link0,link1,link2,link3,link4,link5,link6')
     main(parser.parse_args())

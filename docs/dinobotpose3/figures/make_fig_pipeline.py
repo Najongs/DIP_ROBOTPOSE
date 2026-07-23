@@ -124,88 +124,136 @@ def arm_poly(x, y, w, h, dx=0.0, dy=0.0, **kw):
 # ---------- figure ----------
 
 def fig_pipeline():
-    fig, ax = plt.subplots(figsize=(13.5, 6.6))
-    ax.set_xlim(0, 1350)
-    ax.set_ylim(0, 660)
+    """Two-pass topology, matching Eval/selfbbox_eval.py.
+
+    Corrections vs. the earlier draft (verified against source):
+      * pass 1 and pass 2 are SEPARATE weight sets (selfbbox_eval.py:165-169,
+        verify_sota.sh:9-12) -- not one network re-entered, so both are drawn.
+      * angle and rot heads both branch off the keypoint head's soft-argmax
+        output (model_angle.py:296,320-323,341-344); they are siblings, not a
+        keypoint->angle chain and not parallel branches off the backbone.
+      * DARK / heatmap-covariance re-decode the heatmaps and feed the SOLVER
+        only (selfbbox_eval.py:273-285); the heads never see them.
+      * pass 1 runs a full kinematic solve, then FK-projects all 7 joints
+        (incl. the occluded base) to build the box (selfbbox_eval.py:212-236).
+    """
+    fig, ax = plt.subplots(figsize=(15.0, 9.2))
+    ax.set_xlim(0, 1500)
+    ax.set_ylim(0, 920)
     ax.set_aspect("equal")
     ax.axis("off")
 
-    Y0, Y1 = 420, 510          # main-flow row
-    ymid = (Y0 + Y1) / 2
+    # ======================= PASS 1 : full frame =========================
+    ax.add_patch(FancyBboxPatch((150, 758), 980, 148,
+                                boxstyle="round,pad=0,rounding_size=10",
+                                fc="none", ec=C_TRAIN, lw=1.4,
+                                linestyle=(0, (5, 3)), zorder=2))
+    ax.text(164, 888, "PASS 1 — full frame   (full-frame-trained weights)",
+            ha="left", va="center", fontsize=9.5, fontweight="bold",
+            color=C_TRAIN, zorder=4)
 
-    # --- stage 1: input frame (real inset) ---
+    P1, P1H = 778, 72
+    p1mid = P1 + P1H / 2
+
     img_in = plt.imread(FRAME)
-    inset(ax, img_in, 20, 415, 140, 105, "input RGB frame")
-    arrow(ax, 162, ymid, 183, ymid)
+    inset(ax, img_in, 22, 772, 118, 89, "input RGB frame")
+    arrow(ax, 143, p1mid, 252, p1mid)
 
-    # --- auto-bbox loop ---
-    box(ax, 185, Y0, 122, Y1 - Y0, F_TRAIN, C_TRAIN, "Auto-bbox",
-        "bbox-from-solved\ndetect $\\rightarrow$ solve $\\rightarrow$ crop")
-    arrow(ax, 309, ymid, 320, ymid)
+    box(ax, 255, P1, 135, P1H, F_FROZEN, C_FROZEN, "DINOv3 ViT-B/16",
+        "~86M, frozen during\nhead training", tfs=8.4, sfs=6.3)
+    arrow(ax, 391, p1mid, 408, p1mid)
+    box(ax, 410, P1, 125, P1H, F_TRAIN, C_TRAIN, "Keypoint head",
+        "7 heatmaps\n$\\rightarrow$ soft-argmax", tfs=8.4, sfs=6.3)
+    arrow(ax, 536, p1mid, 553, p1mid)
+    box(ax, 555, P1, 140, P1H, F_TRAIN, C_TRAIN, "Angle + Rot heads",
+        "$\\hat{\\theta}$,  $R_{init}$", tfs=8.4, sfs=6.6)
+    arrow(ax, 696, p1mid, 713, p1mid)
+    box(ax, 715, P1, 150, P1H, F_FREE, C_FREE, "kinematic solve",
+        "$\\theta, R, t$  (full frame)", tfs=8.4, sfs=6.3)
+    arrow(ax, 866, p1mid, 883, p1mid)
+    box(ax, 885, P1, 165, P1H, F_FREE, C_FREE, "FK-project 7 pts",
+        "$\\rightarrow$ square bbox\n(occluded base filled)", tfs=8.4, sfs=6.3)
 
-    # --- frozen backbone ---
-    box(ax, 322, Y0, 160, Y1 - Y0, F_FROZEN, C_FROZEN, "Frozen DINOv3\nViT-B/16",
-        "~86M, frozen throughout\npatch tokens 32$\\times$32$\\times$768", sfs=6.4)
-    arrow(ax, 484, ymid, 495, ymid)
+    # pass 1 -> crop (clear channel between the two bands)
+    elbow(ax, [(1052, p1mid), (1090, p1mid), (1090, 730), (195, 730), (195, 684)],
+          ls="--", lw=1.4, color=C_TRAIN)
+    ax.text(660, 743, "solved-pose bbox  (guard: fall back to detected-kp bbox "
+                      "if the pass-1 solve diverged)",
+            ha="center", va="center", fontsize=6.8, color=C_TRAIN, zorder=4)
 
-    # --- keypoint stage: trained head (top) + free decode (bottom) ---
-    box(ax, 497, 462, 150, 48, F_TRAIN, C_TRAIN, "Keypoint head",
-        "7 keypoint heatmaps")
-    box(ax, 497, 412, 150, 46, F_FREE, C_FREE, "DARK decode",
-        "sub-pixel, conf, 2$\\times$2 cov", sfs=6.5)
+    # ======================= PASS 2 : crop ===============================
+    ax.add_patch(FancyBboxPatch((90, 400), 1120, 312,
+                                boxstyle="round,pad=0,rounding_size=10",
+                                fc="none", ec=C_TRAIN, lw=1.4,
+                                linestyle=(0, (5, 3)), zorder=2))
+    ax.text(340, 698, "PASS 2 — crop   (crop-trained weights; angle + rot heads "
+                      "self-trained per camera)",
+            ha="left", va="center", fontsize=9.5, fontweight="bold",
+            color=C_TRAIN, zorder=4)
 
-    # --- heads (trained) ---
-    box(ax, 672, 470, 150, 50, F_TRAIN, C_TRAIN, "Angle head",
-        "$\\hat{\\theta}$ 6 joints (sin/cos)")
-    box(ax, 672, 402, 150, 50, F_TRAIN, C_TRAIN, "Rotation head",
-        "6D rot $\\rightarrow$ $R_{init}$")
-    arrow(ax, 649, 486, 670, 495)
-    arrow(ax, 649, 435, 670, 427)
+    box(ax, 110, 628, 170, 52, F_FREE, C_FREE, "roi_align crop",
+        "$K \\rightarrow$ crop-$K$ (focal, pp)", tfs=8.4, sfs=6.3)
+    arrow(ax, 195, 626, 195, 620)
 
-    # --- solver (training-free) ---
-    box(ax, 845, Y0, 195, Y1 - Y0, F_FREE, C_FREE, "cov-PnP + kinematic\nrefinement",
-        "EPnP init (top-conf kp)\ndiff. FK + IRLS, 250 iters")
-    arrow(ax, 824, 495, 843, 478)
-    arrow(ax, 824, 427, 843, 450)
+    box(ax, 110, 528, 170, 88, F_FROZEN, C_FROZEN, "DINOv3 ViT-B/16",
+        "separate weights\npatch tokens 32$\\times$32$\\times$768", tfs=8.4, sfs=6.3)
+    arrow(ax, 281, 572, 308, 572)
+    box(ax, 310, 528, 140, 88, F_TRAIN, C_TRAIN, "Keypoint head",
+        "7 heatmaps", tfs=8.4, sfs=6.6)
+    arrow(ax, 451, 572, 478, 572)
+    box(ax, 480, 542, 112, 60, F_NEUT, C_EDGE, "soft-argmax",
+        "kp2d, conf", tfs=8.2, sfs=6.5)
 
-    # --- output ---
-    box(ax, 1052, Y0, 110, Y1 - Y0, F_NEUT, C_EDGE, "Output",
-        "joint angles $\\theta$\ncamera pose $R, t$")
-    arrow(ax, 1042, ymid, 1050, ymid)
+    # both heads branch off the decoded keypoints (siblings, not a chain)
+    box(ax, 632, 590, 150, 58, F_TRAIN, C_TRAIN, "Angle head",
+        "$\\hat{\\theta}$ 6 joints (sin/cos)", tfs=8.4, sfs=6.4)
+    box(ax, 632, 500, 150, 58, F_TRAIN, C_TRAIN, "Rotation head",
+        "6D rot $\\rightarrow$ $R_{init}$", tfs=8.4, sfs=6.4)
+    arrow(ax, 593, 580, 630, 615)
+    arrow(ax, 593, 564, 630, 533)
+    ax.text(707, 574, "tokens @ kp2d  +  bearing geom.",
+            ha="center", va="center", fontsize=6.2, color="#666666", zorder=4)
+
+    # DARK / covariance: heatmaps -> solver, bypassing the heads
+    box(ax, 330, 420, 250, 54, F_FREE, C_FREE, "DARK re-decode  +  heatmap cov",
+        "sub-pixel kp2d, 2$\\times$2 $\\Sigma^{-1}$   (solver only)",
+        tfs=8.2, sfs=6.4)
+    arrow(ax, 380, 526, 380, 476)
+    ax.text(390, 500, "heatmaps", ha="left", va="center", fontsize=6.6,
+            color=C_FREE, zorder=4)
+
+    # solver
+    box(ax, 850, 500, 185, 118, F_FREE, C_FREE, "cov-PnP + kinematic\nrefinement",
+        "EPnP init, $R_{init}$ overrides\ndiff. FK + IRLS, 250 iters",
+        tfs=8.8, sfs=6.3)
+    arrow(ax, 784, 619, 848, 600)
+    arrow(ax, 784, 529, 848, 552)
+    elbow(ax, [(582, 447), (895, 447), (895, 498)], lw=1.4, color=C_FREE)
+
+    box(ax, 1065, 528, 120, 88, F_NEUT, C_EDGE, "Output",
+        "joint angles $\\theta$\ncamera pose $R, t$", tfs=8.8, sfs=6.6)
+    arrow(ax, 1037, 572, 1063, 572)
+
     img_mesh = crop_panel(os.path.join(QUAL, "qual_realsense_mesh.png"), 1, 0)
-    mh = 150 * img_mesh.shape[0] / img_mesh.shape[1]
-    inset(ax, img_mesh, 1188, ymid - mh / 2, 150, mh, "predicted mesh overlay")
-    arrow(ax, 1164, ymid, 1186, ymid)
+    mh = 155 * img_mesh.shape[0] / img_mesh.shape[1]
+    inset(ax, img_mesh, 1250, 572 - mh / 2, 155, mh, "predicted mesh overlay")
+    arrow(ax, 1212, 572, 1248, 572)
 
-    # --- top band: heatmap schematic + decoded keypoints (real) ---
-    hm = heatmap_schematic()
-    ax.imshow(hm, extent=(512, 632, 555, 645), cmap="inferno", zorder=3)
-    ax.add_patch(plt.Rectangle((512, 555), 120, 90, fc="none", ec=C_EDGE, lw=1.0, zorder=4))
-    ax.text(572, 651, "heatmaps (schematic)", ha="center", va="bottom",
-            fontsize=7.2, color="#666666", zorder=4)
-    ax.plot([572, 572], [512, 553], color="#999999", lw=1.0, ls=":", zorder=2)
+    # ============ bottom band: test-time render-and-compare ==============
+    ax.add_patch(FancyBboxPatch((430, 40), 750, 340,
+                                boxstyle="round,pad=0,rounding_size=10",
+                                fc="none", ec=C_FREE, lw=1.4,
+                                linestyle=(0, (5, 3)), zorder=2))
+    ax.text(444, 362, "Test-time render-and-compare  (depth/scale corrector, training-free)",
+            ha="left", va="center", fontsize=9.5, fontweight="bold",
+            color=C_FREE, zorder=4)
 
-    img_kp = crop_panel(os.path.join(QUAL, "qual_realsense_clean.png"), 1, 0)
-    kw_ = 132
-    kh_ = kw_ * img_kp.shape[0] / img_kp.shape[1]
-    inset(ax, img_kp, 690, 645 - kh_, kw_, kh_, None)
-    ax.text(756, 651, "decoded 2D keypoints", ha="center", va="bottom",
-            fontsize=7.2, color="#666666", zorder=4)
-    ax.plot([747, 747], [522, 645 - kh_ - 2], color="#999999", lw=1.0, ls=":", zorder=2)
-
-    # --- bottom band: test-time render-and-compare ---
-    ax.add_patch(FancyBboxPatch((470, 60), 700, 290, boxstyle="round,pad=0,rounding_size=10",
-                                fc="none", ec=C_FREE, lw=1.4, linestyle=(0, (5, 3)), zorder=2))
-    ax.text(482, 334, "Test-time render-and-compare  (depth/scale corrector, training-free)",
-            ha="left", va="center", fontsize=9.5, fontweight="bold", color=C_FREE, zorder=4)
-
-    box(ax, 520, 210, 150, 62, F_FREE, C_FREE, "Zero-shot SAM",
+    box(ax, 480, 238, 150, 62, F_FREE, C_FREE, "Zero-shot SAM",
         "ViT-B\nrobot foreground mask", tfs=8.6)
-    box(ax, 520, 105, 150, 62, F_FREE, C_FREE, "nvdiffrast render",
+    box(ax, 480, 128, 150, 62, F_FREE, C_FREE, "nvdiffrast render",
         "mesh + FK silhouette", tfs=8.6)
 
-    # IoU panel: two offset silhouettes
-    px, py, pw_, ph_ = 715, 115, 130, 160
+    px, py, pw_, ph_ = 678, 132, 130, 160
     ax.add_patch(plt.Rectangle((px, py), pw_, ph_, fc="#1a1a1a", ec=C_EDGE, lw=1.0, zorder=3))
     ax.add_patch(arm_poly(px, py, pw_, ph_, dx=0.05, dy=0.02, fc="white",
                           ec="none", alpha=0.85, zorder=4))
@@ -213,46 +261,44 @@ def fig_pipeline():
                           ec="none", alpha=0.65, zorder=5))
     ax.text(px + pw_ / 2, py - 13, "SAM mask vs rendered silhouette",
             ha="center", va="center", fontsize=7.2, color="#444444", zorder=4)
-    arrow(ax, 672, 241, 713, 220, color=C_FREE)
-    arrow(ax, 672, 136, 713, 165, color=C_FREE)
+    arrow(ax, 632, 269, 676, 248, color=C_FREE)
+    arrow(ax, 632, 159, 676, 186, color=C_FREE)
 
-    box(ax, 875, 155, 160, 70, F_FREE, C_FREE, "maximize soft-IoU",
+    box(ax, 850, 178, 160, 70, F_FREE, C_FREE, "maximize soft-IoU",
         "optimize depth/scale\n(+ reproj anchor)", tfs=8.6)
-    arrow(ax, 847, 190, 873, 190, color=C_FREE)
+    arrow(ax, 810, 213, 848, 213, color=C_FREE)
 
-    # per-camera toggle note
-    ax.text(820, 76, "per-camera toggle:  RealSense +0.070 $\\cdot$ Kinect +0.062 $\\cdot$ "
+    ax.text(805, 62, "per-camera toggle:  RealSense +0.070 $\\cdot$ Kinect +0.062 $\\cdot$ "
                      "ORB +0.040 $\\cdot$ Azure OFF (near-range)",
             ha="center", va="center", fontsize=7.6, color=C_FREE, zorder=4)
 
-    # pass-1 feedback loop: solved pose -> FK-projected bbox -> re-crop (pass 2)
-    elbow(ax, [(880, 418), (880, 370), (246, 370), (246, 418)],
-          ls="--", lw=1.3, color=C_TRAIN)
-    ax.text(563, 384, "pass-1 solved pose $\\rightarrow$ FK-projected bbox "
-                      "(re-detect on crop = pass 2)",
-            ha="center", va="center", fontsize=6.8, color=C_TRAIN, zorder=4)
-
-    # branch arrows in/out of RC
-    elbow(ax, [(30, 413), (30, 241), (518, 241)], ls="--", lw=1.2, color="#777777")
-    ax.text(300, 250, "full image", ha="center", fontsize=7.2, color="#777777", zorder=4)
-    elbow(ax, [(942, 418), (942, 300), (495, 300), (495, 136), (517, 136)],
+    # RC wiring
+    elbow(ax, [(14, 790), (14, 269), (478, 269)], ls="--", lw=1.2, color="#777777")
+    ax.text(250, 278, "full image (uncropped)", ha="center", fontsize=7.2,
+            color="#777777", zorder=4)
+    elbow(ax, [(1020, 498), (1020, 330), (446, 330), (446, 159), (478, 159)],
           lw=1.4, color=C_FREE)
-    ax.text(770, 310, "initial pose $(\\theta, R, t)$", ha="center", fontsize=7.4,
+    ax.text(760, 340, "initial pose $(\\theta, R, t)$", ha="center", fontsize=7.4,
             color=C_FREE, zorder=4)
-    elbow(ax, [(1037, 190), (1107, 190), (1107, 418)], lw=1.4, color=C_FREE)
-    ax.text(1118, 250, "corrected $t$", ha="left", fontsize=7.4, color=C_FREE, zorder=4)
+    elbow(ax, [(1012, 213), (1125, 213), (1125, 526)], lw=1.4, color=C_FREE)
+    ax.text(1148, 320, "corrected $t$", ha="left", fontsize=7.4, color=C_FREE, zorder=4)
 
     # --- legend ---
-    lx, ly = 30, 175
-    items = [(F_FROZEN, C_FROZEN, "Frozen (DINOv3 backbone)"),
-             (F_TRAIN, C_TRAIN, "Trained (sim-to-real + per-camera self-training,\nlight occlusion aug)"),
+    lx, ly = 40, 205
+    items = [(F_FROZEN, C_FROZEN, "Frozen DINOv3 backbone (one per pass,\nseparate weights)"),
+             (F_TRAIN, C_TRAIN, "Trained (sim-to-real; pass-2 angle + rot\nheads self-trained per camera)"),
              (F_FREE, C_FREE, "Training-free / test-time")]
-    ax.text(lx, ly + 40, "Legend", fontsize=8.6, fontweight="bold", color=C_EDGE)
+    ax.text(lx, ly + 46, "Legend", fontsize=8.6, fontweight="bold", color=C_EDGE)
     for i, (fc, ec, lab) in enumerate(items):
-        yy = ly - i * 52
+        yy = ly - i * 56
         ax.add_patch(plt.Rectangle((lx, yy), 34, 20, fc=fc, ec=ec, lw=1.4, zorder=3))
-        ax.text(lx + 44, yy + 10, lab, ha="left", va="center", fontsize=7.8,
+        ax.text(lx + 44, yy + 10, lab, ha="left", va="center", fontsize=7.6,
                 color="#333333", zorder=4)
+
+    ax.text(40, 32, "Pass 1 and pass 2 share the architecture but NOT the\n"
+                    "weights; the only quantity carried across is the bbox.",
+            ha="left", va="center", fontsize=7.6, style="italic",
+            color="#555555", zorder=4)
 
     save(fig, "fig_pipeline")
 

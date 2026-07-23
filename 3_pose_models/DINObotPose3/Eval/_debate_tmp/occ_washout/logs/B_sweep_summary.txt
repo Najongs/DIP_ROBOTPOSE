@@ -1,0 +1,4 @@
+==== SWEEP B_pure_selftrain  head=/home/najo/NAS/DIP/3_pose_models/DINObotPose3/Eval/_debate_tmp/occ_washout/realsense_pure_selftrain/best_selftrain_head.pth ====
+OCCL B_pure_selftrain  ratio=0.0  ADD-AUC@100mm=0.7448
+OCCL B_pure_selftrain  ratio=0.2  ADD-AUC@100mm=0.6306
+OCCL B_pure_selftrain  ratio=0.4  ADD-AUC@100mm=0.3938

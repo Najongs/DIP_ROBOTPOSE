@@ -66,6 +66,7 @@ def main(args):
         heatmap_size=(args.image_size, args.image_size),
         augment=True, aug_level='strong', include_angles=True, sigma=2.5,
         crop_to_robot=args.crop_to_robot, crop_margin=args.crop_margin,
+        crop_aspect=args.crop_aspect,
         norm_mean=norm_mean, norm_std=norm_std,
         angle_joint_names=ang_names)
     val_ds = PoseEstimationDataset(
@@ -74,6 +75,7 @@ def main(args):
         heatmap_size=(args.image_size, args.image_size),
         augment=False, include_angles=True, sigma=2.5,
         crop_to_robot=args.crop_to_robot, crop_margin=args.crop_margin,
+        crop_aspect=args.crop_aspect,
         norm_mean=norm_mean, norm_std=norm_std,
         angle_joint_names=ang_names)
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True,
@@ -82,8 +84,9 @@ def main(args):
                             num_workers=args.num_workers, pin_memory=True)
 
     model = AnglePredictor(args.model_name, args.image_size, fix_joint7_zero=True,
-                           head_type=args.head_type).to(device)
-    print(f"==> Angle head type: {args.head_type}")
+                           head_type=args.head_type, n_hyp=args.n_mix,
+                           angle_backbone=args.angle_backbone).to(device)
+    print(f"==> Angle head type: {args.head_type} | angle backbone: {args.angle_backbone}")
 
     # Load the Stage-1 detector weights into backbone + keypoint_head.
     ckpt = torch.load(args.detector_ckpt, map_location=device)
@@ -98,7 +101,16 @@ def main(args):
         model.angle_head.load_state_dict(torch.load(args.init_head, map_location=device))
         print(f'[warm-start] angle_head <- {args.init_head}')
 
-    opt = optim.AdamW(model.angle_head.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    # P1b: the DINOv3 detector (backbone + keypoint_head) MUST stay frozen (kp2d/conf only). The
+    # separate ResNet50 angle trunk (angle_feat) is the only new trainable module besides the head.
+    assert not any(p.requires_grad for p in model.backbone.parameters()), "DINOv3 backbone must be frozen"
+    assert not any(p.requires_grad for p in model.keypoint_head.parameters()), "keypoint_head must be frozen"
+    param_groups = [{'params': model.angle_head.parameters(), 'lr': args.lr}]
+    if args.angle_backbone == 'resnet50':
+        assert all(p.requires_grad for p in model.angle_feat.parameters()), "resnet50 angle_feat must be trainable"
+        param_groups.append({'params': model.angle_feat.parameters(), 'lr': args.lr * 0.2})  # backbone LR = head×0.2
+        print(f"==> resnet50 angle trunk trainable ({sum(p.numel() for p in model.angle_feat.parameters())/1e6:.1f}M params), lr={args.lr*0.2:.1e}")
+    opt = optim.AdamW(param_groups, weight_decay=args.weight_decay)
     sched = optim.lr_scheduler.CosineAnnealingLR(opt, T_max=args.epochs, eta_min=args.min_lr)
 
     if args.use_wandb and _HAS_WANDB:
@@ -106,8 +118,14 @@ def main(args):
     out = Path(args.output_dir); out.mkdir(parents=True, exist_ok=True)
 
     best_mae = 1e9
+    # P1 focal tail-reweighting: per-joint mask + detached per-joint EMA normalizer (decoupled from
+    # the batch-32 tail so the loss scale is stationary). idx4=J5 mask~0 (observability write-off).
+    focal_jw = torch.tensor([float(x) for x in args.joint_weights.split(',')], device=device)  # (6,)
+    ema_dj = torch.ones(6, device=device)
     for epoch in range(args.epochs):
         model.angle_head.train()
+        if model.angle_feat is not None:
+            model.angle_feat.train()          # resnet BN uses batch stats during training
         run_loss = 0.0
         pbar = tqdm(train_loader, desc=f"Ep{epoch} [train]")
         for batch in pbar:
@@ -126,21 +144,57 @@ def main(args):
             sc = out_d['sin_cos']                       # (B,6,2)
             gt6 = gt[:, :6]
             gt_sc = torch.stack([torch.sin(gt6), torch.cos(gt6)], dim=-1)
-            sc_loss = F.smooth_l1_loss(sc[has], gt_sc[has])
-            loss = sc_loss
+            _mixsel = bool(out_d.get('is_mixsel'))
+            if _mixsel:
+                # P3: MCL winner-take-all on the OBSERVABLE joints (exclude J5=idx4) so the K modes
+                # split on the recoverable basin, + appearance-selector CE to the winner, + load-balance
+                # (anti mode-collapse). At inference the selector (not the solver) picks the hypothesis.
+                sc_all = out_d['sin_cos_all']; sel = out_d['sel_logits']      # (B,K,6,2),(B,K)
+                _obs = [0, 1, 2, 3, 5]
+                _dw = (sc_all[:, :, _obs, :] - gt_sc[:, None, _obs, :]).pow(2).sum(dim=(-1, -2))  # (B,K)
+                winner = _dw.argmin(dim=1)                                    # (B,)
+                _bi = torch.arange(sc_all.shape[0], device=device)
+                sc_loss = F.smooth_l1_loss(sc_all[_bi, winner][has], gt_sc[has])
+                sel_loss = F.cross_entropy(sel[has], winner[has].detach())
+                _p = sel[has].softmax(-1).mean(0)                            # (K,)
+                _lb = math.log(sel.shape[1]) + (_p * _p.clamp(min=1e-8).log()).sum()  # >=0, 0 at uniform
+                loss = sc_loss + args.selector_weight * sel_loss + args.load_balance * _lb
+            elif args.tail_gamma > 0 and epoch >= args.focal_warmup_epochs:
+                # focal reweight by detached per-joint angular residual (EMA-normalized), clamped.
+                with torch.no_grad():
+                    ang_pred = out_d['joint_angles'][:, :6]
+                    dj = torch.atan2(torch.sin(ang_pred - gt6), torch.cos(ang_pred - gt6)).abs()  # (B,6)
+                    if has.any():
+                        ema_dj.mul_(0.99).add_(0.01 * dj[has].mean(0))
+                    w = focal_jw.view(1, 6) * (dj[has] / ema_dj.view(1, 6).clamp(min=1e-3)).pow(args.tail_gamma)
+                    w = w.clamp(max=args.focal_clamp)
+                per = F.smooth_l1_loss(sc[has], gt_sc[has], reduction='none').sum(-1)  # (Nhas,6)
+                sc_loss = (w * per).sum() / w.sum().clamp(min=1e-6)
+                loss = sc_loss
+            elif args.head_type == 'ief' and 'sin_cos_iters' in out_d:
+                # IEF deep supervision: L1 on EVERY iterate's sin/cos, later iterates weighted higher.
+                it = out_d['sin_cos_iters']                         # (B,n_iter,6,2)
+                w = torch.linspace(0.5, 1.0, it.shape[1], device=it.device)   # ramp toward final iterate
+                per = F.smooth_l1_loss(it[has], gt_sc[has].unsqueeze(1).expand(-1, it.shape[1], -1, -1),
+                                       reduction='none').mean(dim=(2, 3))       # (Nhas,n_iter)
+                sc_loss = (per * w).sum(1).mean() / w.sum()
+                loss = sc_loss
+            else:
+                sc_loss = F.smooth_l1_loss(sc[has], gt_sc[has])
+                loss = sc_loss
             # FK robot-frame consistency (Panda/FR3 only; needs 7-angle panda FK). Skipped for
             # robots without a wired-up FK by passing --fk-weight 0 --reproj-weight 0.
-            if args.fk_weight > 0 or args.reproj_weight > 0:
+            if not _mixsel and (args.fk_weight > 0 or args.reproj_weight > 0):
                 fk_pred = fk_fn(out_d['joint_angles'])
                 fk_gt = fk_fn(gt)
-            if args.fk_weight > 0:
+            if not _mixsel and args.fk_weight > 0:
                 fk_loss = F.mse_loss(fk_pred[has], fk_gt[has])
                 loss = loss + args.fk_weight * fk_loss
             # RoboTAG-style cross-dimensional (2D<->3D) consistency: project FK(pred_angles) through
             # the GT camera pose (Kabsch of FK(gt) onto camera-frame GT keypoints) and match GT 2D.
             # Adds the camera-frame reprojection signal the robot-frame fk_loss lacks — sharpens
             # angles where small errors move 2D (near cameras / azure, our RoboTAG-relative weakness).
-            if args.reproj_weight > 0 and 'keypoints_3d' in batch:
+            if not _mixsel and args.reproj_weight > 0 and 'keypoints_3d' in batch:
                 kp3d = batch['keypoints_3d'].to(device)              # (B,7,3) camera frame
                 kp2d = batch['keypoints'].to(device).float()        # (B,7,2) @ IS
                 vm = batch['valid_mask'].to(device).float()         # (B,7)
@@ -163,6 +217,8 @@ def main(args):
 
         # ---- validation: per-joint angle MAE (deg) ----
         model.angle_head.eval()
+        if model.angle_feat is not None:
+            model.angle_feat.eval()           # resnet BN uses running stats during val
         errs = []
         with torch.no_grad():
             for batch in val_loader:
@@ -189,9 +245,15 @@ def main(args):
             wandb.log(log)
 
         torch.save(model.angle_head.state_dict(), out / 'last_angle_head.pth')
+        # P1b: when a separate trainable angle backbone exists (e.g. resnet50), its trained
+        # weights ARE the experiment — persist them alongside the head or the ckpt is useless.
+        if getattr(model, 'angle_feat', None) is not None:
+            torch.save(model.angle_feat.state_dict(), out / 'last_angle_feat.pth')
         if mae < best_mae:
             best_mae = mae
             torch.save(model.angle_head.state_dict(), out / 'best_angle_head.pth')
+            if getattr(model, 'angle_feat', None) is not None:
+                torch.save(model.angle_feat.state_dict(), out / 'best_angle_feat.pth')
             print(f"  -> new best {best_mae:.2f} deg")
     print(f"Done. Best val angle MAE = {best_mae:.2f} deg")
 
@@ -217,10 +279,23 @@ if __name__ == '__main__':
     p.add_argument('--min-lr', type=float, default=1e-6)
     p.add_argument('--weight-decay', type=float, default=1e-4)
     p.add_argument('--fk-weight', type=float, default=10.0)
-    p.add_argument('--head-type', type=str, default='mlp', choices=['mlp', 'transformer', 'mlp_patch'])
+    p.add_argument('--tail-gamma', type=float, default=0.0, help='P1 focal exponent on per-joint angular residual (0=off=uniform L2)')
+    p.add_argument('--joint-weights', type=str, default='1,0.7,1,1,0.1,0.3', help='P1 per-joint mask J1..J6; idx4=J5~0 (observability write-off)')
+    p.add_argument('--focal-warmup-epochs', type=int, default=3, help='plain-L2 epochs before focal kicks in (avoids noisy early residuals)')
+    p.add_argument('--focal-clamp', type=float, default=5.0, help='max per-element focal weight (anti hard-negative-memorization)')
+    p.add_argument('--n-mix', type=int, default=2, help='P3 mlp_mixsel: number of hypotheses/modes')
+    p.add_argument('--selector-weight', type=float, default=1.0, help='P3: appearance-selector CE weight')
+    p.add_argument('--load-balance', type=float, default=0.5, help='P3: mode load-balance (anti-collapse) weight')
+    p.add_argument('--head-type', type=str, default='mlp', choices=['mlp', 'transformer', 'mlp_patch', 'mlp_mcl', 'mlp_mixsel', 'pare', 'ief'])
+    p.add_argument('--angle-backbone', type=str, default='dino_frozen', choices=['dino_frozen', 'resnet50'],
+                   help='P1b: feature source for the angle head. dino_frozen (default) = frozen DINOv3 pooled tokens (unchanged). '
+                        'resnet50 = separate TRAINABLE ImageNet-init ResNet50 trunk (frozen DINOv3 stays kp2d/conf-only).')
     p.add_argument('--crop-to-robot', action='store_true',
                    help='crop image to robot bbox (train+test), RoboPEPP-style; must match detector ckpt')
     p.add_argument('--crop-margin', type=float, default=1.5)
+    p.add_argument('--crop-aspect', type=float, default=1.0,
+                   help='crop rect w/h. 1.0=legacy square. Set to the deploy frame aspect '
+                        '(640x480 -> 1.3333) to match Eval/selfbbox_eval.py roi_align crops.')
     p.add_argument('--occlude-aug', type=float, default=0.0,
                    help='train-time occlusion augmentation: with prob 0.5 paste black occluders covering U(0.05,THIS) of the robot RoI (frozen detector -> head learns to handle degraded conf/keypoints)')
     p.add_argument('--kp-drop', type=float, default=0.0,

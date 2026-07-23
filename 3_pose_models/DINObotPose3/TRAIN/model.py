@@ -2,7 +2,7 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from transformers import AutoModel
+from transformers import AutoModel, AutoConfig
 from torchvision.ops import roi_align
 import numpy as np
 import cv2
@@ -300,19 +300,38 @@ def soft_argmax_2d(heatmaps, temperature=100.0):
     return torch.stack([x, y], dim=-1)  # (B, N, 2)
 
 class DINOv3Backbone(nn.Module):
-    def __init__(self, model_name, unfreeze_blocks=2):
+    def __init__(self, model_name, unfreeze_blocks=2, pretrained=True):
         super().__init__()
         self.model_name = model_name
-        self.model = AutoModel.from_pretrained(model_name)
+        # pretrained=False -> random-init (from-scratch) baseline: same ViT-B/16 architecture,
+        # random weights (AutoModel.from_config bypasses downloaded checkpoints).
+        if pretrained:
+            self.model = AutoModel.from_pretrained(model_name)
+        else:
+            cfg = AutoConfig.from_pretrained(model_name)
+            self.model = AutoModel.from_config(cfg)
+
+        if not pretrained:
+            # random-init control. unfreeze_blocks<=0 -> FROZEN random backbone (head-only,
+            # parameter-matched control that should collapse). Otherwise the ENTIRE backbone
+            # trains (patch-embed, pos-embed, CLS + all blocks) — partial unfreeze of random
+            # weights is meaningless, and from-scratch needs the embeddings trainable too.
+            full = unfreeze_blocks > 0
+            for param in self.model.parameters():
+                param.requires_grad = full
+            msg = "full backbone trainable (from-scratch)" if full else "FROZEN random backbone (head-only)"
+            print(f"  [DINOv3Backbone] random-init ({model_name}): {msg}")
+            return
 
         # Freeze backbone parameters
         for param in self.model.parameters():
             param.requires_grad = False
-            
+
         # Unfreeze last N transformer blocks for fine-tuning.
         # Locate the encoder layer list across backbones:
-        #   DINOv3:  model.encoder.layers  or  model.blocks
-        #   SigLIP2: model.vision_model.encoder.layers  (nested vision tower)
+        #   DINOv3:     model.encoder.layers  or  model.blocks
+        #   SigLIP2:    model.vision_model.encoder.layers  (nested vision tower)
+        #   plain ViT:  model.encoder.layer   (singular — google/vit)
         if unfreeze_blocks > 0:
             layers = None
             vt = getattr(self.model, "vision_model", self.model)
@@ -320,6 +339,10 @@ class DINOv3Backbone(nn.Module):
                 layers = vt.encoder.layers
             elif hasattr(self.model, "encoder") and hasattr(self.model.encoder, "layers"):
                 layers = self.model.encoder.layers
+            elif hasattr(self.model, "encoder") and hasattr(self.model.encoder, "layer"):
+                layers = self.model.encoder.layer
+            elif hasattr(self.model, "layer"):
+                layers = self.model.layer          # DINOv3 (transformers 5.x: model.layer ModuleList)
             elif hasattr(self.model, "blocks"):
                 layers = self.model.blocks
             if layers is not None:
@@ -331,13 +354,19 @@ class DINOv3Backbone(nn.Module):
                 print("  [DINOv3Backbone] WARNING: could not locate encoder layers to unfreeze")
 
     def forward(self, image_tensor_batch):
+        model_type = getattr(self.model.config, "model_type", "")
         if "siglip" in self.model_name:
             # SigLIP/SigLIP2 vision tower returns ALL patch tokens, no CLS/register tokens
             # (verified: siglip2-base-patch16-512 -> (B,1024,768), a perfect 32x32 grid).
             vt = getattr(self.model, "vision_model", self.model)
             outputs = vt(pixel_values=image_tensor_batch, interpolate_pos_encoding=True)
             patch_tokens = outputs.last_hidden_state
-        else: # DINOv3 계열
+        elif model_type == "vit":
+            # plain HF ViT (supervised google/vit or random-init): trained at 384, our input is
+            # 512 -> MUST interpolate pos-embed. CLS at index 0, no register tokens.
+            outputs = self.model(pixel_values=image_tensor_batch, interpolate_pos_encoding=True)
+            patch_tokens = outputs.last_hidden_state[:, 1:, :]
+        else: # DINOv3 계열 (interpolates pos-embed internally)
             outputs = self.model(pixel_values=image_tensor_batch)
             tokens = outputs.last_hidden_state
             num_reg = int(getattr(self.model.config, "num_register_tokens", 0))

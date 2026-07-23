@@ -1123,3 +1123,211 @@ User asked "what other comparison groups are needed?" → prioritized + executed
 - §4.10 (i)/(ii) rewritten, Table 12 pose rows filled with real numbers + caption corrected, orphan
   synth-val row removed. Old buggy tsv kept as results_siglip_BUGGY_imagenet_norm.tsv. Committed.
 - Lesson: always verify per-backbone preprocessing (siglip=0.5, dino=ImageNet) across train AND eval.
+
+---
+
+## 2026-07-20 백본 실험 확장: pretraining vs architecture (표12 검출 행)
+
+**동기**: §4.10은 DINOv3 vs SigLIP2(둘 다 pretrained)만 비교 → "구조 자체가 좋냐 vs 다양한
+이미지 pretraining 덕이냐"를 못 가름. random-init(from-scratch) 통제군 추가로 분리(ViT 원논문·
+He2018 "Rethinking ImageNet Pre-training" 방식). Panda·검출 레벨(stage1 full-frame, val=real-azure AUC).
+
+**설계(2×2)**: pretrained{DINOv3/SigLIP2(있음), google/vit supervised(신규)} × random-init(신규)
+                × frozen(헤드만) / unfrozen(백본).
+- frozen 행 = 파라미터-매칭 통제(pretrained-frozen도 random-frozen도 헤드만 학습, 동일 학습 파라미터 수).
+- unfrozen random = 전체 백본 from-scratch(embeddings 포함). He2018 공정성: 긴 스케줄(≤80ep, plateau 조기중단).
+
+**정밀도 = fp32 (공정성)**: 기존 DINOv3/SigLIP2 앵커가 fp32 → 신규도 fp32로 통일(arm간 정밀도 섞으면
+confound; from-scratch가 저정밀도에 더 민감해 bf16이 편향 소지). `--amp` 플래그 코드에 있으나 OFF.
+
+**구현**: model.py/model_v4.py DINOv3Backbone에 `pretrained` 파라미터(random-init=AutoModel.from_config),
+random-init 시 unfreeze_blocks>0이면 전체 trainable·=0이면 frozen. 일반 ViT는 forward에
+interpolate_pos_encoding=True(512 pos-embed) + model.encoder.layer(단수)/model.layer(DINOv3 5.x) unfreeze 탐색.
+정규화는 norm_utils.get_norm_stats(AutoImageProcessor.image_mean/std 자동 읽기, siglip 하드코딩 대체).
+train_heatmap.py: --random-init/--amp 플래그, DDP find_unused_parameters=random_init(from-scratch의
+pooler/mask_token 미사용 grad 대응). 런처 run_backbone_ablation.sh.
+
+**측정 처리량(fp32, 3-GPU DDP, batch8/gpu)**: from-scratch 2.1 it/s, ~33min/epoch → 80ep ~44h(최악),
+plateau 조기중단 시 ~22-28h. (fine-tune 대비 느림 = 전체 백본 backward.)
+
+**🔄 실행중(2026-07-20)**:
+- random-unfrozen(from-scratch): GPU 2·3·4, ep80 ceiling, out=bbabl_random-unfrozen_20260720_165132
+- random-frozen(대조군): GPU 0 단일, ep20, out=bbabl_random-frozen_20260720_170016
+- 이후(선택): sup-frozen/sup-unfrozen(google/vit), dino-frozen-sanity(하네스 검증).
+- val AUC plateau 감시 → 조기중단. 결과로 표12 검출 행 확장.
+
+---
+
+## 2026-07-21 합성(synthetic) Panda 성능 진단 + 개선 시도
+
+**문제**: Table 1(tab:main) 합성 Panda ADD-AUC 우리 74.2/76.9(DR/Photo) vs RoboPEPP 83.0/84.1, RoboTAG 82.5/84.3 (~9-10점 열세).
+
+**진단 (Eval/ablation_logs/oracle_angle_synth/, dr/photo_pred/oracle base+RC)**:
+| | pred base | pred +RC | oracle-angle base | oracle-angle +RC |
+|---|---|---|---|---|
+| DR | 0.704 | 0.769 | **0.861** | 0.886 |
+| Photo | 0.738 | 0.799 | **0.869** | 0.897 |
+
+- **병목 = 관절각 예측.** GT 각도 주입 시 base 0.704→0.861(+0.157), RC까지 0.886/0.897 → **RoboPEPP(0.830/0.841) 상회.** 파이프라인 상한은 SOTA 이상, 남은 건 순수 각도 회복.
+- **배제됨**: 2D검출(oracle-2D 무효, ~0.86 AUC), **bbox**(oracle-bbox 0.705 ≈ pred 0.704, 차 0.001), self-occlusion(키포인트 100% 검출), 원거리 깊이(실패는 오히려 근거리 0.6-0.9m 집중).
+- **실패 모드**: ~10% 프레임 파국(>100mm), 90%는 ~15mm. 실패=손목 J4/J5/J6 각도 붕괴(26-38° vs OK 3-9°) + **high reproj(90px vs OK 1.5px)** = 솔버가 잘못된 basin, 검출 2D조차 못 맞춤.
+
+**시도한 개선 (전부 실패 — 손목 관측성 천장)**:
+- RC-실루엣 손목 multi-start(rc_refine_wrist.py, n=8): fail-107 프레임 0.033→0.038 (무효). 손목이 실루엣서도 약하게만 보임.
+- min-reproj multi-start(selfbbox_eval --ms-local 16, synth): DR 0.704→**0.692 (손해)**. 손목이 2D 미관측 → min-reproj가 2D 노이즈 과적합, 90% 좋은 프레임까지 훼손.
+- 근본: SUMMARY 확인 — 손목 self-axis 회전이 자기 키포인트를 안 움직임(관측성 천장). 기하(2D/실루엣)로 복원 불가, appearance/구조-prior 필요.
+
+**공짜 이득 (확정)**: cov-PnP+DARK를 합성 eval에도 일관 적용(실측엔 쓰지만 Table엔 누락됨) → DR 0.742→**0.769**, Photo 0.769→**0.799** (+0.027/+0.030). Table 1 갱신 대상.
+
+**🔄 실행중**: crop-matched mlp_patch + transformer 각도 헤드 재학습(synth) — SUMMARY의 "crop-matched patch head 없음(confounded)" 갭 검증. wrist val MAE가 deployed mlp 대비 개선되면 tail 감소 기대. (out: outputs_angle/synth_{mlp_patch,transformer}_20260721_073917)
+
+**남은 옵션**: RoboPEPP I-JEPA 구조-prior 이식(가중치 별도 필요, 백본적응 반증영역, 고위험). RoboPEPP 메시(urdfs/) 확보됨 → KUKA RC 별도 가능(우리 RC는 Panda 하드코딩).
+
+## 2026-07-21 (cont.) 합성 각도-헤드 개선 — 재분배/라우팅 계열 전부 무효 (결정적 negative)
+eval_synth_head.sh (synth DR base, cov-PnP+DARK, 1000f) vs deployed 0.704 / fail 10.7%:
+- mlp_patch (crop-matched, val MAE 9.0° vs 10.9°): ADD 0.706 / fail 10.7% → 무효.
+- P3 mlp_mixsel (2-mode + appearance selector, 손목 MAE 12.6° 최저): ADD 0.702 / fail 10.3% → 노이즈. 손목↑ but base J0 퇴화 상쇄 = 제로섬 확인.
+- focal(γ1,2, J6=1.0): 부진 → 폐기.
+결론: 가중치재분배·표준헤드·MoE라우팅 전부 순이익 0. 각도 MAE↔ADD 탈동조(병목=10% flip 꼬리, 평균 아님).
+방법론 조사: 정보를 *더하는* 헤드-레벨 기법 = HybrIK twist-swing(base 해석해+roll 전용헤드, 제로섬 원천제거), PARE part-attention(관절별 독립경로), ProHMR/RoboKeyGen(multimodal), RLE/keypoint-filtering. RoboPEPP 우위=masked-embedding 사전학습+per-robot fine-tune(관행, 확인됨).
+신규 코드: model_angle.py AngleHeadMixSel; selfbbox_eval.py --crop-head-type/--oracle-except; train_angle.py --tail-gamma/--n-mix/--selector-weight/--load-balance.
+
+## 2026-07-22 RoboPEPP 격차 재검토 → 근원 = 솔버 basin flip (off-frame kp가 전 팔 오염)
+dr_pred.npz (DR base, cov-PnP+DARK, 1000f, AUC 0.704) 분해 + 경쟁 코드 인용. 문서: docs/dinobotpose3/experiments/2026-07-22_gap_reexamination.md (research agent 소유).
+- **재설정**: DREAM AUC = mean·max(0,1−10·ADD_m) → ADD>100mm 프레임 기여 = 정확히 0. tail(off-frame, 10.7%)의 AUC 총기여 0.0000 → off-frame 손목 복원/드롭은 AUC 불변(oracle-presence 0.703, gt-fill 0.704, mean-fill 0.701 재확인). **tail은 격차가 아님.**
+- **진짜 근원**: 우리 솔버가 θ(7)+R(3)+t(3)=13DOF를 재투영 공동최적화(solve_pose_kinematic.py:218,274) → 환각된 off-frame kp가 손목뿐 아니라 base·R·t까지 잘못된 basin으로 끌고 감(basin flip). tail: reproj 90px, 손목각 26–38°, base link0 62.7mm. RoboPEPP는 θ 회귀(JointNet IEF 4-step)+6DOF-only conf-filter BPnP로 손상을 손목에 국한(J6 5.4°/4.8°).
+- **counterfactual(dump)**: proximal 앵커 단독 +0.006 / distal cap 단독 +0.011 (= refuted 단일축이 net-zero였던 이유 정량 재현) vs **둘 동시** 0.704→0.737(≤150mm)/0.749(≤120mm)/0.758(≤100mm)/0.767(≤80mm). 격차 전체가 이 축.
+
+## 2026-07-22 (cont.) 2악장 P0: 분리 solve (freeze-head-theta) — 🔄 실행 중
+문서: docs/dinobotpose3/experiments/2026-07-22_p0_decoupled_solve.md.
+신규 플래그: selfbbox_eval.py --freeze-head-theta (L136/L366) → solve_batch(freeze_theta=True, theta_init=head_pred). θ를 head 예측에 고정하고 R,t 6DOF만 solve(RoboPEPP식) → basin flip 원천 차단 = counterfactual의 "distal cap+proximal 격리" 동시 구현. --edge-gate로 off-frame kp를 R,t solve에서도 배제.
+변형(DR): control(0.704 재현)/freeze/freeze+edge-gate8/freeze+edge-gate-oracle + freeze(Photo). 예측 +0.03~0.06.
+**결과 🟡 naive freeze REFUTED**: 전역 θ고정 = DR 0.7040→**0.5329**, Photo 0.738→**0.5610** 붕괴. edge-gate8 0.5310/edge-oracle 0.5324 (무의미). 원인=**good 프레임(893장) θ 재투영 정제 상실**(good AUC 0.7884 med14.8mm→0.582 med33mm). freeze는 tail(107장)만 개선(median 183→135mm, 36%<100mm)하나 AUC상 tail은 ~0 기여라 무의미. flip-trigger 2-pass(reproj τ=60px)로 tail만 적용 = 실전 **+0.0090**(oracle per-frame 상한 +0.027). ⇒ **basin flip은 작은 레버로 확정.**
+**후속 진단 → 진짜 격차=good 프레임 각도 정확도**: GOOD 893장 base 0.7884 vs oracle-angle(GTθ) **0.8991**(med 7.2mm) → good에서만 **+0.11 헤드룸**, 게다가 0.899 > RoboPEPP 0.83. head 아키텍처 재배치는 천장(mlp_patch 0.7802/MoE 0.7728 < base 0.7884) → 각도 값 자체의 회귀 정확도를 올려야 함.
+결론: naive decouple 반증, tail(basin flip)은 +0.009 소형 레버. 다음=regressed 각도 정확도 향상(IEF/iterative + pose-prior, P1); flip-trigger 2-pass는 do-no-harm이면 무료 보조.
+
+## 2026-07-22 (cont.) 🔴 근본원인 발견: KUKA/Baxter 내부파라미터(K) 버그 — 과거 결론 다수 무효
+정리본: [docs/dinobotpose3/experiments/2026-07-22_intrinsics_rootcause.md](../../docs/dinobotpose3/experiments/2026-07-22_intrinsics_rootcause.md)
+
+**버그**: `datasets/synthetic/{kuka,baxter}_synth_*` 프레임 JSON에 `meta` 키 자체가 없음(실측: 최상위 키 = `camera_data`/`objects`/`sim_state`) → `TRAIN/dataset.py:574-578`이 조용히 `eye(3)`로 폴백("should not happen with proper data" 주석과 달리 **항상** 발생). 그 항등 유래 K가 `Eval/kuka_add_eval.py:156` · `Eval/baxter_add_eval.py:156`의 `spk.solve_batch(kp2d, conf, K, ...)`를 통해 **진짜 원근투영을 수행하는** 솔버(`Eval/solve_pose_kinematic.py:105-114`, `z`로 나눔)에 직행.
+**오차 크기**: crop·scale 후 **fx=1.736 vs 참값 555.4 → 정확히 ×320**, cx=−562 vs −6.9. native 참값은 `_camera_settings.json`의 fx=fy=320/cx=320/cy=240(KUKA·Baxter 동일)이고 항등 K의 fx=1이므로 배율이 곧 320. 고전적 **focal/depth 모호성** — 솔버는 발산한 게 아니라 *주어진 틀린 카메라에 대해 정확히 최적해*를 찾고 있었음(깊이를 320배 축소).
+**독립 확인**: Panda + 완벽한 GT 2D + 항등 K → 복원 깊이 **4.9 mm**(참값 943 mm), ADD-AUC **0.0000**. 입력 2D가 완벽해도 파국 = 검출기·head 품질과 무관.
+**스코프 = 정확히 이 두 로봇**. Panda는 `datasets/ICRA_multiview/Converted_dataset/DREAM_to_DREAM{,_syn}`으로 학습·평가하고 이 트리는 실제 `meta.K` 보유(합성 320; realsense/kinect/orb 615.5; azure 399.7) → **배포 mean 0.804 유효, 영향 없음**.
+
+**실측 (320프레임 subset, 실제 학습된 head)**:
+| 모드 | KUKA AUC | KUKA mean/med | Baxter AUC | Baxter mean/med |
+|---|---|---|---|---|
+| `--direct-pose` (출하·게재값) | 0.3716 | 73.5 / 59.2 mm | 0.2622 | 85.5 / 75.1 mm |
+| 솔버, 항등 K (현행 코드) | 0.1454 | 1086 / 512 mm | 0.1275 | 1063 / 165 mm |
+| 솔버, **참 K** | **0.6696** | 108 / **13.4** mm | **0.7116** | 39.0 / **19.1** mm |
+
+`--direct-pose` 행이 게재값 0.357/0.253을 재현 → 하네스 검증됨. 항등 K 행의 mean ADD가 1 m 급인 것이 focal/depth 붕괴의 직접 증거. 참 K 솔버가 direct-pose를 **KUKA +0.298 / Baxter +0.449** 능가.
+
+**무효화되는 과거 결론 4건**: ① "KUKA/Baxter에서 솔버가 발산한다" → 망가진 카메라를 먹고 있었음. ② "병목은 rot-head 병진오차 56 mm" → `|dz|` 33.6/36.3 mm는 ~1 m 장면의 **3~4%**로 정상적 metric 회귀, 병목 아님. ③ "iiwa7에서 재투영 최적화는 해롭다" → 버그. ④ `--direct-pose`가 우월 → 실은 **K를 한 번도 건드리지 않는 유일 경로**라 면역이었을 뿐. (교훈: "이유는 모르겠지만 이것만 된다"는 우회로는 *무엇을 건너뛰는지*를 먼저 볼 것.)
+
+**재학습 불필요 (게이지 논증)**: rot head 학습 타깃은 Kabsch(3D↔3D)라 **K-free**. geo/bearing 게이지는 `identity_bearing = 320×true + 320`, 상관 **r = 1.00000000**의 완전 affine → **첫 Linear가 스케일·오프셋을 흡수**, 정보 손실 없음. ⇒ **모델에는 계속 dataset K(항등)를 주고**(게이지 유지), 솔버·렌더러가 쓰는 기하 K만 교체.
+**수정(eval-time 단독)**: 검증된 `Eval/iiwa7_rc_eval.py:81-102`의 `geometric_K()`(native intrinsics + 항등 위에 남은 crop 오프셋 `-bx0,-by0` 결합; GT 3D를 데이터셋 자신의 2D로 재투영해 60프레임 **<0.09 px** 검증)를 위 두 호출부에 배선. 원칙 = **모델에는 dataset K, 솔버에는 참 K**. 주의: `geometric_K:95-96`의 `assert camera_K[0,0,0]==1` 가드는 공용 승격 시 "항등이면 재구성, 아니면 통과"로 일반화 필요(Panda 경로 보호).
+**별도 잠재 이슈**: `Eval/inference_4tier_eval.py:128-131`은 `meta.K` 부재 시 **`zeros(3,3)`** 폴백 — `eye(3)`보다 나쁨(투영 시 z=0 → `clamp(1e-6)`에 걸려 조용히 무의미값). **폴백 대신 `raise` 권장.** 이번 사건의 본질은 "틀린 값"이 아니라 **"조용한 폴백"**. 실제 오염 사례는 **미측정**.
+**문서 정정**: `Eval/iiwa7_rc_eval.py:84` docstring이 "on DREAM (frame JSONs carry no meta.K)"로 일반화했으나 이는 KUKA/Baxter 합성 트리에 한해 참, Panda `DREAM_to_DREAM`에는 **거짓** — 이 과잉일반화가 버그를 정상 동작처럼 보이게 한 요인.
+
+🔴 **논문 수정 플래그 (아직 편집하지 말 것 — full-set 확인 런 진행 중)**: `docs/dinobotpose3/PAPER_DRAFT.md:190`(KUKA 0.357/병목 "회전 헤드 병진 오차(56mm)"), `:191`(Baxter 0.253/"손목 관측성 천장"), `:212`(표4 캡션 "KUKA/Baxter = direct-pose without render-compare (**no mesh**)" — 이중 오류: 진짜 이유는 K 버그이고, iiwa7 메쉬는 **존재**), `:328`(§4.7 본문), `docs/dinobotpose3/figures/make_figs_multirobot.py:34`(`pose = [0.804, 0.357, 0.253]`). **수치 자체는 실행한 것에 대해 정직 — 철회가 아니라 인과 서사 교체 + 수치 상향(약 +0.30~0.45 ADD-AUC 과소평가)의 문제.** 아울러 위 **EXPERIMENTS.md:963-964**에서 파생된 **"KUKA/Baxter 솔버 각도정제 금지"** 결론은 **망가진 솔버 위에서 내려진 것** → 참 K로 재시험 전까지 REFUTED 항목으로 굳히지 말 것(현 판정: 무효화 가능성 높음, **보류**). `:965` "Baxter RC REFUTED"는 앵커·게이트 부재로 별도 규명된 바 있어 독립 사안으로 추정(**미측정**).
+
+**측정 상태**: ✅ 실측 = meta.K 부재 스코프·참 native K·post-crop 배율·Panda GT2D sanity(4.9mm/0.0000)·위 3×2 표(**단 320프레임 subset**)·하네스 재현·affine r=1.0 / 🔄 **full-set 참 K 확인 런 진행 중(논문 수정의 전제조건)** / ❌ 미측정 = 참 K 솔버↔RC 중복도, 4tier zeros 폴백 실제 오염, Baxter RC와 K 버그의 연관성.
+
+## 2026-07-22 (cont.) KUKA render-and-compare 배선 — 차단 해제, 동작 확인 (동반 결과)
+신규: `Eval/iiwa7_render.py` + `Eval/iiwa7_rc_eval.py`. RoboPEPP 동봉 iiwa7 URDF+메쉬 사용 — 그 URDF FK가 DREAM kuka를 **0.0048 mm RMS**로 재현(기하 정합 확인). **GT 포즈 렌더 IoU mean 0.858 / median 0.869, 100%가 ≥0.5** → Baxter가 겪은 실루엣 붕괴 없음(즉 KUKA RC 차단 해제).
+**50프레임**: 재투영 앵커를 건 RC가 해당 subset을 **0.2804 → 0.5721**(mean ADD 94.2 → 69.5 mm)로 개선, **전프레임 발산 없음**.
+⚠️ 이 설정은 **50프레임에서 튜닝**된 것이며 **500프레임 스윕 중** — 채택 전 단계. 위 참 K 결과(0.6696)와 합치면 KUKA에 독립적 큰 레버가 둘이지만 **둘의 중복/가산 여부는 미측정**이며 full-set 확인 후 결정.
+
+## 2026-07-22 (확정) ✅ intrinsics 버그 수정 — 전체 테스트셋 실측·독립 3중 검증 → KUKA/Baxter 성적 반전
+위 07-22 근본원인 항목의 **320프레임 subset 수치를 전체 테스트셋 확정치로 대체**한다. 정리본: [docs/dinobotpose3/experiments/2026-07-22_intrinsics_rootcause.md](../../docs/dinobotpose3/experiments/2026-07-22_intrinsics_rootcause.md).
+
+**버그 재확인**: `camera_K = eye(3)` 폴백이 kuka/baxter 합성 트리에서 항상 발동 → 솔버가 **fx≈1.8**을 받음(참값 **577/626**, **×320 초점거리 오차**). 솔버는 발산한 게 아니라 *틀린 카메라에 대해 정확히* 풀고 있었음.
+
+**확정 실측 (KUKA-DR 5997프레임)**:
+| 모드 | ADD-AUC | mean | median | fail>100mm | med t-err | med R-err |
+|---|---|---|---|---|---|---|
+| direct-pose (출하) | 0.3682 | 72.1 mm | 60.2 mm | 15.4% | 56.1 mm | 7.42° |
+| 솔버 + 참 K | **0.6901** | 91.1 mm | **13.1 mm** | 15.9% | **15.7 mm** | **5.77°** |
+
+**확정 실측 (Baxter-DR 5982프레임)**:
+| 모드 | ADD-AUC | mean | median | fail>100mm | med t-err | med R-err |
+|---|---|---|---|---|---|---|
+| direct-pose (출하) | 0.2739 | 83.1 mm | 73.3 mm | 24.7% | 59.7 mm | 5.65° |
+| 솔버 + 참 K | **0.7125** | **39.5 mm** | **17.1 mm** | **8.0%** | **29.4 mm** | 5.91° |
+
+KUKA **+0.322 (+87%)**, Baxter **+0.439 (+160%)**.
+
+**경쟁모델 대비 (Protocol A, ×100)**: KUKA **69.0** vs RoboPEPP 76.2 / RoboPose 80.2 / HoRoPose 75.1 / RoboTAG 75.0 → "한참 뒤"에서 **사정권**. Baxter **71.3** vs RoboPEPP 34.4 / RoboPose 32.7 / HoRoPose·RoboTAG 58.8 → 🥇 **큰 격차 1위**.
+
+**독립 3중 검증**: ① direct 모드 포즈 오차 56.1 mm/7.42°가 KUKA rot-head **자체 학습 로그와 정확히 일치**. ② 재구성한 K로 GT 3D를 투영하면 데이터셋 자신의 2D와 **median 0.0003 px**. ③ 패치된 프로덕션 스크립트가 독립 에이전트 수치를 **비트 단위 재현**.
+
+**🔴 정직하게 남길 단서 4건**:
+1. **이득의 출처는 오직 참 K이며, outlier 제거 가설은 기각**된다 — outlier 비율이 **불변**(KUKA 키포인트 **21.1%**, Baxter **11.6%**). 로버스트 거부가 참 K **위에** 추가 이득을 주는지는 **미측정**.
+2. **꼬리 거동이 두 로봇에서 갈린다.** KUKA는 파국 꼬리가 **살아남는다**(fail 15.4→**15.9%**, mean 91.1 mm = median의 **7배**, p99 **1012 mm**) — 수정은 **좋은 프레임만 훨씬 좋게** 만들고 **나쁜 프레임은 못 고친다**(잔존 원인 = link-identity 혼동, 미해결). 반면 Baxter는 꼬리가 **붕괴한다**(24.7→**8.0%**) ⇒ **Baxter의 꼬리는 이 버그 자체였다.** (KUKA mean이 72.1→91.1 mm로 나빠지는 것은 이 때문이며 모순 아님.)
+3. **재현 caveat**: direct-pose 기준선이 **0.3682 / 0.2739**로 측정되어 아카이브 **0.3568 / 0.2535**보다 **+0.01~0.02 높다.** 유력 원인 = **`best_*` vs `last_*` 체크포인트 선택**. 아카이브 수치는 **비트 재현되지 않았으나** 개선폭이 +0.32/+0.44 규모라 **결론은 무영향**.
+4. **Panda 무영향** — `Converted_dataset/DREAM_to_DREAM*`는 실제 `meta.K`를 싣고, `Eval/refine_eval.py`의 일반화된 `geometric_K`는 참 K를 **그대로 통과**시킨다(검증 완료). **배포 Panda real 0.804 불변.**
+
+**🔓 과거 결론 판정 — 보류 아님, OVERTURNED**: 위 `EXPERIMENTS.md:961-968`(2026-07-12/13)에서 파생된 **"KUKA/Baxter는 솔버 각도정제 금지"** 결론과 여기서 나온 `SUMMARY.md:53-54,57,116`의 REFUTED 항목은 **망가진 솔버 위에서 내려진 것**이며, 이제 **뒤집혔다** — 참 K 솔버가 direct-pose를 KUKA +0.32 / Baxter +0.44로 능가하므로 **참 K 솔버를 기본 경로로 승격**한다. 특히 `SUMMARY.md:116`의 **"Baxter 병목 = 손목 관측성 천장"** 인과 결론은 **무효**(참 K만으로 꼬리 24.7→8.0% 붕괴). 단 `SUMMARY.md:117` **"Baxter RC REFUTED"는 유지** — 앵커·게이트 부재로 별도 규명된 독립 사안(K 버그와의 연관성 **미측정**).
+
+**🔴 논문 수정 대상 (문서 작업 범위 밖 — 편집하지 않음, 목록만)**: `docs/dinobotpose3/PAPER_OVERLEAF.tex:167`(`tab:main` 우리 행 `35.7 & 31.9 & 25.2` → KUKA-DR **69.0** / KUKA-Photo **미측정** / Baxter-DR **71.3**(하위 그룹 최고이므로 `\textbf{}` 부여)), `:166`(RoboTAG Baxter `\textbf{58.8}` **볼드 해제** — 우리가 이김), `:171` 캡션("KUKA and Baxter use the direct-pose configuration without render-and-compare" = **이중 오류**: direct-pose는 설계 선택이 아니라 버그의 결과였고, iiwa7 메쉬는 **존재**), `:245-246`("no matching mesh" **거짓** + 수치 + "observability ceiling" 서사 + "not comparable/applicability study" **과소주장**), `:312-313`(결론의 관측성 천장 기여 주장 + "need for a benchmark-matched mesh"); `docs/dinobotpose3/PAPER_DRAFT.md:181,183,190,191,194,206,210,212,328,330`; `docs/dinobotpose3/figures/make_figs_multirobot.py:34`(`pose = [0.804, 0.357, 0.253]` → `[0.804, 0.6901, 0.7125]`, y축·주석·캡션 동시 점검).
+
+⚠️ **표 갱신의 게이트**: **재측정한 것은 DR 스플릿뿐이다.** **KUKA-Photo(31.9)는 미측정**이며, DR 두 셀만 고치면 **한 행 안에 두 파이프라인 구성이 섞인다**. **Baxter Photo 스플릿은 DREAM에 존재하지 않으므로** 현행 "열 없음"이 정답이다.
+
+**미해결/대기**: ① KUKA-Photo 참 K 재측정(논문 게이트). ② **RC는 여전히 수정 전 baseline 위에서 튜닝된 상태 → 고쳐진 솔버 위에서 재튜닝 필요(별도 에이전트 진행 중)**, 재튜닝 전 RC 수치 논문 반영 금지. ③ 로버스트 거부의 참 K 위 추가 이득(KUKA 잔존 꼬리의 유일 유력 후보). ④ 아카이브 기준선 ±0.02 차이의 원인 확정.
+
+## 2026-07-22 (cont.) azure 발산 꼬리 — 선행 진단 2건 반증 + 재투영 가드의 설계상 한계 (음성)
+처방(① 경계 마진 게이트 ② 재투영 플래그 멀티스타트 재solve ③ 재투영 기준 do-no-harm 채택)을 구현·검증. **기준선 재현: azure base 0.7953 vs 배포 0.7945** (1000f, `--frac-range 0.7 1.0`) — 이하 전부 이 앵커 위.
+
+**선행 진단 ① 반증 (트리거 부재)**: "P(발산|화면밖 GT kp)=0.382 vs 0.052, **lift 7.4배**" → 실측 **0.000 vs 0.033, lift 0.0배**. ADD>100mm 프레임 **31개 전부 키포인트 7개가 화면 안**이고, 화면밖 키포인트 85/7000(1.21%)은 **전부 good 프레임** 소속. 방향이 약한 게 아니라 **반대**. ⇒ 경계 게이트는 존재하지 않는 트리거를 겨냥 → azure에 GPU 미사용.
+
+**선행 진단 ② 반증 (conf가 이미 presence)**: "`--conf-gate`가 confident-wrong을 구조적으로 못 잡는다" → conf는 **ROC-AUC 0.9829** presence 검출기. 화면밖 kp conf mean **0.0929**(p50 0.0674) vs 화면안 **0.6963**(p50 0.7339). gate 0.05는 화면밖 42.4% 드롭(화면안 1.0% 손실), 0.20은 **91.8%**(3.4%). 원인은 소스: `TRAIN/dataset.py:609-611`이 화면밖 kp에 **전0 히트맵 타깃**을 주고 `train_heatmap.py:232-234`가 **valid mask 없이** 전 픽셀 loss → 검출기가 화면밖에서 peak를 내지 않도록 **이미 지도됨**(RoboPEPP loss 마스킹과 등가). ⇒ `gap_reexamination §16`의 최우선 측정 항목에 대한 직접 답.
+
+**꼬리의 실제 정체 = 저신뢰 프레임**: tail min-conf **0.052** vs good **0.580**, mean-conf 0.344 vs 0.734, 재투영 52.5px vs 0.98px, 화면밖 kp **0.00개**. 자신만만하게 틀린 게 아니라 **정직하게 모른다고 말하는** 프레임. min-conf 0.052가 배포 `--conf-gate 0.05` **바로 위** → 게이트를 올리면 가장 약한 증거만 없앨 뿐 더 나은 init을 공급하지 못함. 탐지 자체는 견고(`reproj>10px`가 7.4% 플래그, 발산 **31/31 포착**, recall 1.00/precision 0.42) — **찾는 것은 문제였던 적이 없음**.
+
+**② 실측 (`--resolve-reproj 10`)**: azure **0.7953→0.7965 (+0.0012)**, 노이즈(~0.010) 내. 74 플래그(7.4%)/**60 채택**(6.0%). **가드는 정상 작동** — 채택 60개 전부 재투영 엄격히 낮고 median **41.3→26.0px**. 그러나 3D: 31개 중 **9개만 100mm 아래로 하강**, 22개 잔류, **6개 신규 악화**(순 31→28), 채택 60개는 **28 개선/32 악화**. AUC 기여 13.602→14.750 = +0.00115로 델타와 산술 일치.
+
+🔑 **기전(핵심) — 채택 기준 자체의 문제, 임계 튜닝 불가**: `corr(Δreproj, ΔADD) = **+0.463**` 뿐. **이 부분모집단은 min-conf 0.052라 잔차를 재는 키포인트 자체가 신뢰불가** → 재투영에 단조인 가드가 **ADD에는 단조가 아님**. 임계를 옮겨도 상관계수는 불변이므로 **회귀 제거는 원리적으로 불가능한 설계상 성질**이며, 없애려 튜닝해서도 안 됨.
+
+**상한 정정**: "+0.041" **철회** → dump 직접계산 **+0.0263**(0.7954→**0.8218**). ADD>100mm는 3.1%뿐이고 이미 기여 0이라 되찾을 총량이 애초에 +0.026. **완벽 복구도 kinect 0.8275·RoboTAG 0.831 미달** — 이 축으론 헤드라인 없음.
+
+**do-no-harm (base-only 비교)**: azure 0.7953→0.7965(74플래그·60채택) / realsense 0.7452→**0.7452(비트 동일, 11플래그·2채택)** / kinect 0.7672→**0.7670(−0.0002, 57플래그·20채택)** / orb 0.7382→**0.7431(+0.0049, 68플래그·48채택)**. 4카메라 전부 회귀 없음(최악 −0.0002 « 노이즈 0.010). orb +0.0049가 최대 이동이나 **노이즈 밴드 내**이며 `corr(Δreproj,ΔADD)=+0.463`의 동전던지기 성질(한 카메라가 사소하게 유리)과 일치 → **신뢰 가능한 이득 아님**. 채택 활동(60/2/20/48, 전부 재투영 엄격히 낮음)에도 ADD 계통 무변동으로 기전 재확인. ⚠️ **GPU 정책 위반 정정**: rs/kinect/orb do-no-harm이 GPU0 포화로 GPU3(A6000)에서 실행됨(정책=GPU0 전용) — 학습 잡 pid 3111614 무해 확인, orb는 GPU0 재실행으로 정정. 비교가 **base-only(pre-RC: rs 0.7452·ki 0.7672·orb 0.7382·az 0.7945)** 여야 하는 이유 = 배포치(0.8153/0.8275/0.7784)는 **post-RC**라 솔버 변경 효과와 RC 단계가 혼동됨. azure만 RC off라 두 값 동일.
+
+⚠️ **일반 교훈 (이 세션에만 3번 걸린 함정)**: `AUC = mean(max(0,1−10·ADD))`이므로 **ADD≥100mm는 이미 기여 0** → **탐지·게이팅·거부만으로는 이득이 원리적으로 0이고, 반드시 임계 아래로 되돌려야 한다.** ① Panda 화면밖 tail(oracle-presence 0.7032 vs control 0.7040 = net-zero) ② KUKA 잔차 거부(검출 ROC 0.859인데 end-to-end 0.753→0.734 음수) ③ azure 꼬리(recall 1.00인데 +0.0012). **처방 설계 체크리스트: "프레임을 임계 *아래로* 옮기는가, 나쁜 프레임을 *식별*만 하는가?"** 후자면 측정 전에 net-zero임을 알 수 있음. 부수 교훈: **대리 목적함수로 채택을 결정할 땐, 그 대리지표가 *개입 대상 부분모집단*에서 목표지표와 얼마나 상관되는지 먼저 재라** — 전체 상관은 무의미(개입은 꼬리에서 일어나고, 꼬리는 정의상 대리지표가 무너진 곳).
+
+**코드 (배포 권고하지 않음)**: `Eval/solve_pose_kinematic.py:139-151`(`border_mask`), `:152-153,171-178`(`pnp_init(deprio=)`), `:265-272`(게이트를 pnp_init **앞**), `:300-310`(refine 가중치 0), `:427-467`(멀티스타트+do-no-harm 채택); `Eval/selfbbox_eval.py:179-182`(`--border-margin`/`--resolve-reproj`, **둘 다 기본 0.0**), `:404-411`(dump에 conf/gtoff); 신규 `Eval/presence_conf_probe.py`. **off-by-default 비트 동일 검증** → 배포 mean 0.804 무변경. `TRAIN/dataset.py` 미수정, azure RC off 유지. 경계 게이트=트리거 부재로 무의미, 재solve=노이즈 내 → **둘 다 미배포**, 코드는 음성 결과 재현 수단으로 존치.
+
+**결론**: azure 꼬리 = **현 단일뷰 구조의 바닥**. 검출기가 **올바르게** 낮은 conf를 내는 프레임이라 **init/basin 개입으로 도달 불가** — 더 나은 *탐색*이 아니라 더 나은 *증거*(멀티뷰·시간일관성·더 강한 검출기)가 필요. 헤드룸은 여전히 **good 프레임 각도**(base 0.788 vs oracle-θ 0.899, +0.11) — 꼬리가 아니라 몸통. 상세: [docs/dinobotpose3/experiments/2026-07-22_azure_tail_refuted.md](../../docs/dinobotpose3/experiments/2026-07-22_azure_tail_refuted.md)
+
+## 2026-07-22 (cont.) KUKA-Photo 측정 → 논문 표 게이트 해제 · (A)층 사실오류 수정 적용
+**KUKA-Photo 확정 (5999장, 솔버+참 K, DR과 동일 체크포인트)**: direct **0.3305 → 솔버 0.6984** (+0.368, **+111%**), med ADD 64.8→**12.1mm**, med t 58.9→**15.0mm**, med R 8.00→**5.98°**. ⇒ **KUKA/Baxter 3개 셀이 전부 동일 설정으로 측정**되어 "한 행에 두 파이프라인 혼재" 위험이 사라졌다. **Baxter Photo는 DREAM에 부재 재확인** — 계속 비워 둔다.
+
+**논문 최종 셀**: KUKA-DR **69.0** / KUKA-Photo **69.8** / Baxter-DR **71.3**(원자료 0.7125 = 71.25 정확히 중간값 → 소수1자리 half-up으로 71.3, 하위그룹 최고라 `\textbf{}`).
+
+**✅ (A) 적용 완료 — 사실 오류만**: `PAPER_OVERLEAF.tex:167`(우리 행 3셀 교체 + Baxter 볼드), `:166`(RoboTAG Baxter `\textbf{58.8}`→`58.8` 볼드 해제), `:171`(캡션 "direct-pose configuration without render-and-compare" → "evaluated with the kinematic solver but without render-and-compare, which is applied only to the Panda real splits"), `:245`("Because **no matching mesh is available**…poses obtained **directly from the heads**…35.7/25.2" → "Because no real data exist for self-training, and render-and-compare is reserved for the Panda real splits, poses come from the **kinematic solver**…**69.0/71.3**"), `:246`(한국어 대역); `PAPER_DRAFT.md:181,183`(0.357·0.253→0.690·0.713), `:190,191`(표3 포즈 수치만), `:210`(표4 행), `:212`(캡션 "(no mesh)" 제거 — 승인된 `tex:171`과 **동일 문장·동일 오류**라 확장 적용); `figures/make_figs_multirobot.py:34`(`[0.804,0.357,0.253]`→`[0.804,0.6901,0.7125]`) + 막대가 높아진 데 따른 `ylim 0.98→1.05`·상단 라벨 `0.90→0.94` 조정.
+
+**🟡 (B) 초안만 — 논문 미적용**: `docs/dinobotpose3/PAPER_REVISION_DRAFT_2026-07-22.md` 신규(B-1~B-10, 각 항목마다 현재 문장/왜 틀렸는지/대안 2가지). 대상 = `tex:245`(not-comparable·applicability 프레이밍, observability-ceiling 인과 서사)·`:246`·`:312`·`:313`, `PAPER_DRAFT.md:194,206,328,330`, `PAPER_DRAFT.md:190/191`의 **병목 열**, 그림7 주석 문구.
+> 🔴 **미해소 부작용**: `PAPER_DRAFT.md:328/330`이 (B)라서 옛 **0.357/0.253**을 그대로 들고 있는데 같은 파일 `:181/:183/:190/:191/:210`은 갱신됨 → **파일 내부에 두 세대 수치 공존**. 초안 **B-8이 최우선 항목**으로 표시.
+
+**(C) 재현 caveat**: 재측정 direct-pose가 아카이브 대비 **세 셀 모두 같은 방향으로 +1~2점** — KUKA-DR 36.8 vs 35.7, KUKA-Photo 33.1 vs 31.9, Baxter-DR 27.4 vs 25.3. 무작위 흔들림이 아닌 **계통 차이**이며 유력 원인은 `best_*` vs `last_*` 체크포인트. **논문 노출 지점 없음** — 교체된 세 셀은 전부 새 설정(솔버+참 K) 값이고, `PAPER_OVERLEAF.tex`에는 direct-pose 언급도 옛 수치도 **남아 있지 않다**(grep 확인). 옛 direct-pose를 동일 프로토콜 baseline으로 인용하는 유일한 잔존 지점은 **`PAPER_DRAFT.md:328/330`**(위 B-8) 및 논문 외 `SUMMARY.md:53-54,57`.
+
+**반영 금지(미확정)**: RC 수치 전부 — 선택자 재튜닝 진행 중(현재 KUKA 솔버 0.690 + 선택적 RC = **0.708**, oracle 상한 **0.745**).
+
+## 2026-07-22 (cont.) 문서 정합성 마무리 — PAPER_DRAFT 수치 통일 · SUMMARY 무효정보 제거
+**① `PAPER_DRAFT.md:328/330` 수치 통일 (파일 내 두 세대 공존 해소)**: `direct-pose로 ADD-AUC 0.357/0.253` → `예측된 관절각으로부터 운동학 솔버가 R,t를 복원해 0.690/0.713`(영문 대역 동일). ⚠️ **숫자만 바꾸는 것은 불가능했다** — "direct-pose로 0.690"은 새로운 거짓이 되기 때문(0.690은 솔버 산출값). 숫자와 경로명이 한 절에 묶여 문법적으로 분리 불가하므로 **경로명 2어절까지 최소 교체**했고, 이는 승인된 `tex:245`("obtained directly from the heads"→"come from the kinematic solver")와 **동일 종류의 사실 교정**이다. 그 문단의 **한계·병목 논증은 미변경**(애초 `:328`에 없고 `:194/:206/:245`에 있음). 초안 B-8에 판단 근거 기록.
+
+**② `SUMMARY.md` 갱신** — CLAUDE.md상 "새 실험 전 반드시 읽는 파일"이라 무효 정보 잔존이 미래 세션을 오도하므로 우선 정리:
+- `:53-54` → **솔버+참 K 확정치**(KUKA-DR 0.690 / KUKA-Photo 0.698 / Baxter-DR 0.713)로 교체 + 경쟁 대비(Baxter 1위 71.3 vs 58.8/34.4/32.7, KUKA 사정권 69.0 vs 75~80) + 옛 0.357/0.253이 **intrinsics 버그 산물**임과 실험문서 링크. 이어서 🔓 **"솔버 각도정제 금지"는 REFUTED가 아니라 OVERTURNED** 항목 신설 — 참 K에서 솔버가 direct-pose를 +0.32/+0.44 능가하므로 **솔버 경로가 3로봇 공통 기본값**. KUKA 잔존 꼬리(fail 15.9%, p99 1012mm)=link-identity 혼동(별건), Baxter 꼬리는 버그 자체(24.7→8.0%).
+- `:57`(현 `:67`) → 합성 비교 수치 교체 + "**모든 합성 로봇에서 뒤진다**"는 독법 폐기 명시.
+- `:116`(현 `:129-130`) → **관측은 존치**(mlp_patch가 plain mlp를 못 이김, 손목은 실제로 키포인트로부터 미결정), **거기서 나온 인과 추론 "따라서 Baxter 병목=손목 관측성"만 REFUTED** 로 분리 기재. 근거 2건: FK 레버암상 손목 25°→키포인트 8mm이라 **완전수정도 +0.005**, 그리고 intrinsics 수정만으로 **fail 24.7→8.0%** 붕괴. ⇒ 손목 관측성은 실재하나 **2차 효과**, 포즈 정확도 한계로 인용 금지.
+- `:117`(현 `:131`) → **유지 + 존치 근거 명기**: Baxter RC 실패는 **앵커/게이트 부재**로 별도 진단됐고 SAM 마스크도 정상(IoU 0.82≈Panda 0.85) → K 버그와 **독립**, 관계는 미측정.
+- **신규 REFUTED 1건(3변형) 추가**: 🔴 **"솔버에서 head θ를 고정/앵커하는 계열 전체"** — 전역 freeze(DR 0.704→0.533, Photo 0.738→0.561; edge-gate 8px·oracle presence 모두 무효 0.531~0.532) / **관절별 부분 freeze**(net-zero) / **프레임 조건부 freeze**(flip-trigger 2-pass τ=60px, 실전 **+0.009**, oracle 상한 +0.027) / **θ-앵커**(net-zero~음수). **근본 원인**: freeze는 head θ가 솔버 θ보다 나은 곳에서만 이득인데, **head θ는 솔버가 나쁜 바로 그 프레임에서 똑같이 나쁘다**(오차가 상보적이 아니라 상관됨) → good 프레임 비용(0.788→0.582, 89%)만 치르고 tail은 AUC 기여 ~0. ⇒ **"head 각도를 대신 믿자"류 재시도 금지** — 재시도하려면 head θ와 솔버 θ가 *서로 다른 프레임*에서 틀린다는 것을 먼저 입증할 것.
+
+**③ 반올림 확정**: Baxter **71.3 (half-up)**. 더 정밀한 원값으로 동률(71.25)을 없애려 했으나 **불가** — `Eval/u1_solver_vs_direct.py:266`이 `{add_auc(a):>9.4f}`로 **소수 4자리 절단** 출력이고, 해당 full-set 런은 `--dump` 없이 돌아 per-frame 배열이 로컬에 없다. **다음 런에 `--dump` 부착 권장.**
+
+## 2026-07-22 (cont.) 논문 서사 교체 — "관측성 천장" 삭제 → link-identity 파국 꼬리 (저자 결정: B-2/B-4 대안 2)
+저자가 초안(`PAPER_REVISION_DRAFT_2026-07-22.md`)의 **B-2/B-4를 대안 2로 확정** → "distal 관측성 천장 = 방법의 한계" 서사를 삭제하고 "**link-identity 혼동에 의한 파국적 꼬리**(그럴듯하나 틀린 kp-link 대응이 신뢰도 높은 오답 포즈 → 신뢰도 기반 거부로 못 잡음)"로 교체. 근거: intrinsics 수정만으로 Baxter fail율 24.7→8.0% 붕괴(관측성이 병목이면 불가능), FK 레버암상 손목 완전수정도 +0.005뿐.
+**적용(승인 텍스트 그대로)**: `PAPER_OVERLEAF.tex:245`(B-1 대안2 포지셔닝 승격 + B-2 대안2 한계 교체)·`:246`(한국어)·`:312`(B-4 대안2 결론)·`:313`(한국어); `PAPER_DRAFT.md:195`(B-6 대안1 경고 재프레이밍)·`:197/199`(B-7 대안1 사실교정)·`:190/191`(B-9 대안2: 표3 병목 열 삭제→median ADD 13.1/17.1mm); `figures/make_figs_multirobot.py:51`(B-10 대안1 주석 "different regime — not a robot-vs-robot ranking").
+**연쇄 적용(B-2/B-4의 병렬 위치 — 승인 서사를 그대로 이식)**: `PAPER_DRAFT.md:326`(절 제목 "관측성 병목"→"잔여 실패모드")·`:334/336`(비교주의 stale 0.34/0.25→0.69/0.71 + 병목 지시 교체)·`:338/340`(관측성 분석: **관측 존치·2차효과로 강등**, 지배 실패=link-identity 명시 — SUMMARY:116과 동일 처리)·`:447/449`(결론 서사 교체).
+**⚠️ B-7 대안2 폐기**: "RC를 KUKA로 확장 = 남은 헤드룸"은 KUKA RC가 방금 **닫힌 레버**(0.75 불가·R 못 고침)라 거짓 → 대안1(RC 헤드룸 주장 없음) 채택.
+**🔴 저자 검토 요망(미적용, 얽힘/범위밖)**: ① `PAPER_DRAFT.md:451/453` 한계 문단 — (a) "공개 iiwa7 메쉬 ~20mm 어긋나 정합 불가"는 **반증됨**(RoboPEPP iiwa7 0.0048mm RMS, `tex:171/245` "no mesh 삭제"와 동류 오류), (b) "RC를 KUKA로 확장" 프레이밍이 RC 폐쇄로 부적절, (c) 손목 관측성 한계 서술 강등 필요 — 셋이 한 문단에 얽혀 강제 재작성 안 함(B-4 대안2가 명시한 살아남는 한계=실측데이터 부재·RC 게이팅 둘뿐). ② `tex:34/41` 서론 기여 항목 "손목 관측성 한계 등" 본문과 불일치(기여 목록이라 민감). ③ `tex:86` "wrist rotation fixed to zero"는 **참인 방법 서술 → 유지**. RC 수치는 여전히 게재 금지(선택자 재튜닝 중).

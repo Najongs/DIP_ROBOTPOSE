@@ -43,6 +43,48 @@ def scale_K(camera_K, original_size, hm):
     return K
 
 
+def geometric_K(val_dir, camera_K, original_size, S):
+    """TRUE metric intrinsics for the SOLVER / any metric geometry, at `S` scale.
+
+    Whether frame JSONs carry `meta.K` is TREE-DEPENDENT, which is why the identity-K solver
+    bug stayed hidden for so long:
+      - datasets/synthetic/{kuka,baxter}_*  : NO meta.K -> PoseEstimationDataset falls back to
+        eye(3). Feeding that to the solver puts fx=1 where the truth is ~555 (320x off), and
+        the classic focal/depth ambiguity collapses solved depth.
+      - Converted_dataset/DREAM_to_DREAM{,_syn} (Panda): meta.K IS present and real
+        (synth 320, rs/kinect/orb 615.5, azure 399.7) -> must NEVER be overwritten.
+    So this reconstructs ONLY when the input is the identity fallback, and otherwise scales and
+    returns the dataset's own K untouched. Safe to call on every path.
+
+    The eye(3) fallback is LOAD-BEARING for the MODEL (checkpoints learned their bearing
+    features from fx=fy=1): dataset K -> model, geometric_K -> solver.
+    The crop block shifts the principal point in place (camera_K[0,2] -= bx0), so on top of
+    eye(3) the returned K[0,2], K[1,2] ARE exactly (-bx0, -by0); combined with
+    _camera_settings.json this rebuilds the true crop intrinsics.
+    Reconstruction verified to <0.09 px reprojection over 60 frames (Eval/iiwa7_rc_eval.py).
+
+    ASSUMES one camera per directory: `_camera_settings.json` is read once and applied to the
+    whole batch. Unsafe for a directory mixing several cameras/intrinsics.
+    """
+    import json
+    is_identity = (abs(float(camera_K[0, 0, 0]) - 1.0) < 1e-6 and
+                   abs(float(camera_K[0, 1, 1]) - 1.0) < 1e-6)
+    if not is_identity:
+        return scale_K(camera_K, original_size, S)   # real meta.K (e.g. Panda) — pass through
+    p = os.path.join(val_dir, '_camera_settings.json')
+    if not os.path.exists(p):
+        raise FileNotFoundError(
+            f'dataset camera_K is the eye(3) fallback but {p} is missing — cannot recover true '
+            f'intrinsics for the solver')
+    it = json.load(open(p))['camera_settings'][0]['intrinsic_settings']
+    B = camera_K.shape[0]
+    Kt = torch.zeros(B, 3, 3)
+    Kt[:, 0, 0] = it['fx']; Kt[:, 1, 1] = it['fy']; Kt[:, 2, 2] = 1.0
+    Kt[:, 0, 2] = it['cx'] + camera_K[:, 0, 2]      # cx0 - bx0
+    Kt[:, 1, 2] = it['cy'] + camera_K[:, 1, 2]      # cy0 - by0
+    return scale_K(Kt, original_size, S)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--detector', default=None)

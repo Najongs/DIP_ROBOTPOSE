@@ -5,6 +5,7 @@ DREAM 데이터셋 구조를 따르는 데이터로더
 
 import os
 import json
+import math
 import random
 import glob
 from pathlib import Path
@@ -124,6 +125,16 @@ class PoseEstimationDataset(Dataset):
         norm_std: Optional[List[float]] = None,   # backbone normalization std  (default ImageNet)
         crop_to_robot: bool = False,  # square-crop around the robot (GT-keypoint bbox) before resize
         crop_margin: float = 1.5,     # bbox expansion factor (random in [1.3, margin] when augmenting)
+        crop_aspect: float = 1.0,     # 크롭 직사각형의 w/h. 1.0 = 기존(정사각) 동작 — 기본값 유지 필수.
+        # ⚠️ 배포 파이프라인(Eval/selfbbox_eval.py)은 원본 640x480 을 먼저 512x512 로 비등방
+        # 리사이즈(x0.8, y1.0667)한 뒤 그 공간에서 정사각 roi_align 크롭을 뜬다. 원본 좌표로 보면
+        # 그 크롭은 w/h = (W0/512)/(H0/512) = W0/H0 = 4/3 인 직사각형이다. 반면 학습(이 코드)은
+        # 원본 공간에서 정사각(w/h=1)으로 잘라왔다 => crop detector 가 학습에서 한 번도 못 본
+        # 4:3 -> 1:1 세로 확대 왜곡을 배포에서 받는다. crop_aspect=W0/H0 로 두면 배포와 일치.
+        # (측정: Eval/crop_chain_probe.py — clean 2D 오차 median 1.78px(배포) vs 1.14px(왜곡없음))
+        crop_aspect_jitter: float = 0.0,  # crop_aspect 에 곱해지는 log-uniform 지터 (0 = 없음)
+        crop_res_jitter: float = 0.0,     # 크롭을 저해상도로 리샘플할 확률 (작은 로봇 유효해상도 모사)
+        crop_res_range: Tuple[int, int] = (140, 512),  # 저해상도 리샘플 목표 변 길이 범위(px)
         angle_joint_names: Optional[List[str]] = None,  # explicit sim_state joint names for GT angles
         # (in order). None -> legacy joints[:7] (correct for Panda). Needed for robots whose sim_state
         # has non-arm joints first (e.g. KUKA 'iiwa7_base_link_iiwa7_joint' -> use iiwa7_joint_1..7).
@@ -165,7 +176,12 @@ class PoseEstimationDataset(Dataset):
         self.occlusion_max_size_frac = max(0.01, float(occlusion_max_size_frac))
         self.crop_to_robot = crop_to_robot
         self.crop_margin = float(crop_margin)
+        self.crop_aspect = float(crop_aspect)
+        self.crop_aspect_jitter = float(crop_aspect_jitter)
+        self.crop_res_jitter = float(crop_res_jitter)
+        self.crop_res_range = tuple(crop_res_range)
         self.json_allowlist_path = json_allowlist_path
+        self._intr_cache = {}          # dir -> (fx, fy) from _camera_settings.json (k_value only)
         self.json_allowlist_keys = self._load_json_allowlist(json_allowlist_path)
         self.aug_level = aug_level
         self.norm_mean = norm_mean if norm_mean is not None else [0.485, 0.456, 0.406]
@@ -262,6 +278,37 @@ class PoseEstimationDataset(Dataset):
                 ),
 
             ], keypoint_params=albu.KeypointParams(format='xy', remove_invisible=False))
+
+    def _intrinsics_for(self, json_path: str):
+        """Real (fx, fy) for the frame's dataset, from NDDS `_camera_settings.json`.
+
+        ⚠️ DREAM frame JSONs carry NO `meta.K` (verified: kuka/baxter/panda synth AND panda real),
+        so `_load_keypoints_from_json` silently falls back to `camera_K = eye(3)` — i.e. fx=fy=1,
+        cx=cy=0. That fallback is LOAD-BEARING: every trained checkpoint learned its bearing
+        features from it (the de-facto input is raw pixel coordinates), so `camera_K` is left
+        exactly as-is. This lookup is used ONLY for k_value, which is meaningless without metric
+        focal lengths. Same source the eval path already uses (Eval/baxter_rc_eval.py:53,
+        train.py:37). Cached per directory; returns None when absent.
+        """
+        d = os.path.dirname(json_path)
+        if d in self._intr_cache:
+            return self._intr_cache[d]
+        fxfy, probe = None, d
+        for _ in range(4):                      # walk up a few levels; NDDS puts it at dataset root
+            cand = os.path.join(probe, '_camera_settings.json')
+            if os.path.exists(cand):
+                try:
+                    it = json.load(open(cand))['camera_settings'][0]['intrinsic_settings']
+                    fxfy = (float(it['fx']), float(it['fy']))
+                except Exception:
+                    fxfy = None
+                break
+            nxt = os.path.dirname(probe)
+            if nxt == probe:
+                break
+            probe = nxt
+        self._intr_cache[d] = fxfy
+        return fxfy
 
     @staticmethod
     def _normalize_path_token(path_str: str) -> str:
@@ -607,6 +654,28 @@ class PoseEstimationDataset(Dataset):
         keypoints_data = self._load_keypoints_from_json(sample_info['annotation_path'])
         keypoints = keypoints_data['projections'].copy()  # (N, 2) [x, y]
 
+        # RootNet geometric depth prior (HoRoPose lib/core/function.py:88-97):
+        #     k = sqrt(fx*fy*1000*1000 / max(|bbox_w|,|bbox_h|)^2)   [mm]
+        # ⚠️ MUST be computed HERE — on the ORIGINAL-frame keypoint bbox with the ORIGINAL K,
+        # i.e. before the crop_to_robot block (which resizes the crop to image_size and thereby
+        # NORMALIZES apparent size away) and before augmentation (whose ShiftScaleRotate would
+        # rescale the robot without changing its true depth). This is the only apparent-size ->
+        # depth cue the rotation head gets; computing it downstream silently destroys it.
+        # fx,fy come from _camera_settings.json, NOT from camera_K (which is eye(3) on DREAM —
+        # see _intrinsics_for). With fx=fy=1 the prior collapses to ~5mm instead of ~1.3m.
+        _W0, _H0 = original_size
+        _fxfy = self._intrinsics_for(sample_info['annotation_path'])
+        _inb0 = ((keypoints[:, 0] >= 0) & (keypoints[:, 0] < _W0) &
+                 (keypoints[:, 1] >= 0) & (keypoints[:, 1] < _H0))
+        if _fxfy is not None and _inb0.sum() >= 2:
+            _p = keypoints[_inb0]
+            _side = max(float(_p[:, 0].max() - _p[:, 0].min()),
+                        float(_p[:, 1].max() - _p[:, 1].min()))
+            _area = max(_side ** 2, 1.0)
+            k_value = float(np.sqrt(_fxfy[0] * _fxfy[1] * 1e6 / _area))
+        else:
+            k_value = 0.0                              # undetermined -> consumer must mask
+
         # Robot-centered SQUARE crop (more pixels on small/foreshortened robots -> better keypoints,
         # esp. base-yaw J0). Crop around the in-frame GT keypoints + margin; adjust keypoints & K
         # (principal-point shift). Square -> no aspect distortion. Scale/center jitter when training.
@@ -618,22 +687,32 @@ class PoseEstimationDataset(Dataset):
                 pts = keypoints[inb]
                 cx = (pts[:, 0].min() + pts[:, 0].max()) / 2.0
                 cy = (pts[:, 1].min() + pts[:, 1].max()) / 2.0
-                side = max(pts[:, 0].max() - pts[:, 0].min(), pts[:, 1].max() - pts[:, 1].min())
+                dx = pts[:, 0].max() - pts[:, 0].min()
+                dy = pts[:, 1].max() - pts[:, 1].min()
                 marg = random.uniform(1.3, self.crop_margin) if self.augment else self.crop_margin
-                side = max(side * marg, 16.0)
+                # 종횡비 a 인 크롭. a=1.0 이면 아래 식은 기존 정사각 코드와 완전히 동일하고
+                # (max(dx, 1.0*dy) == max(dx,dy), side_h == side_w) 난수 소비 순서도 같다 —
+                # 기존 설정의 재현성이 보장된다. a>1 이면 배포의 '512공간 정사각 = 원본 4:3' 기하를
+                # 원본 공간에서 그대로 재현한다: w = marg*max(dx, a*dy), h = w/a.
+                a = self.crop_aspect
+                if self.augment and self.crop_aspect_jitter > 0:
+                    a *= math.exp(random.uniform(-1.0, 1.0) * math.log(1.0 + self.crop_aspect_jitter))
+                side_w = max(max(dx, a * dy) * marg, 16.0)
                 if self.augment:
-                    side *= random.uniform(0.9, 1.1)
-                    cx += random.uniform(-0.1, 0.1) * side
-                    cy += random.uniform(-0.1, 0.1) * side
-                bx0 = int(round(cx - side / 2.0)); by0 = int(round(cy - side / 2.0))
-                bs = int(round(side))
-                image = image.crop((bx0, by0, bx0 + bs, by0 + bs))  # out-of-bounds -> black pad
+                    side_w *= random.uniform(0.9, 1.1)
+                side_h = side_w / a
+                if self.augment:
+                    cx += random.uniform(-0.1, 0.1) * side_w
+                    cy += random.uniform(-0.1, 0.1) * side_h
+                bx0 = int(round(cx - side_w / 2.0)); by0 = int(round(cy - side_h / 2.0))
+                bw = max(1, int(round(side_w))); bh = max(1, int(round(side_h)))
+                image = image.crop((bx0, by0, bx0 + bw, by0 + bh))  # out-of-bounds -> black pad
                 keypoints = keypoints.copy()
                 keypoints[:, 0] -= bx0; keypoints[:, 1] -= by0
                 if 'camera_K' in keypoints_data:
                     keypoints_data['camera_K'][0, 2] -= bx0
                     keypoints_data['camera_K'][1, 2] -= by0
-                original_size = (bs, bs)
+                original_size = (bw, bh)
 
         # FDA augmentation (applied before other augmentations)
         if self.fda_real_paths and random.random() < self.fda_prob:
@@ -658,6 +737,14 @@ class PoseEstimationDataset(Dataset):
             if aug_kps.shape[0] == keypoints.shape[0]:
                 image = PILImage.fromarray(augmented['image'])
                 keypoints = aug_kps
+
+        # 유효 입력 해상도 지터: 작은 로봇은 크롭이 크게 업샘플되어 흐릿한 상태로 들어온다
+        # (bbox 대각 73px -> 512 크롭 = ~5x 업샘플). 큰 로봇 크롭을 저해상도로 리샘플해
+        # 그 영역의 학습 표본을 늘린다. 이미지 '내용'만 흐려질 뿐 기하는 그대로이고
+        # original_size 를 건드리지 않으므로 keypoint 매핑은 불변이다 (transform 이 512로 복원).
+        if self.augment and self.crop_res_jitter > 0 and random.random() < self.crop_res_jitter:
+            e = int(random.uniform(*self.crop_res_range))
+            image = image.resize((max(8, e), max(8, e)), PILImage.BILINEAR)
 
         # 이미지 크기 변경에 따른 keypoint 좌표 조정
         scale_x = self.heatmap_size[1] / original_size[0]
@@ -705,6 +792,8 @@ class PoseEstimationDataset(Dataset):
             'annotation_path': sample_info['annotation_path'],
             'camera_K': camera_K,
             'original_size': torch.tensor([original_size[0], original_size[1]], dtype=torch.float32),  # (W, H)
+            # RootNet depth prior in mm, ORIGINAL frame (pre-crop, pre-augment). 0 = undetermined.
+            'k_value': torch.tensor(k_value, dtype=torch.float32),
         }
 
         # Joint angles 포함 (있는 경우)

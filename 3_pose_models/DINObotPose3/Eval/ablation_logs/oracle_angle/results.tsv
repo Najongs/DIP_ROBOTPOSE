@@ -1,0 +1,4 @@
+oracle-angle	azure	base=[0.7881]	final=[0.7881]
+oracle-angle	realsense	base=[0.8673]	final=[0.8252]
+oracle-angle	kinect	base=[0.8673]	final=[0.8775]
+oracle-angle	orb	base=[0.8279]	final=[0.8306]

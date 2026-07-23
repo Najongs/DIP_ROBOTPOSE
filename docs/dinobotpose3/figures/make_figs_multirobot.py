@@ -31,7 +31,7 @@ def save(fig, name):
 # ---------------------------------------------------------------- fig7: 3-robot pose
 def fig7():
     robots = ["Panda", "KUKA iiwa7", "Baxter"]
-    pose = [0.804, 0.357, 0.253]                 # ADD-AUC@100mm
+    pose = [0.804, 0.6901, 0.7125]               # ADD-AUC@100mm (KUKA/Baxter: solver + true K, 2026-07-22)
     det  = [None, 0.735, 0.817]                # detector 2D keypoint AUC (synth); Panda n/a here
     cols = [C_REAL, C_SYN, C_SYN]
     fig, ax = plt.subplots(figsize=(7.2, 4.4))
@@ -46,14 +46,14 @@ def fig7():
                     fontsize=8.5, color="#444")
     # real | synthetic divider
     ax.axvline(0.5, color="#999", ls="--", lw=1.1)
-    ax.text(0.0, 0.90, "REAL\n(headline SOTA)", ha="center", va="center", fontsize=9,
+    ax.text(0.0, 0.94, "REAL\n(headline SOTA)", ha="center", va="center", fontsize=9,
             color=C_REAL, transform=ax.get_xaxis_transform(), fontweight="bold")
-    ax.text(1.5, 0.90, "SYNTHETIC-ONLY  (no render-compare)\nnot comparable to Panda real",
+    ax.text(1.5, 0.94, "SYNTHETIC-ONLY  (no render-compare)\ndifferent regime — not a robot-vs-robot ranking",
             ha="center", va="center", fontsize=9, color=C_SYN,
             transform=ax.get_xaxis_transform())
     ax.set_xticks(x); ax.set_xticklabels(robots, fontsize=12)
     ax.set_ylabel("pose ADD-AUC@100 mm  (↑)")
-    ax.set_ylim(0, 0.98); ax.set_axisbelow(True)
+    ax.set_ylim(0, 1.05); ax.set_axisbelow(True)
     ax.yaxis.grid(True, color="#eee", lw=0.8)
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)

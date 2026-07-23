@@ -50,13 +50,26 @@ Same-condition ablations on the locked 1000-frame held-out set, per-camera deplo
 - **RC design**: converges by ~150 iters (=deployed 250) → 250→150 cuts ~40% RC cost, no loss. RC signal is
   **entirely the silhouette-IoU term** (no-sil → base); reproj-anchor +0.002.
 - **Runtime (RTX 3090)**: backbone 19 ms, solver(250it) 352 ms, RC ~1.3 s → base ~2.4 fps, +RC ~0.6 fps.
-- **Cross-robot (direct-pose, synthetic-only, no RC)**: KUKA iiwa7 **0.357**, Baxter **0.253**; data-fit FK
-  (0.003 mm RMS, Baxter needs 40-start). Not comparable to Panda real (DREAM has real test only for Panda).
+- **Cross-robot (kinematic solver + TRUE K, synthetic-only, no RC)** — 🔴 **CORRECTED 2026-07-22**:
+  KUKA-DR **0.690**, KUKA-Photo **0.698**, Baxter-DR **0.713**; data-fit FK (0.003 mm RMS, Baxter needs
+  40-start). Not comparable to Panda real (DREAM has real test only for Panda), but directly comparable to
+  competitors' synthetic splits: **Baxter is 1st by a wide margin** (71.3 vs RoboTAG/HoRoPose 58.8,
+  RoboPEPP 34.4, RoboPose 32.7); KUKA is **within range** (69.0 vs 75–80).
+  ⚠️ The old **0.357 / 0.253 (direct-pose)** figures were an **intrinsics bug artifact**, NOT a method limit —
+  `camera_K=eye(3)` fallback fed the solver fx≈1.8 against a true 577/626 (**320x focal error**). See
+  [docs/dinobotpose3/experiments/2026-07-22_intrinsics_rootcause.md](../../docs/dinobotpose3/experiments/2026-07-22_intrinsics_rootcause.md).
+- 🔓 **OVERTURNED (not refuted): "no solver angle refinement for KUKA/Baxter."** That rule was inferred from a
+  solver that was being fed a broken camera. With true K the solver **beats direct-pose by +0.32 (KUKA) /
+  +0.44 (Baxter)**. **The solver path is the default for all three robots.** Residual KUKA tail
+  (fail 15.9%, p99 ~1012 mm) is **link-identity confusion**, a separate unsolved issue; Baxter's tail was the
+  bug itself (fail 24.7% → 8.0%).
 - Figs 1–11 (fig10 mesh overlay, fig11 occlusion ladder). Logs Eval/ablation_logs/*; EXPERIMENTS.md 07-14.
 - **Synthetic comparison (Table 4) + bbox CORRECTION (07-14)**: our synth ADD-AUC — Panda DR/photo (+RC)
-  **0.742/0.769**, KUKA **0.357/0.319**, Baxter DR **0.252** — TRAILS synth-specialized RoboPEPP (83/84)/
+  **0.742/0.769**, KUKA **0.690/0.698**, Baxter DR **0.713** (🔴 **KUKA/Baxter CORRECTED 2026-07-22**, was
+  0.357/0.319 and 0.252 — intrinsics bug, see above). Panda TRAILS synth-specialized RoboPEPP (83/84)/
   RoboPose on synth (their training-distribution home turf) but BEATS **HoRoPose\* (auto-bbox) 41/41** by
-  ~33 pts under matched predicted+auto protocol. 🔴 **RoboPEPP is auto-bbox, NOT GT** (Table2 Known-BBox=No;
+  ~33 pts under matched predicted+auto protocol. **Baxter now LEADS all competitors (71.3 vs 58.8);
+  KUKA is in range (69.0/69.8 vs 75–80)** — the old "trails on all synthetic robots" reading is dead. 🔴 **RoboPEPP is auto-bbox, NOT GT** (Table2 Known-BBox=No;
   real cols = our Table 1). Corrected paper+refs: RoboPEPP/RoboTAG = same auto protocol (fair win 0.804 vs
   0.780); GT-bbox = HoRoPose (collapses to ORB 0.098 under auto detector). Runtime T10 (feed-forward vs
   optimization). Synth logs Eval/synth_logs/SYNTH_comparison.txt.
@@ -113,8 +126,15 @@ do-no-harm on every adapted camera; realsense deployed 0.745 == the locked @1000
 7. **Rotation-head pseudo-label self-train** (2026-06-29, `selftrain_pseudo_rot.py`) — adapt the ROT head (not just angle) toward the solver's refined R\* on real; deployable self-bbox +0.011 rs / +0.007 orb / +0.007 kinect over the angle-only-selftrain head. The diagnosed R/gauge bottleneck, the only deployable realization of the gauge headroom (depth headroom stays single-view-unreachable).
 
 ## What was REFUTED (negative results, decisively)
-- **mlp_patch appearance angle head (Panda + Baxter wrist)**: k=3/k=5 patch head never beat plain mlp over 9 epochs → wrist under-determination is an **observability ceiling** (self-axis rotation doesn't move its own keypoint), not a detection/architecture failure. No crop-matched patch head exists → H2 arch comparison deferred as confounded.
-- **Baxter render-and-compare**: silhouette-depth + wrist-shape ambiguity degrades pose (77→204 mm) — RC helps Panda far-cams only.
+- **mlp_patch appearance angle head (Panda + Baxter wrist)**: k=3/k=5 patch head never beat plain mlp over 9 epochs. The **observation stands** — wrist angle is genuinely under-determined from keypoints (self-axis rotation doesn't move its own keypoint), and this is not a detection/architecture failure. No crop-matched patch head exists → H2 arch comparison deferred as confounded.
+  - 🔴 **BUT the causal inference drawn from it — "therefore the wrist observability ceiling is Baxter's pose bottleneck" — is REFUTED (2026-07-22).** Two independent reasons: (1) FK lever-arm arithmetic shows a 25° wrist error displaces its keypoint by only ~8 mm, so **perfectly fixing the wrist buys about +0.005 ADD-AUC**; (2) empirically, **fixing camera intrinsics alone took Baxter 0.2739 → 0.7125 and collapsed the failure rate 24.7% → 8.0%** — impossible if wrist observability were the binding constraint. Wrist observability is a real but **second-order** effect. Do not cite it as a pose-accuracy limit.
+- **Baxter render-and-compare**: silhouette-depth + wrist-shape ambiguity degrades pose (77→204 mm) — RC helps Panda far-cams only. ✅ **STILL VALID after the 2026-07-22 intrinsics fix**: the failure was separately diagnosed as **missing anchor/gate** (divergence on every frame), not a camera problem, and SAM masks were fine (IoU 0.82 ≈ Panda 0.85). Its relation to the K bug is **unmeasured** — treat as an independent result.
+- 🔴 **FREEZING head θ IN THE SOLVER — entire family REFUTED (2026-07-22)**. Three variants, all net-zero or worse:
+  - **global freeze** (`--freeze-head-theta`, θ=head, solve R,t only): DR 0.704→**0.533**, Photo 0.738→**0.561**. edge-gate (8px or oracle presence) changes nothing (0.531–0.532).
+  - **per-joint partial freeze** (freeze distal only, keep proximal free): net-zero.
+  - **frame-conditional freeze** (flip-trigger 2-pass, reproj τ=60px, freeze only high-residual frames): **+0.009** real, oracle per-frame ceiling only +0.027.
+  - **θ-anchor on the head prediction** (penalize deviation from head θ instead of hard freeze): net-zero to negative.
+  - **Root cause (why none of them can work):** freezing θ helps only where head θ is better than the solver's refined θ. But **head θ is bad in precisely the frames the solver is bad in** — the errors are correlated, not complementary — so anchoring to it pays the good-frame cost (good AUC 0.788→0.582 under global freeze, 89% of frames) without buying tail accuracy. The tail contributes ~0 to DREAM AUC anyway. **Do not re-attempt any "trust the head angle instead" scheme** without first showing head θ and solver θ err on *different* frames. See [p0_decoupled_solve](../../docs/dinobotpose3/experiments/2026-07-22_p0_decoupled_solve.md) and [gap_reexamination](../../docs/dinobotpose3/experiments/2026-07-22_gap_reexamination.md).
 - **conf-gate as a tuned peak**: sweep {0,.05,.10,.20}=0.747/0.745/0.746/0.749, flat ±0.002 — deployed 0.05 is a wide basin, not sensitive.
 - **union-bbox** (solved∪detected): −0.002 — self-bbox already encloses kp; the −0.04 vs GT-crop is oracle-zoom, not bbox defect.
 - **iterative crop-selftrain r2**: realsense plateau (+0.000) — head lever saturated.

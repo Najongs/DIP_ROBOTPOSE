@@ -1,0 +1,2 @@
+[mlpctrl_gf] ALL=0.7128  CLEAN(good,n=859)=0.7706  OFF(n=141)=0.3601  fail=9.8%
+       baseline(deployed mlp): ALL 0.704 / CLEAN 0.7884 / OFF 0.353  <- CLEAN is the decision metric

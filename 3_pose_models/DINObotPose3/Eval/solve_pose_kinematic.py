@@ -136,10 +136,28 @@ def p_to_theta(p, lo, hi):
 # ---------------------------------------------------------------------------
 # PnP initialization (single solve on FK(theta_init))
 # ---------------------------------------------------------------------------
-def pnp_init(kp_2d, kp_3d_robot, K, conf=None, conf_gate=0.0, min_kp=6, pnp_rel=0.0, pnp_drop=3):
+def border_mask(kp_2d, margin, img_size):
+    """Keypoints whose DECODED 2D position sits within `margin` px of (or outside) the image
+    border. A keypoint that has left the frame produces a heatmap peak PINNED to the border that
+    is confidently wrong — a sharp, high-confidence, geometrically bogus detection. `conf_gate`
+    filters on the confidence axis and so structurally cannot see these; the frame boundary is an
+    independent axis. kp_2d: (B,N,2) tensor or np, margin px, img_size px. Returns (B,N) bool."""
+    if isinstance(kp_2d, np.ndarray):
+        x, y = kp_2d[..., 0], kp_2d[..., 1]
+        return (x < margin) | (x > img_size - margin) | (y < margin) | (y > img_size - margin)
+    x, y = kp_2d[..., 0], kp_2d[..., 1]
+    return (x < margin) | (x > img_size - margin) | (y < margin) | (y > img_size - margin)
+
+
+def pnp_init(kp_2d, kp_3d_robot, K, conf=None, conf_gate=0.0, min_kp=6, pnp_rel=0.0, pnp_drop=3,
+             deprio=None):
     """
     Confidence-ranked PnP for a robust (R, t) initialization.
     kp_2d: (B,N,2) np, kp_3d_robot: (B,N,3) np, K: (B,3,3) np, conf: (B,N) np or None.
+    deprio: (B,N) bool np or None — keypoints pushed to the BACK of the confidence ranking
+            (border-pinned off-frame hallucinations). They are therefore excluded from the
+            top-k minimal init set, but remain available to the degeneracy fallback so a frame
+            can never be starved below 4 points.
 
     KEY EMPIRICAL FINDING (Eval/solve_sweep.py, strided 600 frames/cam): the cleaner the PnP
     INIT, the better the final pose — because the gradient refine uses ALL points to polish, so
@@ -156,7 +174,14 @@ def pnp_init(kp_2d, kp_3d_robot, K, conf=None, conf_gate=0.0, min_kp=6, pnp_rel=
     valid = np.zeros(B, dtype=bool)
     k0 = max(4, N - pnp_drop)  # smallest (cleanest) init set; grow on degeneracy
     for b in range(B):
-        order = np.argsort(-conf[b]) if conf is not None else np.arange(N)
+        if conf is not None:
+            rank_key = conf[b].astype(np.float64).copy()
+            if deprio is not None:
+                # push border-pinned keypoints below every real detection, order-preserving
+                rank_key[deprio[b]] -= 1e3
+            order = np.argsort(-rank_key)
+        else:
+            order = np.arange(N)
         for k in range(k0, N + 1):                     # top-k, fall back to more pts if invalid
             sel = order[:k]
             p3 = kp_3d_robot[b][sel].astype(np.float64)
@@ -219,7 +244,9 @@ def solve_batch(kp_2d, conf, K, fix_joint7=True, iters=250, lr=5e-2,
                 img_size=512, device='cuda', prior_w=2e-3, theta_init=None,
                 conf_gate=0.0, anchor_init_w=0.0, min_kp=6, pnp_rel=0.0, pnp_drop=3,
                 R_init=None, t_init=None, gt_tz=None, depth_w=0.0, return_pose=False,
-                cov_inv=None, prior_adaptive=0.0, freeze_theta=False):
+                cov_inv=None, prior_adaptive=0.0, freeze_theta=False,
+                border_margin=0.0, resolve_reproj_thr=0.0, resolve_drops=(0, 1, 2),
+                _resolve_stats=None):
     """
     kp_2d: (B,N,2) tensor, conf: (B,N) tensor, K: (B,3,3) tensor.
     theta_init: optional (B,7) tensor — learned-prediction init (refinement mode).
@@ -236,6 +263,17 @@ def solve_batch(kp_2d, conf, K, fix_joint7=True, iters=250, lr=5e-2,
                         the reprojection residual becomes a Mahalanobis (whitened) distance, so
                         diffuse/ambiguous heatmaps are down-weighted CONTINUOUSLY per-direction
                         (upgrade of the scalar-conf weighting; conf_gate still composes).
+      border_margin>0 : BORDER gate (off by default). Keypoints decoded within this many px of the
+                        image border are treated as off-frame hallucinations: pushed out of the
+                        minimal-set PnP init and zero-weighted in the refine. Orthogonal to
+                        conf_gate — a border-pinned peak is SHARP (high conf) but wrong, so the
+                        confidence axis cannot reject it.
+      resolve_reproj_thr>0 : MULTI-START re-solve (off by default). Frames whose solved
+                        reprojection exceeds this many px are re-solved from several alternative
+                        PnP inits (grown/shrunk minimal sets, `resolve_drops`). A candidate is
+                        adopted ONLY if it lowers the solver's own reprojection residual — the
+                        same structural do-no-harm guard used for the refine below, so a re-solve
+                        can never make a frame worse by the solver's own measure.
     Returns theta (B,7), kp_cam (B,N,3), reproj_px (B,).
     """
     B, N = kp_2d.shape[:2]
@@ -253,9 +291,13 @@ def solve_batch(kp_2d, conf, K, fix_joint7=True, iters=250, lr=5e-2,
         theta0[:, 6] = 0.0
     theta0 = torch.max(torch.min(theta0, hi), lo)  # clamp into limits
     fk0 = panda_forward_kinematics(theta0)  # (B,N,3) robot frame
+    # BORDER gate: computed on the DECODED 2d, before the PnP init (the init is what the
+    # off-frame trigger breaks; the existing divergence guard cannot recover a bad init).
+    bmask = border_mask(kp_2d, border_margin, img_size) if border_margin > 0 else None
     R0, t0, _ = pnp_init(kp_2d.cpu().numpy(), fk0.detach().cpu().numpy(),
                          K.cpu().numpy(), conf.cpu().numpy(), conf_gate=conf_gate,
-                         min_kp=min_kp, pnp_rel=pnp_rel, pnp_drop=pnp_drop)
+                         min_kp=min_kp, pnp_rel=pnp_rel, pnp_drop=pnp_drop,
+                         deprio=bmask.cpu().numpy() if bmask is not None else None)
     R0 = torch.from_numpy(R0).to(device, dtype)
     t0 = torch.from_numpy(t0).to(device, dtype)
     # Optional learned/oracle pose init to escape the far-camera rotation-basin ambiguity
@@ -290,6 +332,16 @@ def solve_batch(kp_2d, conf, K, fix_joint7=True, iters=250, lr=5e-2,
             topk.scatter_(1, rank[:, :min_kp], True)
             keep = keep | topk
         base_w = base_w * keep.to(base_w.dtype)
+    if bmask is not None:
+        # zero-weight border-pinned keypoints in the refine too, with the same top-min_kp floor
+        # used by conf_gate so a frame is never starved into a degenerate fit.
+        bkeep = ~bmask
+        if min_kp > 0:
+            rank = torch.argsort(conf, dim=1, descending=True)
+            topk = torch.zeros_like(bkeep)
+            topk.scatter_(1, rank[:, :min_kp], True)
+            bkeep = bkeep | topk
+        base_w = base_w * bkeep.to(base_w.dtype)
     base_w = base_w / base_w.sum(dim=1, keepdim=True).clamp(min=1e-6)  # (B,N)
     theta_init_p = theta0.detach().clone()  # anchor target = learned init (post-clamp)
     w = base_w.clone()
@@ -370,6 +422,50 @@ def solve_batch(kp_2d, conf, K, fix_joint7=True, iters=250, lr=5e-2,
             reproj_px[worse] = reproj_init[worse]
             R[worse] = R0m[worse]
             t_out[worse] = t0[worse]
+
+    # --- Multi-start / grown-set re-solve on frames flagged by high solved reprojection ---
+    # The diagnosed failure is a WRONG-BASIN init, which the guard above cannot repair (it can
+    # only fall back to that same broken init). So re-run the whole solve from alternative PnP
+    # inits: each candidate uses a different minimal-set size and, crucially, does NOT take the
+    # learned R_init override — so candidates can land in genuinely different rotation basins.
+    if resolve_reproj_thr > 0.0 and not freeze_theta:
+        flagged = reproj_px > resolve_reproj_thr
+        nflag = int(flagged.sum())
+        if _resolve_stats is not None:
+            _resolve_stats['flagged'] = _resolve_stats.get('flagged', 0) + nflag
+            _resolve_stats['total'] = _resolve_stats.get('total', 0) + B
+        if nflag > 0:
+            idx = flagged.nonzero(as_tuple=True)[0]
+            adopted = torch.zeros(len(idx), dtype=torch.bool, device=device)
+
+            def _sub(x):
+                return None if x is None else x[idx]
+
+            for drop in resolve_drops:
+                th_c, kc_c, rp_c, R_c, t_c = solve_batch(
+                    kp_2d[idx], conf[idx], K[idx], fix_joint7=fix_joint7, iters=iters, lr=lr,
+                    img_size=img_size, device=device, prior_w=prior_w,
+                    theta_init=theta0[idx], conf_gate=conf_gate, anchor_init_w=anchor_init_w,
+                    min_kp=min_kp, pnp_rel=pnp_rel, pnp_drop=drop,
+                    R_init=None, t_init=None, gt_tz=_sub(gt_tz), depth_w=depth_w,
+                    return_pose=True, cov_inv=_sub(cov_inv),
+                    prior_adaptive=prior_adaptive, freeze_theta=False,
+                    border_margin=border_margin, resolve_reproj_thr=0.0)
+                # STRUCTURAL do-no-harm: adopt ONLY where the candidate lowers the solver's own
+                # reprojection residual. Never adopt a worse-reprojection solution.
+                with torch.no_grad():
+                    better = rp_c < reproj_px[idx]
+                    if better.any():
+                        gi = idx[better]
+                        theta[gi] = th_c[better]
+                        kp_cam[gi] = kc_c[better]
+                        reproj_px[gi] = rp_c[better]
+                        R[gi] = R_c[better]
+                        t_out[gi] = t_c[better]
+                        adopted |= better
+            if _resolve_stats is not None:
+                _resolve_stats['adopted'] = _resolve_stats.get('adopted', 0) + int(adopted.sum())
+
     if return_pose:
         return theta.detach(), kp_cam.detach(), reproj_px.detach(), R.detach(), t_out.detach()
     return theta.detach(), kp_cam.detach(), reproj_px.detach()

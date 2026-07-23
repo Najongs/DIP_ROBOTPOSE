@@ -112,6 +112,9 @@ def main():
     ap.add_argument('--reproj-keep', type=float, default=0.0)
     ap.add_argument('--crop', action='store_true')
     ap.add_argument('--crop-margin', type=float, default=1.5)
+    ap.add_argument('--crop-aspect', type=float, default=1.0,
+                    help='crop rect w/h. 1.0=legacy square. Set to the deploy frame aspect '
+                         '(640x480 -> 1.3333) to match Eval/selfbbox_eval.py roi_align crops.')
     ap.add_argument('--epochs', type=int, default=10)
     ap.add_argument('--lr', type=float, default=3e-4)
     ap.add_argument('--rot-lambda', type=float, default=1.0, help='weight on the chordal rot loss toward solver R*')
@@ -136,6 +139,7 @@ def main():
                                       heatmap_size=(args.image_size, args.image_size),
                                       augment=False, include_angles=True, sigma=2.5,
                                       crop_to_robot=args.crop, crop_margin=args.crop_margin,
+                                      crop_aspect=args.crop_aspect,
                                       norm_mean=norm_mean, norm_std=norm_std)
     N = len(real_full.samples); cut = int(args.adapt_frac * N)
     adapt_idx = list(range(cut)); eval_idx = list(range(cut, N))
@@ -178,6 +182,7 @@ def main():
                                   heatmap_size=(args.image_size, args.image_size),
                                   augment=True, aug_level='strong', include_angles=True, sigma=2.5,
                                   crop_to_robot=args.crop, crop_margin=args.crop_margin,
+                                  crop_aspect=args.crop_aspect,
                                   norm_mean=norm_mean, norm_std=norm_std)
     pseudo_loader = DataLoader(Subset(real_wrap, kept), batch_size=args.batch_size, shuffle=True,
                                num_workers=8, pin_memory=True, drop_last=True)

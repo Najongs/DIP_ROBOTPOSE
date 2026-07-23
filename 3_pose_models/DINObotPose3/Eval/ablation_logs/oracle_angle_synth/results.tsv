@@ -1,0 +1,4 @@
+photo	pred	base=[0.7377]	RC=[0.7986]
+dr	pred	base=[0.7040]	RC=[0.7691]
+photo	oracle	base=[0.8687]	RC=[0.8965]
+dr	oracle	base=[0.8610]	RC=[0.8860]

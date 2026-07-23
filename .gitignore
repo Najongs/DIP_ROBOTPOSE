@@ -32,6 +32,14 @@ DINOv3/
 *.csv
 *.tiff
 
+#other repo
+
+RoboPEPP/
+DREAM/
+CtRNet-X/
+Holistic-Robot-Pose-Estimation/
+
+
 # Training / evaluation outputs (regenerable)
 wandb/
 outputs/

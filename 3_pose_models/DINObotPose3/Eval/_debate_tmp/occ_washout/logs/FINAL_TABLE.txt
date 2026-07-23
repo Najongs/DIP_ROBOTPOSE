@@ -1,0 +1,19 @@
+=== FINAL A/B OCCLUSION SWEEP (pose-stage ADD-AUC@100mm, RoboPEPP protocol, synth_photo) ===
+
+200-frame:
+  ratio   A(deployed)  B(pure)    A-B
+  0%      0.7591       0.7448     +0.0143
+  20%     0.6245       0.6306     -0.0061
+  40%     0.3956       0.3938     +0.0018
+
+1000-frame (tighter, primary):
+  ratio   A(deployed)  B(pure)    A-B    A_ret%   B_ret%
+  0%	0.7405	0.7330	+0.0075	100.0	100.0
+  20%	0.6194	0.6148	+0.0046	83.6	83.9
+  40%	0.3910	0.3823	+0.0087	52.8	52.2
+  clean->40% absolute drop:  A=0.3495  B=0.3507
+
+Reference anchors (07-05 internal bench, 200f, pose-stage):
+  base head (NO occ-aug):        0.753 / 0.610 / 0.376
+  light head (occ-aug,no selftr):0.758 / 0.620 / 0.420
+  RoboPEPP (competitor):         0.795 / 0.600 / 0.351

@@ -1,0 +1,3 @@
+oracle_all	ADD-AUC=0.8607
+oracle_except_J5	ADD-AUC=0.8180
+oracle_except_J5J6	ADD-AUC=0.7542

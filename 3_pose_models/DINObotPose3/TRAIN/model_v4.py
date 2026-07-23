@@ -2,7 +2,7 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from transformers import AutoModel
+from transformers import AutoModel, AutoConfig
 from torchvision.ops import roi_align
 import numpy as np
 import cv2
@@ -322,36 +322,71 @@ def windowed_soft_argmax_2d(heatmaps, temperature=100.0, win=15):
     return torch.stack([x, y], dim=-1)
 
 class DINOv3Backbone(nn.Module):
-    def __init__(self, model_name, unfreeze_blocks=2):
+    def __init__(self, model_name, unfreeze_blocks=2, pretrained=True):
         super().__init__()
         self.model_name = model_name
-        self.model = AutoModel.from_pretrained(model_name)
+        # pretrained=False -> random-init (from-scratch) baseline: same ViT-B/16 architecture,
+        # random weights (AutoModel.from_config bypasses downloaded checkpoints).
+        if pretrained:
+            self.model = AutoModel.from_pretrained(model_name)
+        else:
+            cfg = AutoConfig.from_pretrained(model_name)
+            self.model = AutoModel.from_config(cfg)
+
+        if not pretrained:
+            # random-init control. unfreeze_blocks<=0 -> FROZEN random backbone (head-only,
+            # parameter-matched control). Otherwise the ENTIRE backbone trains (embeddings + all
+            # blocks) — from-scratch needs patch/pos/CLS trainable too.
+            full = unfreeze_blocks > 0
+            for param in self.model.parameters():
+                param.requires_grad = full
+            msg = "full backbone trainable (from-scratch)" if full else "FROZEN random backbone (head-only)"
+            print(f"  [DINOv3Backbone] random-init ({model_name}): {msg}")
+            return
 
         # Freeze backbone parameters
         for param in self.model.parameters():
             param.requires_grad = False
-            
-        # Unfreeze last N blocks for fine-tuning
+
+        # Unfreeze last N blocks for fine-tuning.
+        #   DINOv3:     model.encoder.layers  or  model.blocks
+        #   SigLIP2:    model.vision_model.encoder.layers
+        #   plain ViT:  model.encoder.layer   (singular — google/vit)
         if unfreeze_blocks > 0:
-            if hasattr(self.model, "encoder") and hasattr(self.model.encoder, "layers"):
+            layers = None
+            vt = getattr(self.model, "vision_model", self.model)
+            if hasattr(vt, "encoder") and hasattr(vt.encoder, "layers"):
+                layers = vt.encoder.layers
+            elif hasattr(self.model, "encoder") and hasattr(self.model.encoder, "layers"):
                 layers = self.model.encoder.layers
-                for i in range(len(layers) - unfreeze_blocks, len(layers)):
-                    for param in layers[i].parameters():
-                        param.requires_grad = True
+            elif hasattr(self.model, "encoder") and hasattr(self.model.encoder, "layer"):
+                layers = self.model.encoder.layer
+            elif hasattr(self.model, "layer"):
+                layers = self.model.layer          # DINOv3 (transformers 5.x: model.layer ModuleList)
             elif hasattr(self.model, "blocks"):
                 layers = self.model.blocks
+            if layers is not None:
                 for i in range(len(layers) - unfreeze_blocks, len(layers)):
                     for param in layers[i].parameters():
                         param.requires_grad = True
+                print(f"  [DINOv3Backbone] unfroze last {unfreeze_blocks}/{len(layers)} blocks")
+            else:
+                print("  [DINOv3Backbone] WARNING: could not locate encoder layers to unfreeze")
 
     def forward(self, image_tensor_batch):
+        model_type = getattr(self.model.config, "model_type", "")
         if "siglip" in self.model_name:
             # SigLIP/SigLIP2 vision tower returns ALL patch tokens, no CLS/register tokens
             # (verified: siglip2-base-patch16-512 -> (B,1024,768), a perfect 32x32 grid).
             vt = getattr(self.model, "vision_model", self.model)
             outputs = vt(pixel_values=image_tensor_batch, interpolate_pos_encoding=True)
             patch_tokens = outputs.last_hidden_state
-        else: # DINOv3 계열
+        elif model_type == "vit":
+            # plain HF ViT (supervised google/vit or random-init): trained at 384, our input is
+            # 512 -> MUST interpolate pos-embed. CLS at index 0, no register tokens.
+            outputs = self.model(pixel_values=image_tensor_batch, interpolate_pos_encoding=True)
+            patch_tokens = outputs.last_hidden_state[:, 1:, :]
+        else: # DINOv3 계열 (interpolates pos-embed internally)
             outputs = self.model(pixel_values=image_tensor_batch)
             tokens = outputs.last_hidden_state
             num_reg = int(getattr(self.model.config, "num_register_tokens", 0))
@@ -569,6 +604,75 @@ def baxter_left_forward_kinematics(joint_angles):
         cumul = cumul @ fixed[i].unsqueeze(0) @ R_joint
         keypoints.append(cumul[:, :3, 3])
     return torch.stack(keypoints, dim=1)
+
+
+# =====================================================================================
+# Baxter WHOLE-BODY (17-keypoint) FK — matches the DREAM baxter benchmark keypoint set
+#   torso_t0, left_{s0,s1,e0,e1,w0,w1,w2}, left_hand, right_{s0..w2}, right_hand
+# Fixed joint transforms FIT to DREAM baxter synth data (per-arm 40-start scipy LM + joint
+# polish; Eval/baxter_fullbody_fk_fit.py) — reproduces ALL 17 GT `location`s to 0.012mm RMS
+# (max 0.05mm) on 400 held-out AND 400 test frames. Left/right arms fit standalone (8 kp incl.
+# hand); the right chain is placed into the left gauge by a fixed rigid _BAXTER_FB_BR; torso is
+# a fixed point _BAXTER_FB_TORSO. Positions exact (solver/PnP ready); intermediate frame
+# orientations are gauge. w2 (both arms) does NOT move any keypoint — the hand offset is a pure
+# +z (on the w2 roll axis) — so w2 is UNOBSERVABLE and fixed to 0 (the head predicts 12 joints:
+# left {s0,s1,e0,e1,w0,w1} + right {s0,s1,e0,e1,w0,w1}).
+_BAXTER_FB_LEFT = [
+    {'xyz': (0.256262, -0.057765, 0.355434), 'rpy': (1.159134, 1.266669, -0.852888)},
+    {'xyz': (0.035532, -0.059149, 0.270350), 'rpy': (2.060004, -1.570803, 1.622546)},
+    {'xyz': (0.000001, 0.101999, 0.000000), 'rpy': (1.655866, 1.570753, -3.056536)},
+    {'xyz': (0.000003, 0.069002, 0.262419), 'rpy': (1.570768, 2.594572, 4.712341)},
+    {'xyz': (-0.053881, -0.088475, -0.000002), 'rpy': (-1.570753, 2.095780, 2.594614)},
+    {'xyz': (0.005012, 0.008656, 0.270700), 'rpy': (1.570901, 1.074047, -2.095684)},
+    {'xyz': (-0.101958, 0.055269, -0.000004), 'rpy': (1.570729, 2.130766, -2.067601)},
+    {'xyz': (0.000000, 0.000001, 0.113550), 'rpy': (0.000000, 0.000000, 0.000000)},
+]
+_BAXTER_FB_RIGHT = [
+    {'xyz': (-0.154570, 0.020230, 0.279668), 'rpy': (1.540141, -0.110858, -0.110573)},
+    {'xyz': (-0.052109, -0.045225, 0.270351), 'rpy': (1.570804, 3.408976, 0.714787)},
+    {'xyz': (0.098375, 0.026949, -0.000000), 'rpy': (1.570793, -0.147431, 1.838170)},
+    {'xyz': (0.068253, -0.010138, 0.262420), 'rpy': (1.570740, -2.423445, 2.994206)},
+    {'xyz': (0.068161, -0.078005, -0.000005), 'rpy': (-1.570591, 1.796742, -2.423234)},
+    {'xyz': (0.002240, 0.009743, 0.270700), 'rpy': (1.570821, -0.836442, -1.796748)},
+    {'xyz': (0.086085, 0.077715, -0.000002), 'rpy': (1.570789, -4.251388, -3.978034)},
+    {'xyz': (0.000003, 0.000000, 0.113550), 'rpy': (1.072065, 0.924819, 0.724986)},
+]
+_BAXTER_FB_BR = {'xyz': (0.010167, 0.118766, 0.715264), 'rpy': (1.415203, 1.577114, 0.926216)}
+_BAXTER_FB_TORSO = (0.376135, 0.061497, 0.599164)
+# 12 observable joints: [left s0,s1,e0,e1,w0,w1 | right s0,s1,e0,e1,w0,w1]. (w2 fixed 0.)
+_BAXTER_FB_JOINT_LIMITS = [(-1.7016, 1.7016), (-2.147, 1.047), (-3.0541, 3.0541),
+                           (-0.05, 2.618), (-3.059, 3.059), (-1.5707, 2.094)] * 2
+
+
+def _baxter_arm_chain(angles7, fixed_list):
+    """angles7: (B,7) rad (s0..w2). fixed_list: 8 transforms. -> (B,8,3) keypoints (s0..w2, hand)."""
+    B = angles7.shape[0]; device, dtype = angles7.device, angles7.dtype
+    fixed = [torch.tensor(_make_transform(j['xyz'], j['rpy']), device=device, dtype=dtype) for j in fixed_list]
+    cumul = torch.eye(4, device=device, dtype=dtype).unsqueeze(0).expand(B, -1, -1)
+    pts = []
+    for i in range(7):
+        R_joint = torch.eye(4, device=device, dtype=dtype).unsqueeze(0).expand(B, -1, -1).clone()
+        R_joint[:, :3, :3] = _rotation_matrix_z(angles7[:, i])
+        cumul = cumul @ fixed[i].unsqueeze(0) @ R_joint
+        pts.append(cumul[:, :3, 3])
+    pts.append((cumul @ fixed[7].unsqueeze(0))[:, :3, 3])   # hand (fixed, no joint)
+    return torch.stack(pts, dim=1)
+
+
+def baxter_forward_kinematics(joint_angles):
+    """joint_angles: (B,12) rad = [left s0,s1,e0,e1,w0,w1 | right s0,s1,e0,e1,w0,w1] ->
+    (B,17,3) robot-frame keypoints in DREAM baxter order
+    [torso_t0, left_s0..left_w2, left_hand, right_s0..right_w2, right_hand]. w2 fixed 0."""
+    B = joint_angles.shape[0]; device, dtype = joint_angles.device, joint_angles.dtype
+    z = torch.zeros(B, 1, device=device, dtype=dtype)
+    left7 = torch.cat([joint_angles[:, :6], z], dim=1)      # w2 = 0
+    right7 = torch.cat([joint_angles[:, 6:12], z], dim=1)
+    left8 = _baxter_arm_chain(left7, _BAXTER_FB_LEFT)        # (B,8,3) left gauge (common frame)
+    right8 = _baxter_arm_chain(right7, _BAXTER_FB_RIGHT)     # (B,8,3) right standalone gauge
+    BR = torch.tensor(_make_transform(_BAXTER_FB_BR['xyz'], _BAXTER_FB_BR['rpy']), device=device, dtype=dtype)
+    right8 = torch.einsum('ij,bnj->bni', BR[:3, :3], right8) + BR[:3, 3]   # place into common frame
+    torso = torch.tensor(_BAXTER_FB_TORSO, device=device, dtype=dtype).view(1, 1, 3).expand(B, 1, 3)
+    return torch.cat([torso, left8, right8], dim=1)          # (B,17,3)
 
 
 class DirectJointAngleHead(nn.Module):
