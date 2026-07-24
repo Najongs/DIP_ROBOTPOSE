@@ -1,0 +1,149 @@
+<?xml version="1.0"?>
+<!--
+  FR5 v6 body-only model for DINObotPose3 rendering and RC.
+
+  Kinematic dimensions follow the FR5 v6 mesh package and the project FK:
+    d1=0.152, a2=-0.425, a3=-0.395, d4=0.1021, d5=0.102 m.
+  The borrowed gripper/end-effector is intentionally excluded. The project FK's
+  final 0.100 m flange/keypoint offset is handled by robot_fk.py, not by a mesh.
+-->
+<robot name="fr5v6_no_ee">
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <mesh filename="../meshes/fr5v6/visual/base_link.DAE"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="../meshes/fr5v6/collision/base_link.STL"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="j1_Link">
+    <visual>
+      <geometry>
+        <mesh filename="../meshes/fr5v6/visual/j1_Link.DAE"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="../meshes/fr5v6/collision/j1_Link.STL"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="j2_Link">
+    <visual>
+      <geometry>
+        <mesh filename="../meshes/fr5v6/visual/j2_Link.DAE"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="../meshes/fr5v6/collision/j2_Link.STL"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="j3_Link">
+    <visual>
+      <geometry>
+        <mesh filename="../meshes/fr5v6/visual/j3_Link.DAE"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="../meshes/fr5v6/collision/j3_Link.STL"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="j4_Link">
+    <visual>
+      <geometry>
+        <mesh filename="../meshes/fr5v6/visual/j4_Link.DAE"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="../meshes/fr5v6/collision/j4_Link.STL"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="j5_Link">
+    <visual>
+      <geometry>
+        <mesh filename="../meshes/fr5v6/visual/j5_Link.DAE"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="../meshes/fr5v6/collision/j5_Link.STL"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="j6_Link">
+    <visual>
+      <geometry>
+        <mesh filename="../meshes/fr5v6/visual/j6_Link.DAE"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="../meshes/fr5v6/collision/j6_Link.STL"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="j1" type="revolute">
+    <parent link="base_link"/>
+    <child link="j1_Link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.0543" upper="3.0543" effort="150" velocity="3.15"/>
+  </joint>
+
+  <joint name="j2" type="revolute">
+    <parent link="j1_Link"/>
+    <child link="j2_Link"/>
+    <origin xyz="0 0 0.152" rpy="1.5707963267948966 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-4.6251" upper="1.4835" effort="150" velocity="3.15"/>
+  </joint>
+
+  <joint name="j3" type="revolute">
+    <parent link="j2_Link"/>
+    <child link="j3_Link"/>
+    <origin xyz="-0.425 0 0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-2.7925" upper="2.7925" effort="150" velocity="3.15"/>
+  </joint>
+
+  <joint name="j4" type="revolute">
+    <parent link="j3_Link"/>
+    <child link="j4_Link"/>
+    <origin xyz="-0.39501 0 0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-4.6251" upper="1.4835" effort="28" velocity="3.2"/>
+  </joint>
+
+  <joint name="j5" type="revolute">
+    <parent link="j4_Link"/>
+    <child link="j5_Link"/>
+    <origin xyz="0 0 0.1021" rpy="1.5707963267948966 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.0543" upper="3.0543" effort="28" velocity="3.2"/>
+  </joint>
+
+  <joint name="j6" type="revolute">
+    <parent link="j5_Link"/>
+    <child link="j6_Link"/>
+    <origin xyz="0 0 0.102" rpy="-1.5707963267948966 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.0543" upper="3.0543" effort="28" velocity="3.2"/>
+  </joint>
+</robot>
